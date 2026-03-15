@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" fill="none">
+  <!-- CE Monogram -->
+  <rect x="0" y="4" width="40" height="40" rx="8" fill="#059669"/>
+  <text x="20" y="32" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="white" letter-spacing="-1">CE</text>
+  <!-- Wordmark -->
+  <text x="52" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" fill="white" letter-spacing="-0.5">CALCUTTA</text>
+  <text x="52" y="40" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="300" fill="#34d399" letter-spacing="3">EDGE</text>
+</svg>

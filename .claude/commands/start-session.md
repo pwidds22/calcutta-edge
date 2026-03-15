@@ -17,8 +17,8 @@ Current branch:
 
 ## Instructions
 1. Read `CLAUDE.md` for project conventions, architecture, and anti-patterns
-2. Read the "Session Notes" section at the bottom of `CLAUDE.md` for current state
-3. Check `TODO.md` and `FUTURE_IMPROVEMENTS.md` for pending work
+2. Read memory files in `~/.claude/projects/*/memory/MEMORY.md` for session continuity
+3. Check `TODO.md` and `ROADMAP.md` for pending work
 4. Summarize: current state, what was last worked on, suggested next task
 
 ## Check for Feedback
@@ -27,7 +27,9 @@ If the user mentions feedback or bugs:
 - Fix any issues identified before starting new work
 
 ## Project Quick Reference
-- **Dev server**: `npm run dev` (port 5000)
-- **Production**: Vercel at calcuttaedge.com (legacy still on Render)
-- **Stack**: Express + MongoDB + Stripe + JWT auth
-- **Critical**: Webhook route must be before `express.json()` in server.js
+- **Dev server**: `cd v2 && npm run dev` (port 3000)
+- **Tests**: `cd v2 && npm test` (Vitest, 41 tests)
+- **Build**: `cd v2 && npm run build`
+- **Production**: Vercel at calcuttaedge.com (auto-deploys on push to main)
+- **Stack**: Next.js 16 + Supabase + Stripe + Vercel
+- **Supabase MCP**: Available for DB operations (execute_sql, etc.)

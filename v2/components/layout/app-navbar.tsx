@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { logout } from '@/actions/auth'
+import Image from 'next/image'
 import { Menu, X, TrendingUp, User, LogOut, Radio } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,11 +23,8 @@ export function AppNavbar() {
     <nav className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between px-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500">
-            <span className="text-[11px] font-bold tracking-tight text-white font-mono">CE</span>
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-white">Calcutta Edge</span>
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/logo.svg" alt="Calcutta Edge" width={160} height={32} priority />
         </Link>
 
         {/* Desktop nav links */}

@@ -36,7 +36,10 @@ function ProfitCell({
       >
         {formatCurrency(profit)}
       </div>
-      <div className="text-[10px] text-muted-foreground tabular-nums">
+      <div
+        className="text-[10px] text-muted-foreground tabular-nums cursor-help"
+        title={`${formatPercent(odds)} chance to reach this round\n${formatPercent(roundValue)} of pot value from this round`}
+      >
         {formatPercent(odds)} ({formatPercent(roundValue)})
       </div>
     </TableCell>

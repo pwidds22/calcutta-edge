@@ -13,6 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  icons: {
+    icon: '/logo-icon.svg',
+    apple: '/logo-icon.svg',
+  },
   title: "Calcutta Edge — The Calcutta Auction Platform | Free Hosting + Strategy Analytics",
   description:
     "Host your Calcutta auction for free with real-time bidding, countdown timers, and commissioner controls. Upgrade to strategy analytics with devigged odds, fair values, and profit projections. $29.99/event.",

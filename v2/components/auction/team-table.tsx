@@ -146,6 +146,11 @@ export function TeamTable() {
         </span>
       </div>
 
+      {/* Legend for sub-values */}
+      <p className="text-[11px] text-muted-foreground">
+        Each round column shows <span className="text-emerald-400">profit</span>/<span className="text-red-400">loss</span> if the team reaches that round. Below: <span className="text-white/70">odds to reach round</span> (<span className="text-white/70">% of pot value</span>). Hover for details.
+      </p>
+
       {/* Data table */}
       <div className="overflow-x-auto rounded-md border">
         <Table>

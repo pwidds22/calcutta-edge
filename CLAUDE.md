@@ -1,904 +1,138 @@
 # Calcutta Edge - Claude Code Context
 
 ## Project Overview
-Calcutta Edge (calcuttaedge.com) is a Calcutta auction platform — combining strategy analytics with live auction hosting. Users get fair value calculations, bid recommendations, round-by-round profit projections, and (soon) real-time auction hosting.
+Calcutta Edge (calcuttaedge.com) is a Calcutta auction platform — free live auction hosting + paid strategy analytics ($29.99/event). Supports March Madness, golf majors, NFL playoffs, and custom tournaments.
 
-**Target market**: Calcutta auction participants across March Madness, golf majors, NFL playoffs, and more. Affluent, analytically-minded audience with $500-$100K+ at stake per pool.
+**Business model**: Free hosting (distribution flywheel) + paid strategy ($29.99/event) + custom solutions ($200-500+)
 
-**Business model**: Free hosting (distribution) + paid strategy analytics ($29.99/event) + commissioner premium ($99-149/yr)
-
-See `ROADMAP.md` for the full product strategy, phased build plan, and revenue targets.
-
-## Current Status: Rebuilding for March Madness 2026
-
-**Old stack** (legacy, still live on Render): Node.js + Express, MongoDB/Mongoose, Stripe, JWT auth, vanilla JS
-**New stack** (building now): Next.js 15 (App Router, TypeScript), Supabase (auth + DB + real-time), Stripe, Vercel
-
-### New Stack Quick Start
+## Quick Start
 ```bash
-npm run dev     # Next.js dev server (port 3000)
-npm run build   # Production build
-npm run lint    # ESLint
+cd v2
+npm run dev       # Next.js dev server (port 3000)
+npm run build     # Production build (run before deploy)
+npm test          # Vitest unit tests (41 tests)
+npm run lint      # ESLint
 ```
 
-### Required Environment Variables (New Stack)
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (server-side only, for webhooks)
-- `STRIPE_SECRET_KEY` - Stripe secret key
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
+## Stack
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16 (App Router, TypeScript, Tailwind CSS, shadcn/ui) |
+| Hosting | Vercel — auto-deploys on push to `main` |
+| Database | Supabase PostgreSQL (project: `xtkdwyrxllqmgoedfotf`, us-east-1) |
+| Auth | Supabase Auth (`@supabase/ssr`, cookie-based sessions) |
+| Real-time | Supabase Realtime (Broadcast + Presence for live auctions) |
+| Payments | Stripe (Payment Links + webhooks) |
 
----
+## Required Environment Variables
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase client
+- `SUPABASE_SERVICE_ROLE_KEY` — server-side only (webhooks, admin operations)
+- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Stripe server-side
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` / `NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL` — Stripe client-side
+- `NEXT_PUBLIC_SITE_URL` — for password reset emails (set to `https://calcuttaedge.com`)
 
-## New Architecture
-
-### Tech Stack
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Frontend | Next.js 15+ (App Router, TypeScript) | SSR, server actions, file-based routing |
-| Styling | Tailwind CSS + shadcn/ui | Rapid UI development, consistent design |
-| Hosting | Vercel | First-party Next.js support, serverless (pay for seasonal use) |
-| Database | Supabase PostgreSQL | Auth + DB + real-time in one, RLS for security |
-| Auth | Supabase Auth (`@supabase/ssr`) | Cookie-based sessions, middleware route protection |
-| Real-time | Supabase Realtime | Broadcast + Presence for live auctions |
-| Payments | Stripe | Payment Links + webhooks (same as before, cleaner integration) |
-| Blog | MDX / next-mdx-remote | Markdown blog with React components |
-
-### Database Schema (Supabase PostgreSQL)
-```sql
--- profiles: extends Supabase auth.users
-profiles: id (uuid FK auth.users), email, has_paid, payment_date, created_at
-
--- auction_data: per-user per-event auction state
-auction_data: id, user_id (FK profiles), teams (jsonb), payout_rules (jsonb),
-              estimated_pot_size, event_type, updated_at
+## Key Directories
+```
+v2/                         # Next.js app (root dir on Vercel)
+  app/                      # App Router pages and layouts
+    (auth)/                 # Login, register, forgot/reset password
+    (protected)/            # Auth-required pages
+      auction/              # Strategy tool (free preview + paid full access)
+      host/                 # Commissioner: dashboard, create, manage sessions
+      join/                 # Join live auction by code
+      live/[sessionId]/     # Live auction participant view
+      profile/              # User profile + upgrade CTA
+      payment/              # Stripe payment page
+    api/webhooks/stripe/    # Stripe webhook handler
+  lib/
+    calculations/           # Core math: odds, values, profits, pot, normalize (41 tests)
+    tournaments/            # Tournament configs, registry, payout presets
+    auction/                # Strategy state (useReducer + Context + auto-save)
+    auction/live/           # Live auction: types, timer, channel, settlement, export
+    supabase/               # Client helpers: client, server, middleware, admin, broadcast
+    stripe/                 # Stripe config (lazy init)
+  components/
+    auction/                # Strategy tool UI (6 components)
+    live/                   # Live auction UI (19 components)
+    landing/                # Landing page sections (8 components)
+    layout/                 # Navbar, AppNavbar, Footer
+    auth/                   # Login, register, forgot/reset password forms
+    ui/                     # shadcn/ui primitives
+  actions/                  # Server actions: auth, auction, session, bidding
+  supabase/migrations/      # SQL migrations (2 files)
 ```
 
-### Key Directories (New)
-```
-app/                    # Next.js App Router pages and layouts
-  (auth)/               # Auth pages (login, register)
-  (protected)/          # Pages requiring auth + payment
-    auction/            # Auction tool
-    profile/            # User profile
-  api/                  # API routes
-    webhooks/stripe/    # Stripe webhook handler
-lib/                    # Shared utilities
-  supabase/             # Supabase client helpers (server + client)
-  calculations/         # Core auction math (odds, values, profits, pot)
-  stripe/               # Stripe helpers
-components/             # React components
-  ui/                   # shadcn/ui components
-  auction/              # Auction-specific components
-content/                # MDX blog posts
-```
+## Database Tables
+- `profiles` — extends `auth.users` (email, has_paid, payment_date)
+- `auction_data` — per-user strategy tool state (teams jsonb, payout_rules, pot_size, event_type)
+- `auction_sessions` — live auction rooms (status, team order, settings, timer, highest bid)
+- `auction_participants` — per-session membership (display names)
+- `auction_bids` — full bid history (is_winning_bid flag)
 
-### Auth Flow (New)
-1. User registers via Supabase Auth -> session cookie set -> redirected to payment
-2. User pays via Stripe Payment Link -> webhook marks `has_paid: true` in profiles
-3. Next.js middleware checks session + `has_paid` on protected routes
-4. Supabase RLS ensures users can only access their own data
+## Architecture Patterns
 
-### Payment Flow (New)
-1. Authenticated user hits checkout -> gets Stripe Payment Link URL
-2. Stripe webhook at `app/api/webhooks/stripe/route.ts` fires on `checkout.session.completed`
-3. Webhook uses Supabase admin client (service role key) to update `profiles.has_paid`
-4. `req.text()` in App Router gives raw body for signature verification (no config needed)
+### Auth Flow
+Register → Supabase Auth cookie → middleware checks session → redirect to `/auction`
 
-### Core Calculation Logic (preserve from old app)
-These formulas are the heart of the product — port to TypeScript with unit tests:
-- **Team value**: `valuePercentage = SUM(odds[round] * payoutRules[round] / 100)`
-- **Fair value**: `fairValue = valuePercentage * potSize`
-- **Pot inference**: `projectedPotSize = totalPaid / totalValuePercentage`
-- **Round profit**: `profit[round] = cumulativePayout[round] - purchasePrice`
-- **Suggested bid**: `fairValue * 0.95`
-- **Odds devigging**: Convert American odds to implied probabilities, remove vig
+### Payment Flow
+User clicks "Unlock" → Stripe Payment Link → `checkout.session.completed` webhook → `profiles.has_paid = true`
 
----
+### Free Preview
+`/auction` is auth-only (not payment-gated). Seeds 1-2 show full data; seeds 3+ blurred with CSS `blur-[3px]`. Upgrade banner for unpaid users.
 
-## Legacy Architecture (Express + MongoDB — still live on Render)
+### Live Auction Flow
+Commissioner creates session → participants join via 6-char code → real-time bidding via Supabase Broadcast → DB is source of truth for reconnection → `sellTeam()` auto-syncs to strategy tool's `auction_data`
 
-### Server (`server.js`)
-- Express app, port 5000 (dev) / 10000 (prod)
-- Stripe webhook route registered before `express.json()` (critical order)
-- **Known tech debt**: Webhook handler duplicated at lines ~48 and ~272
-- CORS: localhost + calcuttaedge.com + www subdomain
-- Cookie-based JWT auth with domain-aware settings (.calcuttaedge.com in prod)
+### Tournament System
+Config-driven: adding a tournament = one file in `v2/lib/tournaments/configs/`. Registry provides `getTournament(id)`, `getActiveTournament()`, `listTournaments()`. Devigging strategies: `bracket` (NCAA), `global` (golf/NFL), `group` (World Cup), `none` (custom).
 
-### Legacy Required Environment Variables
-- `MONGO_URI`, `JWT_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `FRONTEND_URL`
-
-### Routes
-| Route | File | Auth | Purpose |
-|-------|------|------|---------|
-| `/api/auth/*` | `routes/auth.js` | Mixed | Register, login, logout, profile update |
-| `/api/payment/*` | `routes/payment.js` | Private | Stripe checkout, payment status, webhooks |
-| `/api/data/*` | `routes/userData.js` | Private | CRUD for user auction data |
-| `/api/blog/*` | `routes/blog.js` | Public | Blog posts from markdown files |
-
-### Models
-- **User** (`models/User.js`): email, password (bcrypt), hasPaid, paymentDate
-- **UserData** (`models/UserData.js`): user ref, teams (jsonb-like array), payoutRules, estimatedPotSize
-
-### Frontend
-- **Views** (`views/`): HTML pages
-- **JS** (`js/`): `auction-tool.js` (2068-line monolith — main app logic, NOT using the MVC files below)
-  - `js/controllers/AuctionController.js` — unused ES6 class
-  - `js/models/Auction.js`, `Team.js` — unused data models
-  - `js/views/View.js`, `TeamTableView.js` — unused view classes
-- **Note**: The MVC files were started but never integrated. All logic lives in `auction-tool.js`.
-
----
-
-## Workflow Orchestration
-
-### 1. Plan Mode Default
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately
-- Write detailed specs upfront to reduce ambiguity
-
-### 2. Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- One task per subagent for focused execution
-
-### 3. Self-Improvement Loop
-- After ANY correction from the user: update CLAUDE.md anti-patterns
-- Write rules for yourself that prevent the same mistake
-
-### 4. Verification Before Done
-- Never mark a task complete without proving it works
-- Ask yourself: "Would a staff engineer approve this?"
-- Run dev server, check logs, demonstrate correctness
-
-### 5. Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- Skip this for simple, obvious fixes — don't over-engineer
-
-### 6. Autonomous Bug Fixing
-- When given a bug report: just fix it. No hand-holding needed.
-- Point at logs, errors, failing tests — then resolve them
-
-## Task Management
-1. **Plan First**: Write plan to todo list with checkable items
-2. **Verify Plan**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
-4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Summarize what was done
-6. **Capture Lessons**: Update CLAUDE.md anti-patterns after corrections
-
-## Core Principles
-- **Simplicity First**: Make every change as simple as possible
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
-- **Minimal Impact**: Changes should only touch what's necessary
-- **Use Context7**: Look up Supabase, Next.js, Stripe docs via MCP before guessing
-- **Test Calculations**: Core math functions must have unit tests
-
----
+### Core Calculations
+- **Team value**: `SUM(odds[round] * payoutRules[round] / 100)`
+- **Fair value**: `valuePercentage * potSize`
+- **Pot inference**: `totalPaid / totalValuePercentage`
+- **Round profit**: `cumulativePayout[round] - purchasePrice`
+- **Odds devigging**: American → implied probabilities → structure-aware vig removal
 
 ## Anti-Patterns (DO NOT DO THESE)
 
-### New Stack (Next.js + Supabase)
-- **DON'T** use the Supabase service role key on the client — it bypasses RLS. Only use in server-side code (API routes, server actions).
-- **DON'T** create Supabase clients without `@supabase/ssr` cookie handling — sessions won't persist across server components
-- **DON'T** skip RLS policies on tables — every table with user data must have row-level security enabled
-- **DON'T** put `SUPABASE_SERVICE_ROLE_KEY` in `NEXT_PUBLIC_*` variables — it would be exposed to the browser
-- **DON'T** forget to disable Vercel deployment protection on the Stripe webhook route
-- **DON'T** hardcode Stripe Payment Link URLs — use environment variables
+### Supabase
+- **DON'T** use service role key on the client — bypasses RLS
+- **DON'T** create clients without `@supabase/ssr` cookie handling
+- **DON'T** skip RLS policies on tables with user data
+- **DON'T** put `SUPABASE_SERVICE_ROLE_KEY` in `NEXT_PUBLIC_*` variables
+- **DON'T** write self-referencing RLS policies — causes PostgreSQL infinite recursion. Use `SECURITY DEFINER` functions instead (see `is_session_participant()`)
 
-### Legacy Server (Express)
-- **DON'T** move the Stripe webhook route after `express.json()` — signature verification requires raw body
-- **DON'T** add another webhook handler — there's a duplicate at line ~272 that needs removal
+### Supabase Realtime
+- **DON'T** use `realtime:` prefix on broadcast topics — HTTP API silently drops messages. Use raw channel name: `auction:{sessionId}`
+- **DON'T** render Presence state without deduplication — multiple entries per user from multiple connections. Always deduplicate by `userId`
 
-### Payments
+### Stripe
+- **DON'T** hardcode Payment Link URLs — use `NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL` env var
 - **DON'T** modify webhook handling without testing with `stripe listen --forward-to`
-- **DON'T** remove the fallback "recent unpaid user" logic without a replacement
+- **DON'T** remove the fallback "recent unpaid user" logic without implementing `client_reference_id`
+- **DON'T** set webhook URL without `www` — Vercel redirects `calcuttaedge.com` → `www.calcuttaedge.com` (307), and Stripe doesn't follow redirects. Use `https://www.calcuttaedge.com/api/webhooks/stripe`
+
+### Vercel / Build
+- **DON'T** put Windows-only `*-win32-x64-msvc` packages in `dependencies` or `devDependencies` — use `optionalDependencies` or Vercel Linux build fails with EBADPLATFORM
+- **DON'T** initialize Stripe SDK at module level — lazy init with `getStripe()` or build fails without env vars
 
 ### Git
-- **DON'T** commit environment variable files or any file containing secrets
-- **DON'T** force push to main without discussing first
-- **DON'T** make commits with vague messages — follow the existing descriptive style
+- **DON'T** commit `.env` files or secrets
+- **DON'T** force push to main
+- **DON'T** make commits with vague messages
 
----
+## Workflow
+1. **Plan first** — enter plan mode for any non-trivial task (3+ steps)
+2. **Use subagents** — offload research and parallel work
+3. **Test calculations** — core math functions must have unit tests
+4. **Verify before done** — run build, check tests, prove it works
+5. **Use Context7 MCP** — look up Supabase, Next.js, Stripe docs before guessing
+6. **Update anti-patterns** — after any correction from user, capture the lesson
 
 ## Key Reference Documents
-- `ROADMAP.md` — Full product strategy, phased build plan, revenue targets
-- `CLAUDE_RESEARCH1.md` — Market analysis (competition, pricing, expansion opportunities)
-- `CLAUDE_RESEARCH2.md` — Strategic playbook (business model, shared-info problem, revenue formula)
-- `FUTURE_IMPROVEMENTS.md` — Old feature requests (some incorporated into roadmap)
-
-## Session Notes
-<!-- Updated by /start-session and /end-session commands -->
-
-### Session: 2026-02-23 — Project Organization & Rebuild Planning
-
-**Completed:**
-- Audited and improved Claude Code setup (`.claude/` commands, agents, settings)
-- Deleted `PROJECT_OVERVIEW.md` (was for PoolPicks.io, wrong repo)
-- Updated `CLAUDE.md` with missing directory docs, client-side MVC info, duplicate webhook note, new anti-patterns
-- Read and synthesized all research docs (`CLAUDE_RESEARCH1.md`, `CLAUDE_RESEARCH2.md`, `FUTURE_IMPROVEMENTS.md`)
-- Researched tech stack: Next.js 15 + Supabase + Vercel confirmed (~$46/mo)
-- Researched sportsbook affiliates → wrote `AFFILIATE_RESEARCH.md`
-- Created `ROADMAP.md` — full product strategy, phased build plan, revenue targets
-- Created `TODO.md` — sprint tasks for March Madness 2026 rebuild
-- Rewrote `CLAUDE.md` for new stack (new architecture + legacy reference)
-- Committed and pushed all setup files
-
-**Key Decisions Made:**
-- Full rebuild: Next.js 15 (App Router, TS) + Supabase + Vercel
-- Timeline: Ship for March Madness 2026 (~3 weeks)
-- Pricing: $14.99 → $29.99/event
-- Build order: Foundation → Core tool → Polish/launch → Post-season hosting
-- Affiliates: FanDuel first, start with DFS, track before investing in state licensing
-
-**Next Steps (Next Session):**
-- Start Phase 1: Init Next.js project, create Supabase project + schema, implement auth, deploy to Vercel
-- See `TODO.md` Phase 1 tasks for full checklist
-
-**Blockers:**
-- None. Ready to build.
-
-### Session: 2026-02-23 — Phase 1 Foundation Build (COMPLETE)
-
-**Completed:**
-- Initialized Next.js 16 (App Router, TypeScript, Tailwind, shadcn/ui) in `v2/` subdirectory
-- Created Supabase project "Calcutta Edge" (`xtkdwyrxllqmgoedfotf`, us-east-1) via MCP
-- Applied full DB migration: `profiles` + `auction_data` tables, RLS policies, auto-create trigger
-  - Migration file: `v2/supabase/migrations/00001_initial_schema.sql`
-- Built 4 Supabase client utilities: `v2/lib/supabase/{client,server,middleware,admin}.ts`
-- Implemented auth flow (register, login, logout) with `@supabase/ssr`
-  - Server actions: `v2/actions/auth.ts`
-  - Forms: `v2/components/auth/{login-form,register-form}.tsx`
-  - Pages: `v2/app/(auth)/login/`, `v2/app/(auth)/register/`, `v2/app/(auth)/auth/callback/`
-- Built middleware for route protection + payment gate: `v2/middleware.ts`
-- Built Stripe webhook handler: `v2/app/api/webhooks/stripe/route.ts`
-  - Lazy Stripe init to avoid build-time errors: `v2/lib/stripe/config.ts`
-  - Preserves legacy "recent unpaid user" fallback logic
-- Created placeholder pages: payment, auction, profile, landing
-- Created Stripe sandbox payment link ($29.99) — working end-to-end
-- Fixed `.claude/settings.json` write hook (was blocking `process.env` in source code)
-- Updated `.gitignore` for v2 Next.js files
-- Verified full auth flow: register → payment redirect → pay → /auction access → /profile shows "Active"
-- Build passes (`npx next build`)
-
-**Key Files Created:**
-- `v2/` — entire Next.js app directory (20+ files)
-- `v2/middleware.ts` — auth + payment gate
-- `v2/lib/supabase/` — 4 client utilities
-- `v2/app/api/webhooks/stripe/route.ts` — Stripe webhook
-- `v2/actions/auth.ts` — login/signup/logout server actions
-
-**Infrastructure:**
-- Supabase project: `xtkdwyrxllqmgoedfotf` (us-east-1, $10/mo)
-- Stripe sandbox payment link: `https://buy.stripe.com/test_5kQ3cobmL0Ynbl3f4b18c00`
-- Next.js version: 16.1.6 (installed as latest, not 15 — middleware deprecated warning is cosmetic)
-
-**Known Issues:**
-- Stripe webhook can't reach localhost (no tunnel) — manually updated `has_paid` via Supabase MCP for testing. Will work in production with Vercel URL.
-- Stripe Payment Link doesn't redirect back to app after payment — need to configure redirect URL in Stripe dashboard
-- `middleware.ts` deprecated warning in Next.js 16 — still works, can migrate to `proxy` convention later
-
-**Next Steps (Next Session):**
-- Start Phase 2: Port calculation logic from `js/auction-tool.js` to TypeScript
-- Build auction tool UI (team table, payout rules editor, pot size, profit projections)
-- Port landing page from `views/home.html`
-- Wire up Supabase CRUD for save/load
-- Deploy to Vercel
-
-**Blockers:**
-- None. Foundation is solid, ready for Phase 2.
-
-### Session: 2026-02-23 — Vercel Deployment & Stripe Webhook (Phase 1 COMPLETE)
-
-**Completed:**
-- Cleaned up `v2/next.config.ts` — removed `turbopack.root` workaround that would break in Vercel's deploy context
-- Removed hardcoded live Stripe Payment Link URL from `v2/lib/stripe/config.ts` — now requires `NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL` env var
-- Moved Windows-only binary packages (`@tailwindcss/oxide-win32-x64-msvc`, `lightningcss-win32-x64-msvc`) from `dependencies` to `optionalDependencies` in `v2/package.json` — fixes Vercel Linux build (npm silently skips incompatible optional deps)
-- Deployed v2 to Vercel: **calcuttaedge.com** (root directory: `v2`)
-- Configured all environment variables in Vercel (Supabase + Stripe live keys)
-- Verified landing page, auth pages, and route protection working in production
-- Set up Stripe webhook endpoint in live mode: `checkout.session.completed` → `https://calcuttaedge.com/api/webhooks/stripe`
-- Added `STRIPE_WEBHOOK_SECRET` to Vercel env vars and redeployed
-
-**Key Files Modified:**
-- `v2/next.config.ts` — simplified to empty config
-- `v2/lib/stripe/config.ts` — removed hardcoded fallback URL
-- `v2/package.json` — Windows binaries moved to `optionalDependencies`
-
-**Infrastructure:**
-- Vercel project: `calcutta-edge` at `calcuttaedge.com`
-- Stripe webhook: live mode, `checkout.session.completed` event
-- Auto-deploys on push to `main` via GitHub integration
-
-**Key Learnings:**
-- Windows platform binaries (`*-win32-x64-msvc`) in `dependencies` cause `EBADPLATFORM` errors on Vercel (Linux) — must use `optionalDependencies`
-- User's global `~/.npmrc` has `os=linux` which blocks Windows optional deps from auto-resolving locally — existing `node_modules` from prior installs still work
-- Vercel MCP `deploy_to_vercel` tool only provides instructions, doesn't actually deploy — use dashboard or CLI
-
-**Next Steps (Next Session):**
-- **Domain**: Rebranded to Calcutta Edge, calcuttaedge.com purchased and configured.
-- **Phase 2**: Port calculation logic from `js/auction-tool.js` to TypeScript (`v2/lib/calculations/`)
-- Build auction tool UI (team table, payout rules editor, pot size, profit projections)
-- Wire up Supabase CRUD for save/load
-- 2026 March Madness team data (64 teams + current odds)
-
-**Blockers:**
-- None. Phase 1 fully complete. Ready for Phase 2.
-
-### Session: 2026-02-23 — Phase 2 Core Product Build (COMPLETE)
-
-**Completed:**
-- Ported ALL calculation logic from legacy `js/auction-tool.js` (2068 lines) to TypeScript modules:
-  - `v2/lib/calculations/types.ts` — All interfaces, constants, bracket structure (RoundKey, Team, PayoutRules, etc.)
-  - `v2/lib/calculations/odds.ts` — American odds conversion + structure-aware devigging (R32 pairs → S16 quadrants → E8 halves → F4 regions → F2 bracket sides → Championship global, with per-round capping)
-  - `v2/lib/calculations/values.ts` — Team value calculation (`valuePercentage = SUM(odds[round] * payoutRules[round] / 100)`), fair values, suggested bids
-  - `v2/lib/calculations/profits.ts` — Round-by-round cumulative profit projections
-  - `v2/lib/calculations/pot.ts` — Projected pot inference (`totalPaid / totalValuePercentage`)
-  - `v2/lib/calculations/format.ts` — Currency/percent formatting
-  - `v2/lib/calculations/initialize.ts` — Orchestrator: base teams + saved state → fully hydrated teams
-  - `v2/lib/calculations/index.ts` — Barrel export
-- Wrote **34 unit tests** across 4 test files, all passing:
-  - `v2/lib/calculations/__tests__/odds.test.ts` (15 tests)
-  - `v2/lib/calculations/__tests__/values.test.ts` (9 tests)
-  - `v2/lib/calculations/__tests__/profits.test.ts` (6 tests)
-  - `v2/lib/calculations/__tests__/pot.test.ts` (4 tests)
-- Ported 64 NCAA teams with American odds: `v2/lib/data/march-madness-2026.ts`
-- Built state management with React useReducer + Context:
-  - `v2/lib/auction/auction-state.ts` — State, reducer, selectors (filtering, sorting, summary stats)
-  - `v2/lib/auction/auction-context.tsx` — React context provider with memoized derived values
-  - `v2/lib/auction/use-auto-save.ts` — Debounced (1.5s) auto-save to Supabase
-- Built full auction tool UI (6 components):
-  - `v2/components/auction/auction-tool.tsx` — Main wrapper (init, layout, save status)
-  - `v2/components/auction/pot-size-section.tsx` — Estimated/projected/effective pot size
-  - `v2/components/auction/payout-rules-editor.tsx` — Collapsible rules editor with % validation
-  - `v2/components/auction/summary-stats-cards.tsx` — My Teams / Opponents / Available stats
-  - `v2/components/auction/team-table.tsx` — Filter bar + 13-column data table
-  - `v2/components/auction/team-table-row.tsx` — Memoized row with profit cells, inline price input, checkbox
-- Built Supabase CRUD server actions: `v2/actions/auction.ts` (load, save/upsert, reset)
-- Wired up auction page: `v2/app/(protected)/auction/page.tsx` (server component → client AuctionTool)
-- Installed shadcn components: table, select, checkbox, badge, separator, tooltip
-- Installed Vitest + configured: `v2/vitest.config.ts`, test scripts in package.json
-- Build passes, all 34 tests pass, dev server loads auction tool successfully
-
-**Key Technical Decisions:**
-- Pure functions for all calculations (testable, no side effects)
-- React useReducer + Context for state (no external deps needed for 64 rows)
-- Reducer recalculates derived values (projected pot, team values) on every relevant mutation
-- Auto-save debounced at 1.5s to avoid Supabase spam
-- React.memo on table rows for selective re-rendering
-- Vitest (not Jest) for native TS/ESM support
-
-**Known Issues:**
-- Stripe Payment Link redirect after payment not working locally — redirects back to /payment instead of /auction. Need to investigate Stripe Payment Link redirect URL configuration.
-- Windows `os=linux` in `~/.npmrc` drops platform-specific binaries on `npm install` — had to force-install `lightningcss-win32-x64-msvc` and `@rollup/rollup-win32-x64-msvc`
-- DB default payout rules in migration have props at 5% each (total > 100%) — TypeScript defaults used instead (props at 0%)
-
-**Next Steps (Next Session):**
-- Fix Stripe Payment Link redirect (needs redirect URL configured in Stripe dashboard)
-- Visual polish: responsive layout, dark mode support, loading states
-- Phase 3: Landing page, pricing tiers, blog migration, SEO, domain setup
-- Deploy Phase 2 to Vercel (push to main triggers auto-deploy)
-- Update 2026 March Madness odds when bracket is set
-
-**Blockers:**
-- None. Phase 2 core product complete and functional.
-
-### Session: 2026-02-24 — Rebrand to Calcutta Edge + Vercel Deploy Fix
-
-**Completed:**
-- Full rebrand from "Calcutta Genius" to "Calcutta Edge" across 33 files:
-  - v2 app: `v2/app/layout.tsx`, `v2/app/page.tsx`, `v2/app/(protected)/payment/page.tsx`, `v2/components/auth/{login-form,register-form}.tsx`
-  - Legacy views: `views/{home,blog,login,register,payment,payment-success,payment-cancel,profile,index}.html`
-  - Legacy routes: `routes/{auth,blog,payment}.js`, `server.js`
-  - Config: `robots.txt`, `sitemap.xml`, `v2/supabase/migrations/00001_initial_schema.sql`
-  - Docs: `CLAUDE.md`, `ROADMAP.md`, `TODO.md`, `CLAUDE_RESEARCH1.md`, `CLAUDE_RESEARCH2.md`, `AFFILIATE_RESEARCH.md`
-  - Claude Code: `.claude/agents/{code-reviewer,security-reviewer}.md`, `.claude/commands/{review,start-session}.md`
-  - Assets: `img/dashboard-preview.svg`, `email_templates/welcome_email.txt`
-- Updated git remote to `https://github.com/pwidds22/calcutta-edge.git` (user renamed repo on GitHub)
-- Fixed Vercel deploy failure: moved `@rollup/rollup-win32-x64-msvc` from `devDependencies` to `optionalDependencies` in `v2/package.json`
-- Verified zero remaining "calcuttagenius" / "Calcutta Genius" / "calcutta-genius" references in codebase
-- Vercel deploy succeeds, site live at calcuttaedge.com with new branding
-
-**Commits:**
-- `fd38860` — Rebrand: Calcutta Genius → Calcutta Edge across entire codebase
-- `a51e9fb` — Move @rollup/rollup-win32-x64-msvc to optionalDependencies for Vercel
-
-**Key Learnings:**
-- ALL Windows-only `*-win32-x64-msvc` packages must go in `optionalDependencies` (not `devDependencies`) for Vercel Linux builds — `@rollup/rollup-win32-x64-msvc` was missed previously
-
-**Next Steps (Next Session):**
-- Fix Stripe Payment Link redirect (needs redirect URL configured in Stripe dashboard)
-- Phase 3: Landing page redesign, pricing tiers, blog migration, SEO
-- Visual polish: responsive layout, dark mode support, loading states
-- Update 2026 March Madness odds when bracket is set
-
-**Blockers:**
-- None. Rebrand complete, deployed, and live.
-
-### Session: 2026-02-24 — Phase 3: Landing Page + Dark Theme + Brand System
-
-**Completed:**
-- Built full production landing page with 8 new components:
-  - `v2/components/landing/hero-section.tsx` — Dark hero, radial emerald glow, product preview mock table
-  - `v2/components/landing/features-section.tsx` — 3-column: Devigged Odds, Fair Value, Profit Projections
-  - `v2/components/landing/how-it-works-section.tsx` — 4-step flow with emerald connectors
-  - `v2/components/landing/social-proof-section.tsx` — Stats-based trust signals (64 Teams, 6 Rounds, $29.99)
-  - `v2/components/landing/pricing-section.tsx` — $29.99 card with emerald glow, competitor comparison
-  - `v2/components/landing/cta-section.tsx` — Final CTA with emerald-tinted section
-  - `v2/components/layout/navbar.tsx` — Marketing navbar (sticky, glass blur, mobile hamburger)
-  - `v2/components/layout/footer.tsx` — Dark footer with brand + links
-- Implemented dark brand theme globally:
-  - `v2/app/globals.css` — `.dark.landing-theme` CSS vars (emerald primary, dark charcoal bg, oklch colors)
-  - `v2/app/layout.tsx` — Added `dark landing-theme` to `<html>`, rich SEO metadata (OG tags, keywords)
-  - CSS specificity fix: `.dark.landing-theme` (0-2-0) overrides `.dark` (0-1-0)
-- Fixed all hardcoded light-mode colors across auction components:
-  - `v2/components/auction/team-table-row.tsx` — green-50/green-600 → emerald-500/10, emerald-400
-  - `v2/components/auction/summary-stats-cards.tsx` — green/red-600 → emerald/red-400
-  - `v2/components/auction/payout-rules-editor.tsx` — percentage badges → emerald/amber dark variants
-  - `v2/components/auth/{login-form,register-form}.tsx` — error states → red-500/10, red-400
-- Created shared navigation + layout system:
-  - `v2/components/layout/app-navbar.tsx` — Authenticated navbar (CE logo, Auction/Profile links, Sign Out, mobile menu)
-  - `v2/app/(auth)/layout.tsx` — Auth layout with CE logo + "Back to home" link
-  - `v2/app/(protected)/layout.tsx` — Protected layout wrapping all auth'd pages with AppNavbar
-- Restyled all pages for brand consistency:
-  - `v2/app/page.tsx` — Full landing page composition (8 sections)
-  - `v2/app/(protected)/payment/page.tsx` — Emerald glow card, amber badge, green CTA
-  - `v2/app/(protected)/profile/page.tsx` — Account details, payment status indicator, support section
-  - `v2/components/auction/auction-tool.tsx` — Removed inline header (navbar handles navigation)
-  - `v2/app/(auth)/{login,register}/page.tsx` — Simplified (layout handles centering + branding)
-- Build passes, all 34 tests pass
-
-**User Review Scores:**
-- Landing: 9/10, Login: 8/10, Register: 8/10, Payment: 9/10, Profile: 8.5/10, Auction: 8.5/10
-- User verdict: "Massive improvement. Ready to ship."
-
-**Nice-to-Have Polish (not blockers, saved for future session):**
-- Login/Register card borders — bump to `border-white/10` for visibility
-- Remove email from auction status bar (redundant with navbar)
-- Sign Out in app-navbar — subtle red/muted-red color
-- Register page — add value prop line ("Free to create. Pay only when you're ready.")
-- Mobile responsiveness audit — auction table horizontal scroll
-- Feature cards — subtle hover animation (scale or border glow)
-
-**Next Steps (Next Session):**
-- Deploy to Vercel (push to main triggers auto-deploy)
-- Fix Stripe Payment Link redirect (Stripe dashboard configuration)
-- Blog migration (MDX), email existing customers, end-to-end testing
-- Update 2026 March Madness odds when bracket is set
-- Address nice-to-have polish items above
-
-**Blockers:**
-- None. Landing page + dark theme complete. Site is ready to ship.
-
-### Session: 2026-02-24 — Strategic Pivot: Multi-Tournament Abstraction (Phase A COMPLETE)
-
-**Strategic Decisions Made:**
-- Platform should support ALL Calcutta tournaments (golf, NFL, FIFA, custom), not just March Madness
-- Live auction hosting moved from "Phase 4: Post-March Madness" to pre-March Madness (distribution flywheel)
-- New revenue tier: done-for-you custom tournament solutions ($200-500+ per event)
-- Free hosting = distribution flywheel; Strategy tool = paid product ($29.99); Custom = high-touch upsell
-- Timeline: Selection Sunday 3/15, first game 3/17 (~19 days)
-
-**Completed — Phase A: Tournament Abstraction:**
-- Created tournament configuration system (fully dynamic, tournament-agnostic):
-  - `v2/lib/tournaments/types.ts` — `TournamentConfig`, `BaseTeam`, `Team`, `PayoutRules` with dynamic `RoundKey`/`GroupKey` (strings, not hardcoded unions)
-  - `v2/lib/tournaments/configs/march-madness-2026.ts` — Full config (rounds, groups, bracket devigging, payout defaults) + 64 teams with `group` instead of `region`
-  - `v2/lib/tournaments/registry.ts` — `getTournament()`, `getActiveTournament()`, `listTournaments()`
-  - `v2/lib/tournaments/index.ts` — Barrel export
-- Refactored entire calculation engine to accept `TournamentConfig`:
-  - `v2/lib/calculations/types.ts` — Slimmed to re-export from tournaments/types (backward compat)
-  - `v2/lib/calculations/odds.ts` — Strategy pattern: `bracket` / `global` / `group` / `none` devigging
-  - `v2/lib/calculations/values.ts` — Iterates `config.rounds` instead of hardcoded `PAYOUT_TO_ROUND`
-  - `v2/lib/calculations/profits.ts` — Loops `config.rounds` instead of 6 hardcoded variables
-  - `v2/lib/calculations/initialize.ts` — Dynamic zero-init from `config.rounds`
-- Refactored state management:
-  - `v2/lib/auction/auction-state.ts` — `regionFilter` → `groupFilter`, `config` stored in state, dynamic `PayoutRules`
-  - `v2/lib/auction/auction-context.tsx` — Exposes `config` through context
-  - `v2/lib/auction/use-auto-save.ts` — Passes tournament ID to save action
-- Refactored all 6 auction UI components for dynamic config:
-  - `v2/components/auction/auction-tool.tsx` — Accepts `TournamentConfig` + `BaseTeam[]` props (no hardcoded import)
-  - `v2/components/auction/team-table.tsx` — Groups/rounds from config, dynamic labels
-  - `v2/components/auction/team-table-row.tsx` — Iterates `config.rounds`, uses `team.group`
-  - `v2/components/auction/payout-rules-editor.tsx` — Rules from `config.rounds` + `config.propBets`
-- Updated routes + actions:
-  - `v2/app/(protected)/auction/page.tsx` — Uses `getActiveTournament()` from registry
-  - `v2/actions/auction.ts` — Already tournament-aware via `eventType` param
-- Updated all 34 tests for config-driven API (all passing)
-- Deleted old hardcoded data: `v2/lib/data/march-madness-2026.ts`
-- Build passes, 34 tests pass, zero remaining hardcoded NCAA references in logic/types
-
-**Key Technical Achievement:**
-- Adding a new tournament (golf, NFL, custom) now requires ONLY a new config file in `v2/lib/tournaments/configs/` — zero code changes
-- Devigging strategy is pluggable: `bracket` (NCAA), `global` (golf/NFL), `group` (World Cup), `none` (custom)
-- Plan file with full implementation details: `C:\Users\pwidd\.claude\plans\mutable-dancing-kurzweil.md`
-
-**Next Steps (Next Session):**
-- **Phase B: Live Auction Hosting** (Days 5-12 per plan)
-  - DB migration: `auction_sessions`, `auction_participants`, `auction_bids` tables + RLS
-  - Supabase Realtime: Broadcast for bids/events, Presence for who's online
-  - Commissioner flow: `/host`, `/host/create`, `/host/[sessionId]`
-  - Participant flow: `/join`, `/live/[sessionId]`
-  - Strategy integration: paid users see fair values during live bidding (conversion funnel)
-- **Phase C: Landing + Pricing Update** (Days 13-15)
-  - Rebrand landing from "March Madness calculator" → "Calcutta auction platform"
-  - 3-tier pricing: Free hosting / Strategy $29.99 / Custom Solution (contact us)
-- **Phase D: Buffer + Launch** (Days 16-19)
-  - E2E testing, odds update on Selection Sunday (3/15), deploy
-
-**Blockers:**
-- None. Tournament abstraction complete. Ready for live hosting build.
-
-### Session: 2026-02-25 — Phase B: Live Auction Hosting (BUILD COMPLETE, NEEDS E2E TESTING)
-
-**Completed — Phase B: Live Auction Hosting:**
-- Applied DB migration via Supabase MCP (3 new tables + RLS + indexes):
-  - `v2/supabase/migrations/00002_live_auction_hosting.sql`
-  - `auction_sessions` — room state, team order, bidding status, highest bid tracking
-  - `auction_participants` — per-session membership with display names
-  - `auction_bids` — full bid history with `is_winning_bid` flag
-- Built server-side broadcast utility for serverless functions:
-  - `v2/lib/supabase/broadcast.ts` — Supabase Realtime HTTP API (no persistent WebSocket needed)
-- Built session management server actions:
-  - `v2/actions/session.ts` — createSession, joinSession, getSessionState, updateTeamOrder, getMyHostedSessions
-  - 6-char join codes using unambiguous characters (no I/O/1/0)
-- Built bidding server actions (all server-validated):
-  - `v2/actions/bidding.ts` — startAuction, presentTeam, openBidding, placeBid, closeBidding, sellTeam, skipTeam, undoLastSale, pauseAuction, completeAuction
-  - `placeBid` uses atomic conditional DB update (`.lt('current_highest_bid', amount)`) for race condition safety
-  - `sellTeam` includes auto-sync: updates paid participants' `auction_data` via admin client (winner=isMyTeam:true, others=isMyTeam:false)
-- Built Realtime channel hook:
-  - `v2/lib/auction/live/use-auction-channel.ts` — Broadcast events + Presence tracking, initialState from server for reconnection
-- Built 15 UI components in `v2/components/live/`:
-  - Commissioner: `commissioner-view.tsx`, `bidding-controls.tsx`, `team-queue.tsx`
-  - Participant: `participant-view.tsx`, `bid-panel.tsx`, `my-portfolio.tsx`
-  - Shared: `team-spotlight.tsx`, `bid-ladder.tsx`, `participant-list.tsx`, `results-table.tsx`, `auction-status-bar.tsx`, `strategy-overlay.tsx`
-  - Forms: `host-dashboard.tsx`, `create-session-form.tsx`, `join-session-form.tsx`
-- Built 5 route pages:
-  - `v2/app/(protected)/host/page.tsx` — Host dashboard (list hosted/joined sessions)
-  - `v2/app/(protected)/host/create/page.tsx` — Create session form
-  - `v2/app/(protected)/host/[sessionId]/page.tsx` — Commissioner control panel
-  - `v2/app/(protected)/join/page.tsx` — Join session form (enter code + display name)
-  - `v2/app/(protected)/live/[sessionId]/page.tsx` — Participant live view
-- Updated `v2/components/layout/app-navbar.tsx` — added "Host" link with Radio icon
-- No middleware changes needed — existing logic already gates only `/auction` behind payment
-- Build passes clean, all 34 existing tests pass
-
-**Key Architecture Decisions:**
-- Broadcast + DB as source of truth (Broadcast for real-time UX, DB for reconnection recovery)
-- Server-validated bids (prevents cheating, atomic race condition handling)
-- Strategy tool and live hosting are standalone but auto-sync when used together
-- Strategy overlay shows fair value + suggested bid + edge % during live bidding (paid users only; upsell banner for free)
-- Separate state systems: AuctionState (strategy tool) vs AuctionChannelState (live auction), bridged via `auction_data` table
-
-**New Files (24 new, 1 modified):**
-- `v2/supabase/migrations/00002_live_auction_hosting.sql`
-- `v2/actions/session.ts`, `v2/actions/bidding.ts`
-- `v2/lib/supabase/broadcast.ts`, `v2/lib/auction/live/use-auction-channel.ts`
-- `v2/components/live/` (15 components)
-- `v2/app/(protected)/host/`, `v2/app/(protected)/join/`, `v2/app/(protected)/live/` (5 pages)
-- Modified: `v2/components/layout/app-navbar.tsx`
-
-**Known Issues:**
-- Hydration warning on login page is caused by Norton Password Manager browser extension adding `data-np-*` attributes — NOT a code bug, harmless, doesn't appear in production
-- Realtime broadcast from server actions (HTTP API approach) needs E2E testing with two browser tabs
-- Server-side broadcast topic format may need adjustment if events don't flow between tabs
-
-**Next Steps (Next Session):**
-- **E2E test the full live auction flow**: create session → join from second tab → bid → sell → verify real-time events
-- Debug broadcast if events don't flow (check topic format: `realtime:auction:{id}` vs `auction:{id}`)
-- Test auto-sync: after selling a team in live auction, verify `auction_data` table updates → strategy tool shows data
-- Test reconnection: refresh participant mid-auction, verify state recovers from DB
-- **Phase C: Landing + Pricing Update** — rebrand landing page for multi-tournament platform, 3-tier pricing
-- **Phase D: Deploy + Launch** — push to Vercel, update March Madness odds on Selection Sunday (3/15)
-- Plan file: `C:\Users\pwidd\.claude\plans\lovely-inventing-bengio.md`
-
-**Blockers:**
-- None. Build complete, needs E2E testing.
-
-### Session: 2026-02-25 — E2E Testing: 3 Critical Bugs Found & Fixed
-
-**Completed:**
-- Created broadcast verification script (`v2/scripts/test-broadcast.ts`) to test HTTP API → WebSocket delivery
-- Discovered and fixed **3 critical bugs** that would have made live auctions completely non-functional:
-
-**Bug 1: Broadcast topic format (silent failure)**
-- `v2/lib/supabase/broadcast.ts` line 25: `topic: \`realtime:${channelName}\`` → `topic: channelName`
-- The `realtime:` prefix caused HTTP API broadcasts to silently fail (202 response, no delivery)
-- The Supabase JS SDK does NOT require the prefix — only the raw channel name
-- **Impact**: All real-time events (bids, team sold, auction started) never reached any client
-
-**Bug 2: RLS infinite recursion on `auction_participants` (query failures)**
-- The SELECT policy on `auction_participants` had a self-referencing subquery that caused PostgreSQL `infinite recursion detected` error
-- Supabase returned empty results instead of errors, so `placeBid()` always returned "Not a participant"
-- **Fix**: Created `SECURITY DEFINER` function `public.is_session_participant(p_session_id)` that bypasses RLS for the lookup
-- Updated 3 RLS policies to use the function: `auction_participants` SELECT, `auction_bids` SELECT, `auction_bids` INSERT
-- Applied via Supabase MCP `execute_sql`, also updated migration file for future deployments
-
-**Bug 3: Duplicate presence keys in participant list**
-- `v2/lib/auction/live/use-auction-channel.ts` Presence sync returned duplicate entries per user (multiple connections)
-- Added deduplication by `userId` using a `Set`
-
-**Files Modified:**
-- `v2/lib/supabase/broadcast.ts` — removed `realtime:` prefix from topic
-- `v2/lib/auction/live/use-auction-channel.ts` — deduplicated Presence users
-- `v2/supabase/migrations/00002_live_auction_hosting.sql` — added `is_session_participant()` function, updated RLS policies
-
-**Files Created:**
-- `v2/scripts/test-broadcast.ts` — standalone broadcast verification script
-
-**E2E Test Results (after fixes):**
-- Session creation + join via code: WORKING
-- Real-time Presence (online users): WORKING
-- Commissioner start/open/close bidding: WORKING
-- Participant placing bids: WORKING
-- Real-time bid updates across tabs: WORKING
-- Strategy overlay with fair values: WORKING
-
-**Key Learnings:**
-- Supabase Realtime HTTP Broadcast API does NOT want the `realtime:` prefix on topics — the SDK handles this internally
-- Self-referencing RLS policies on the same table cause infinite recursion in PostgreSQL — use `SECURITY DEFINER` functions instead
-- Always write a standalone transport-layer test before testing the full UI — it caught the broadcast bug in 30 seconds
-
-**Feature Requests (from user, for next session):**
-1. Commissioner should be able to bid (currently only participants can)
-2. Auto-timer with countdown (e.g., 20 seconds, resets to 5-10 on new bid) — needs research on typical Calcutta timer durations; user noted their previous tool had timer bugs (jumping from 20 to 1)
-3. Randomize team order option + rotation draft (each person nominates a team in turn)
-4. Match bid buttons (+1, +5, etc.) — in addition to existing +$5/+$10/+$25/+$50/+$100
-
-**Next Steps (Next Session):**
-- Implement auto-timer for bidding (research standard durations first)
-- Allow commissioner to bid
-- Add randomize/rotation team order options
-- Continue Phase 2 testing: sell team, skip, undo, pause, reconnection, auto-sync to strategy tool
-- **Phase C: Landing + Pricing Update** — rebrand landing page for multi-tournament platform
-- **Phase D: Deploy + Launch** — push to Vercel, update odds on Selection Sunday (3/15)
-
-**Blockers:**
-- Timer implementation needs research on standard Calcutta auction timer conventions (typical durations, reset behavior)
-- Timer reliability is critical — user's previous tool had bugs where timer jumped unexpectedly
-
-### Session: 2026-02-25 — Live Auction Features: Timer, Commissioner Bidding, Shuffle, Increments + Bug Fixes
-
-**Completed — 4 New Features:**
-1. **Commissioner Bidding** — added `BidPanel` + `MyPortfolio` to `v2/components/live/commissioner-view.tsx`
-2. **Configurable Bid Increments** — 3 presets (Casual/Standard/Big Money) stored in `auction_sessions.settings` jsonb
-   - New types: `v2/lib/auction/live/types.ts` (SessionSettings, TimerSettings, BID_INCREMENT_PRESETS)
-   - Updated: `v2/components/live/create-session-form.tsx` (preset selector + timer toggle UI)
-   - Updated: `v2/actions/session.ts` (accepts `settings` param)
-   - Updated: `v2/components/live/bid-panel.tsx` (dynamic `bidIncrements` prop)
-3. **Randomize Team Order** — Fisher-Yates shuffle button in lobby
-   - Updated: `v2/actions/session.ts` (`updateTeamOrder` now broadcasts `TEAM_ORDER_UPDATED`)
-   - Updated: `v2/lib/auction/live/use-auction-channel.ts` (handles `TEAM_ORDER_UPDATED`, timer events)
-   - Updated: `v2/components/live/commissioner-view.tsx` (shuffle button, dynamic `activeTeamOrder`)
-4. **Auto-Timer with Countdown** — absolute timestamp-based, requestAnimationFrame for 60fps
-   - New: `v2/lib/auction/live/use-timer.ts` (timer hook with commissioner auto-close on expiry)
-   - New: `v2/components/live/timer-display.tsx` (progress bar, color transitions: emerald→amber→red)
-   - Updated: `v2/actions/bidding.ts` (TIMER_START/RESET/STOP broadcasts + DB persistence)
-   - Updated: `v2/components/live/bidding-controls.tsx` ("Close Early" label when timer running)
-
-**Completed — 6 Bug Fixes (from user testing):**
-1. **Bid increment labels unclear** — renamed to "Quick Bid Buttons" with `+$` prefix notation
-2. **Team queue only visible to commissioner** — added `TeamQueue` to participant view with 3-6-3 grid layout
-3. **Pause/resume resets to team 1** — `startAuction()` now preserves `current_team_idx` when resuming from paused
-4. **Duplicate key errors on refresh** — `MyPortfolio` + `ResultsTable` use composite keys `${teamId}-${idx}`
-5. **Timer lost on page refresh** — added `timer_ends_at` + `timer_duration_ms` columns to `auction_sessions`, persisted/cleared in all bidding actions, read on page load
-6. **Timer killed by channel sync on mount** — timer DB state flows through channel's `initialState` so `timerIsRunning` is true on mount (no race condition with sync effect)
-
-**DB Changes (applied via Supabase MCP):**
-- Added `timer_ends_at timestamptz` and `timer_duration_ms integer` columns to `auction_sessions`
-- Updated migration file: `v2/supabase/migrations/00002_live_auction_hosting.sql`
-
-**Files Created (3):**
-- `v2/lib/auction/live/types.ts` — SessionSettings, TimerSettings, BID_INCREMENT_PRESETS
-- `v2/lib/auction/live/use-timer.ts` — requestAnimationFrame timer hook
-- `v2/components/live/timer-display.tsx` — visual countdown component
-
-**Files Modified (9):**
-- `v2/actions/bidding.ts` — timer broadcasts, DB persistence, pause/resume fix
-- `v2/actions/session.ts` — settings param, team order broadcast
-- `v2/lib/auction/live/use-auction-channel.ts` — timer + teamOrder state, initial timer from DB
-- `v2/components/live/commissioner-view.tsx` — BidPanel, MyPortfolio, shuffle, timer, DB timer init
-- `v2/components/live/participant-view.tsx` — TeamQueue, 3-6-3 layout, timer, DB timer init
-- `v2/components/live/bidding-controls.tsx` — timerIsRunning prop
-- `v2/components/live/bid-panel.tsx` — dynamic bidIncrements prop
-- `v2/components/live/create-session-form.tsx` — preset selector, timer toggle
-- `v2/components/live/my-portfolio.tsx` + `results-table.tsx` — composite keys
-
-**Commits:**
-- `9fa11ad` — Live auction features: timer, commissioner bidding, shuffle, bid increments
-- `64cacc4` — Fix 5 bugs from live auction testing: timer persistence, pause/resume, team queue fairness
-- `3e0ad10` — Fix timer not showing on refresh — initialize channel state from DB timer fields
-
-**User Testing Results:**
-- Commissioner bidding: WORKING
-- Timer countdown + auto-close: WORKING
-- Timer persistence on refresh: WORKING
-- Pause/resume at correct team: WORKING
-- Team queue visible to all: WORKING
-- Bid increment presets: WORKING
-- Shuffle in lobby: WORKING
-- Known non-issue: Norton Password Manager causes harmless hydration warning (`data-np-autofill-submit`)
-
-**Next Steps (Next Session):**
-- **Deploy to Vercel** — push to main triggers auto-deploy
-- **Continue E2E testing**: sell team, skip, undo, complete auction, auto-sync to strategy tool
-- **Phase C: Landing + Pricing Update** — rebrand landing for multi-tournament platform, 3-tier pricing
-- **Phase D: Buffer + Launch** — E2E testing, odds update on Selection Sunday (3/15), deploy
-- **Rotation draft** — deferred to post-launch (fundamentally different auction mode)
-
-**Blockers:**
-- None. All 4 features implemented and tested. Ready for deploy + continued E2E testing.
-
-### Session: 2026-02-25 — Phase C: Landing Page Redesign + Free Preview + 3-Tier Pricing (COMPLETE)
-
-**Completed — Phase C Landing Redesign:**
-- Repositioned from "March Madness calculator" → "The Calcutta Auction Platform"
-- Free hosting is now the hero value prop; strategy tool ($29.99) is the upsell
-- March Madness 2026 as seasonal badge, not the entire identity
-
-**Completed — Free Preview Mode:**
-- Removed `/auction` from middleware `paidRoutes` — now auth-only, not payment-gated (`v2/middleware.ts`)
-- Added `hasPaid` boolean through AuctionContext (`v2/lib/auction/auction-context.tsx`)
-- Upgrade banner for unpaid users with "Unlock — $29.99" CTA (`v2/components/auction/auction-tool.tsx`)
-- Seeds 1-2 (8 teams) show full data; seeds 3+ blurred with CSS blur-[3px] (`v2/components/auction/team-table-row.tsx`)
-- Unlock CTA card below table for unpaid users (`v2/components/auction/team-table.tsx`)
-- Auction page fetches `has_paid` from profiles and passes to component (`v2/app/(protected)/auction/page.tsx`)
-
-**Completed — Landing Page Rewrite (7 sections):**
-- Hero: "Host Your Calcutta Auction. Win It Too." + live auction mock preview (`v2/components/landing/hero-section.tsx`)
-- **NEW** Hosting features: 4-card section — Real-Time Bidding, One-Click Setup, Commissioner Controls, Works for Any Pool (`v2/components/landing/hosting-features-section.tsx`)
-- Strategy features: reframed as "Strategy Analytics" upsell + 4th card "Live Strategy Overlay" (`v2/components/landing/features-section.tsx`)
-- How It Works: platform flow — Create Account → Host or Join → Unlock Strategy → Dominate (`v2/components/landing/how-it-works-section.tsx`)
-- Social Proof: Free / Real-Time / $29.99 stats (`v2/components/landing/social-proof-section.tsx`)
-- Pricing: 3-tier — Free Hosting / Strategy $29.99 (Most Popular) / Custom Solutions Contact Us (`v2/components/landing/pricing-section.tsx`)
-- CTA: "Your next Calcutta starts here." with Host + Preview buttons (`v2/components/landing/cta-section.tsx`)
-
-**Completed — Nav + SEO + Payment:**
-- Navbar: added "Host Free" emerald link (`v2/components/layout/navbar.tsx`)
-- Footer: added Host/Join/Strategy product links, updated tagline (`v2/components/layout/footer.tsx`)
-- SEO: updated metadata for platform positioning + hosting keywords (`v2/app/layout.tsx`)
-- Payment page: "Unlock Full Strategy Access" + "You've seen the preview" narrative (`v2/app/(protected)/payment/page.tsx`)
-- Page composition: added HostingFeaturesSection (`v2/app/page.tsx`)
-
-**Completed — Full UI Review via Claude:**
-- All 10 pages reviewed and scored (average 8.0/10)
-- Landing: 8.5, Login: 8.0, Register: 7.5, Strategy (paid): 8.5, Strategy (preview): 8.0
-- Payment: 9.0, Host Dashboard: 7.5, Create Session: 8.0, Join: 8.0, Profile: 7.0
-
-**Commits:**
-- `3b08bf4` — Phase C: Landing page redesign — hosting-first positioning, 3-tier pricing, free preview
-
-**Files Created (1):**
-- `v2/components/landing/hosting-features-section.tsx`
-
-**Files Modified (17):**
-- `v2/middleware.ts`, `v2/app/(protected)/auction/page.tsx`, `v2/app/(protected)/payment/page.tsx`
-- `v2/app/layout.tsx`, `v2/app/page.tsx`
-- `v2/components/auction/auction-tool.tsx`, `v2/components/auction/team-table.tsx`, `v2/components/auction/team-table-row.tsx`
-- `v2/components/landing/hero-section.tsx`, `v2/components/landing/features-section.tsx`, `v2/components/landing/how-it-works-section.tsx`, `v2/components/landing/social-proof-section.tsx`, `v2/components/landing/pricing-section.tsx`, `v2/components/landing/cta-section.tsx`
-- `v2/components/layout/navbar.tsx`, `v2/components/layout/footer.tsx`
-- `v2/lib/auction/auction-context.tsx`
-
-**Next Steps (Next Session) — UI Review Fixes (Priority Order):**
-- **P0**: Add `overflow-x-auto` to team table for mobile horizontal scroll (`v2/components/auction/team-table.tsx`)
-- **P1**: Fix/verify landing page mobile navbar hamburger menu renders (`v2/components/layout/navbar.tsx`)
-- **P1**: Add "Forgot password?" link/flow to login page
-- **P2**: Add value prop text to register page ("Free to create. Pay only when you're ready.")
-- **P2**: Fix preview banner layout stacking on mobile (text above, button below)
-- **P2**: Add session metadata to host dashboard cards (date, participants, tournament)
-- **P2**: Verify Stripe Payment Link redirect works in production
-- **P3**: Bump card borders to `border-white/10` on login/register pages
-- **P3**: Remove email from auction status bar (redundant with navbar)
-- **P3**: Add tooltips to column headers (R32, S16, etc.)
-- **P3**: Add "Upgrade to Strategy" CTA on profile page when unpaid
-- **P3**: Add helper text to join page and create session form
-- **P3**: Show "$0" prominently in Free Hosting pricing card for price anchoring
-- **P3**: Add color coding to profile payment status (green Active, amber Unpaid)
-
-**Blockers:**
-- None. Phase C complete and deployed. Ready for UI polish fixes.
-
-### Session: 2026-02-25 — UI Polish: 11 Review Fixes + Forgot Password Flow
-
-**Completed — 11 UI Polish Fixes:**
-1. **Remove email from auction status bar** — removed `userEmail` prop entirely (`v2/components/auction/auction-tool.tsx`, `v2/app/(protected)/auction/page.tsx`)
-2. **Fix upgrade banner mobile stacking** — `flex-col sm:flex-row` with full-width button on mobile (`v2/components/auction/auction-tool.tsx`)
-3. **Forgot password flow** — full Supabase-powered reset flow:
-   - Server actions: `resetPassword()` + `updatePassword()` in `v2/actions/auth.ts`
-   - New forms: `v2/components/auth/forgot-password-form.tsx`, `v2/components/auth/reset-password-form.tsx`
-   - New pages: `v2/app/(auth)/forgot-password/page.tsx`, `v2/app/(auth)/reset-password/page.tsx`
-   - Middleware: added `/forgot-password` + `/reset-password` to public routes (`v2/middleware.ts`)
-   - Login form: "Forgot password?" link + success message after reset (`v2/components/auth/login-form.tsx`)
-   - Flow: forgot → email → Supabase recovery email → `/auth/callback?next=/reset-password` → new password → `/login?message=password_updated`
-4. **Register page value prop** — "Free to create an account. Pay only when you're ready." (`v2/components/auth/register-form.tsx`)
-5. **Card borders on auth pages** — `border border-white/10` on login, register, forgot-password, reset-password forms
-6. **Sign Out subtle red** — `text-red-400/60 hover:text-red-400` on desktop + mobile (`v2/components/layout/app-navbar.tsx`)
-7. **Host dashboard session metadata** — created date shown on session cards (`v2/components/live/host-dashboard.tsx`)
-8. **Profile upgrade CTA** — amber dot on "Unpaid" status + "Unlock Full Strategy Access" card for unpaid users (`v2/app/(protected)/profile/page.tsx`)
-9. **$0 emerald on Free tier** — `text-emerald-400` on Free pricing card (`v2/components/landing/pricing-section.tsx`)
-10. **Join page helper text** — heading + description above join form (`v2/app/(protected)/join/page.tsx`)
-11. **Column header tooltips** — `title` attributes on round headers (payoutLabel) + Bid/Fair Val/Price headers (`v2/components/auction/team-table.tsx`)
-
-**Files Created (4):**
-- `v2/components/auth/forgot-password-form.tsx`
-- `v2/components/auth/reset-password-form.tsx`
-- `v2/app/(auth)/forgot-password/page.tsx`
-- `v2/app/(auth)/reset-password/page.tsx`
-
-**Files Modified (12):**
-- `v2/actions/auth.ts`, `v2/middleware.ts`
-- `v2/app/(protected)/auction/page.tsx`, `v2/app/(protected)/join/page.tsx`, `v2/app/(protected)/profile/page.tsx`
-- `v2/components/auction/auction-tool.tsx`, `v2/components/auction/team-table.tsx`
-- `v2/components/auth/login-form.tsx`, `v2/components/auth/register-form.tsx`
-- `v2/components/landing/pricing-section.tsx`
-- `v2/components/layout/app-navbar.tsx`
-- `v2/components/live/host-dashboard.tsx`
-
-**Commit:** `0756fbb` — UI polish: forgot password flow, auth page borders, mobile fixes, 11 review items
-
-**Remaining from UI Review Queue:**
-- Verify Stripe Payment Link redirect works in production (P2)
-- Verify landing page mobile navbar hamburger renders (P1 — believed working, needs manual check)
-
-**Next Steps (Next Session):**
-- **E2E testing**: sell team, skip team, undo last sale, complete auction, auto-sync to strategy tool
-- **Test forgot password flow** end-to-end (requires Supabase email delivery + `NEXT_PUBLIC_SITE_URL` env var in Vercel)
-- **Deploy to Vercel** — push to main triggers auto-deploy
-- **Phase D: Buffer + Launch** — final testing, odds update on Selection Sunday (3/15), deploy
-
-**Blockers:**
-- `NEXT_PUBLIC_SITE_URL` env var needs to be set in Vercel for password reset emails to link correctly (should be `https://calcuttaedge.com`)
-- Forgot password flow not yet E2E tested (Supabase email delivery needed)
-
-### Session: 2026-02-26 — Tier 1 Launch Fixes + Settlement Calculator
-
-**Completed — Tier 1 Must-Ship Items (from strategic plan):**
-1. **Fixed payout rules 0% bug** — Created `v2/lib/calculations/normalize.ts` to map legacy DB keys (`roundOf64` → `r32`, `sweet16` → `e8`, etc.) to tournament config keys. Applied in `v2/app/(protected)/auction/page.tsx`. Fixed `v2/actions/bidding.ts` `syncAuctionData()` to include `payout_rules` and `estimated_pot_size` in upserts (prevented new rows from using stale DB defaults). Added 7 unit tests in `v2/lib/calculations/__tests__/normalize.test.ts`. Total: 41 tests passing.
-2. **Commissioner payout rules configuration** — Created `v2/lib/tournaments/payout-presets.ts` with 3 research-based presets (Balanced, Top Heavy, With Props). Rewrote `v2/components/live/create-session-form.tsx` with preset selector cards + expandable custom editor with per-round/prop percentage inputs and total validation.
-3. **Post-auction completion screen** — Created `v2/components/live/auction-complete.tsx` (stats row, copy summary, export CSV, participant portfolios, full results table). Created `v2/lib/auction/live/export.ts` (CSV generation, text summary, client-side download). Integrated into both `v2/components/live/commissioner-view.tsx` and `v2/components/live/participant-view.tsx`.
-4. **Legal disclaimers** — Added entertainment/21+/gambling helpline disclaimer to `v2/components/layout/footer.tsx`. Added 21+ acknowledgment text to `v2/components/auth/register-form.tsx`.
-
-**Completed — Tier 2 Settlement Calculator:**
-5. **Settlement calculator** — Created `v2/lib/auction/live/settlement.ts` (pure calculation: per-participant total owed, per-team cumulative round-by-round payouts and profit projections). Created `v2/components/live/settlement-calculator.tsx` (expandable participant cards with per-team profit table, break-even indicator, payout structure reference). Integrated into `v2/components/live/auction-complete.tsx`.
-   - **Bug fix**: Initially used `session.estimated_pot_size` (pre-auction estimate) instead of actual pot. Fixed to compute `actualPot` from sum of sold team amounts.
-   - **Bug fix**: Removed misleading portfolio "Total" row and "Max Payout" that summed all teams as if they could all win simultaneously.
-
-**Market Research:**
-- User provided comprehensive `CLAUDE_BLUEPRINT.md` research document covering payout structures, tournament types, competitive landscape, legal compliance, and more.
-- Strategic plan created at `C:\Users\pwidd\.claude\plans\lazy-brewing-scone.md` — Tier 1 (must-ship for March Madness), Tier 2 (should-ship), Tier 3 (post-season).
-
-**Files Created (6):**
-- `v2/lib/calculations/normalize.ts` — Legacy payout rules key mapping
-- `v2/lib/calculations/__tests__/normalize.test.ts` — 7 unit tests
-- `v2/lib/tournaments/payout-presets.ts` — 3 payout presets (Balanced, Top Heavy, With Props)
-- `v2/components/live/auction-complete.tsx` — Post-auction completion dashboard
-- `v2/lib/auction/live/export.ts` — CSV/text export utilities
-- `v2/lib/auction/live/settlement.ts` — Settlement calculation logic
-- `v2/components/live/settlement-calculator.tsx` — Settlement calculator UI
-- `CLAUDE_BLUEPRINT.md` — Market research document (user-created)
-
-**Files Modified (9):**
-- `v2/app/(protected)/auction/page.tsx` — Added payout rules normalization
-- `v2/actions/bidding.ts` — syncAuctionData includes payout_rules + estimated_pot_size
-- `v2/components/live/create-session-form.tsx` — Rewritten with payout presets + custom editor
-- `v2/components/live/commissioner-view.tsx` — AuctionComplete on completion + config/payoutRules props
-- `v2/components/live/participant-view.tsx` — AuctionComplete on completion + config/payoutRules props
-- `v2/components/layout/footer.tsx` — Legal disclaimer
-- `v2/components/auth/register-form.tsx` — 21+ acknowledgment
-- `v2/lib/calculations/index.ts` — Added normalize export
-- `v2/lib/tournaments/index.ts` — Added payout-presets export
-
-**Next Steps (Next Session):**
-- **Tournament Results & Payout Management** — The big remaining feature:
-  - New DB table: `tournament_results` (team outcomes per round)
-  - Commissioner enters results manually as games happen
-  - Calculate actual payouts based on results + payout rules + pot
-  - Settlement ledger: net P&L per participant
-  - Payment tracking: who's paid/been paid, minimized transactions (Splitwise-style)
-- **Deploy to Vercel** — push to main triggers auto-deploy
-- **Set `NEXT_PUBLIC_SITE_URL`** in Vercel to `https://calcuttaedge.com` for forgot password emails
-- **Configure Stripe Payment Link redirect** to `https://calcuttaedge.com/auction`
-- **Odds update on Selection Sunday (3/15)** — Update `v2/lib/tournaments/configs/march-madness-2026.ts` with actual bracket
-
-**Blockers:**
-- None. All Tier 1 items complete. Settlement calculator built and tested. Ready for tournament lifecycle feature.
+- `ROADMAP.md` — Product strategy, phased build plan, revenue targets
+- `CLAUDE_BLUEPRINT.md` — Market research, competitive analysis, payout structures
+- `CLAUDE_RESEARCH1.md` / `CLAUDE_RESEARCH2.md` — Market analysis, strategic playbook
+
+## Legacy Stack (Express + MongoDB)
+Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + vanilla JS. The `v2/` directory is the active codebase — all new development happens there. Legacy will be deprecated after March Madness 2026 launch.
