@@ -146,9 +146,7 @@ export function StrategyOverlay({
           </p>
         </div>
         <div>
-          <p className="text-[10px] text-white/40">
-            {edge !== null ? 'Edge' : 'Proj. Pot'}
-          </p>
+          <p className="text-[10px] text-white/40">Edge</p>
           {edge !== null ? (
             <p
               className={`text-sm font-bold ${edge > 0 ? 'text-emerald-400' : 'text-red-400'}`}
@@ -157,9 +155,7 @@ export function StrategyOverlay({
               {edge.toFixed(1)}%
             </p>
           ) : (
-            <p className="text-sm font-bold text-white/60">
-              {formatCurrency(projectedPot)}
-            </p>
+            <p className="text-sm font-bold text-white/30">—</p>
           )}
         </div>
         <div>
@@ -208,25 +204,34 @@ export function StrategyOverlay({
         </div>
       )}
 
-      {/* Bundle: compact per-member fair value */}
+      {/* Bundle: per-member with full round-by-round odds */}
       {isBundle && bundleTeams.length > 0 && (
-        <div className="mt-3 space-y-0.5">
+        <div className="mt-3 space-y-2">
           {bundleTeams.map((member) => {
             const memberFV = member.valuePercentage * projectedPot;
-            const topOdds = member.odds?.[config.rounds[0]?.key] ?? 0;
             return (
-              <div
-                key={member.id}
-                className="flex items-center justify-between rounded bg-white/[0.03] px-2 py-1"
-              >
-                <span className="text-[10px] text-white/60">{member.name}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-[9px] text-white/30">
-                    {(topOdds * 100).toFixed(0)}% {config.rounds[0]?.label}
+              <div key={member.id}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-medium text-white/60">{member.name}</span>
+                  <span className="text-[10px] font-medium text-emerald-400">
+                    FV {formatCurrency(memberFV)}
                   </span>
-                  <span className="text-[10px] font-medium text-white/80">
-                    {formatCurrency(memberFV)}
-                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  {config.rounds.map((round) => {
+                    const roundOdds = member.odds?.[round.key] ?? 0;
+                    return (
+                      <div
+                        key={round.key}
+                        className="flex-1 rounded-md bg-white/[0.04] px-1 py-1.5 text-center"
+                      >
+                        <p className="text-[9px] text-white/30">{round.label}</p>
+                        <p className="text-[10px] font-bold text-white/80">
+                          {(roundOdds * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
