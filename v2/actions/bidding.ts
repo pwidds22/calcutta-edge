@@ -5,6 +5,20 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
 import type { SessionSettings } from '@/lib/auction/live/types';
 
+/**
+ * Parse team_order from DB (text[]) back to (number | string)[].
+ * Numeric strings become numbers; bundle IDs (e.g. "b:playin-East-16") stay as strings.
+ */
+function parseTeamOrder(raw: unknown): (number | string)[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item: unknown) => {
+    const s = String(item);
+    if (s.startsWith('b:')) return s;
+    const n = Number(s);
+    return isNaN(n) ? s : n;
+  });
+}
+
 function channelName(sessionId: string) {
   return `auction:${sessionId}`;
 }
@@ -58,6 +72,7 @@ export async function startAuction(sessionId: string) {
 
   if (!session || session.commissioner_id !== user.id)
     return { error: 'Not authorized' };
+  session.team_order = parseTeamOrder(session.team_order);
   if (session.status !== 'lobby' && session.status !== 'paused')
     return { error: 'Cannot start auction in current state' };
   if (!session.team_order?.length) return { error: 'No teams in order' };
@@ -108,6 +123,7 @@ export async function presentTeam(sessionId: string, teamIdx: number) {
 
   if (!session || session.commissioner_id !== user.id)
     return { error: 'Not authorized' };
+  session.team_order = parseTeamOrder(session.team_order);
   if (session.status !== 'active') return { error: 'Auction not active' };
   if (session.bidding_status === 'open')
     return { error: 'Close bidding before presenting a new team' };
@@ -210,6 +226,7 @@ export async function placeBid(sessionId: string, amount: number) {
     .single();
 
   if (!session) return { error: 'Session not found' };
+  session.team_order = parseTeamOrder(session.team_order);
   if (session.status !== 'active') return { error: 'Auction not active' };
   if (session.bidding_status !== 'open')
     return { error: 'Bidding is not open' };
@@ -345,6 +362,7 @@ export async function sellTeam(sessionId: string) {
 
   if (!session || session.commissioner_id !== user.id)
     return { error: 'Not authorized' };
+  session.team_order = parseTeamOrder(session.team_order);
   if (session.bidding_status !== 'closed')
     return { error: 'Close bidding first' };
   if (
@@ -357,7 +375,7 @@ export async function sellTeam(sessionId: string) {
   const currentOrderItem = session.team_order[session.current_team_idx];
   const winnerId = session.current_highest_bidder_id;
   const winAmount = session.current_highest_bid;
-  const isBundle = typeof currentOrderItem === 'string' && String(currentOrderItem).startsWith('b:');
+  const isBundle = typeof currentOrderItem === 'string' && currentOrderItem.startsWith('b:');
 
   const admin = createAdminClient();
 
@@ -640,6 +658,7 @@ export async function skipTeam(sessionId: string) {
 
   if (!session || session.commissioner_id !== user.id)
     return { error: 'Not authorized' };
+  session.team_order = parseTeamOrder(session.team_order);
   if (session.status !== 'active') return { error: 'Auction not active' };
   if (session.bidding_status === 'open')
     return { error: 'Close bidding before skipping a team' };
@@ -698,6 +717,7 @@ export async function undoLastSale(sessionId: string) {
 
   if (!session || session.commissioner_id !== user.id)
     return { error: 'Not authorized' };
+  session.team_order = parseTeamOrder(session.team_order);
 
   const admin = createAdminClient();
   const settings = session.settings as SessionSettings | null;
@@ -853,11 +873,12 @@ export async function autoAdvance(sessionId: string) {
 
   if (!session || session.commissioner_id !== user.id)
     return { error: 'Not authorized' };
+  session.team_order = parseTeamOrder(session.team_order);
   if (session.status !== 'active') return { error: 'Auction not active' };
 
   const admin = createAdminClient();
   const currentOrderItem = session.team_order[session.current_team_idx];
-  const isBundle = typeof currentOrderItem === 'string' && String(currentOrderItem).startsWith('b:');
+  const isBundle = typeof currentOrderItem === 'string' && currentOrderItem.startsWith('b:');
 
   // Resolve teamId for bid tracking (bundles use first member team)
   let teamId: number;

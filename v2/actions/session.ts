@@ -9,6 +9,21 @@ import { getUnbundledTeams } from '@/lib/tournaments/bundles';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { SessionSettings } from '@/lib/auction/live/types';
 
+/**
+ * Parse team_order from DB (text[]) back to (number | string)[].
+ * Numeric strings become numbers; bundle IDs (e.g. "b:playin-East-16") stay as strings.
+ */
+function parseTeamOrder(raw: string[] | null): (number | string)[] {
+  if (!raw) return [];
+  return raw.map((item) => {
+    if (typeof item === 'string' && !item.startsWith('b:')) {
+      const n = Number(item);
+      if (!isNaN(n)) return n;
+    }
+    return item;
+  });
+}
+
 /** SHA-256 hash for session passwords (room access codes, not user credentials) */
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
@@ -63,10 +78,11 @@ export async function createSession(input: {
   }
 
   // Build team order: unbundled team IDs + bundle IDs (prefixed with b:)
+  // All values stored as strings in text[] column
   const bundles = input.settings?.bundles ?? [];
   const unbundledTeams = getUnbundledTeams(tournament.teams, bundles);
-  const teamOrder: (number | string)[] = [
-    ...unbundledTeams.map((t) => t.id),
+  const teamOrder: string[] = [
+    ...unbundledTeams.map((t) => String(t.id)),
     ...bundles.map((b) => `b:${b.id}`),
   ];
 
@@ -168,6 +184,9 @@ export async function getSessionState(sessionId: string) {
 
   if (error || !session) return { error: 'Session not found' };
 
+  // Parse team_order from text[] back to (number | string)[]
+  session.team_order = parseTeamOrder(session.team_order);
+
   // Load participants
   const { data: participants } = await supabase
     .from('auction_participants')
@@ -184,20 +203,33 @@ export async function getSessionState(sessionId: string) {
     .order('created_at', { ascending: true });
 
   // Load current team's bid history
-  const currentTeamId = session.team_order?.[session.current_team_idx];
+  const currentOrderItem = session.team_order?.[session.current_team_idx];
   let currentBids: Array<{
     bidder_id: string;
     amount: number;
     created_at: string;
   }> = [];
-  if (currentTeamId != null && session.status === 'active') {
-    const { data } = await supabase
-      .from('auction_bids')
-      .select('bidder_id, amount, created_at')
-      .eq('session_id', sessionId)
-      .eq('team_id', currentTeamId)
-      .order('created_at', { ascending: true });
-    currentBids = data ?? [];
+  if (currentOrderItem != null && session.status === 'active') {
+    // For bundles, bids are tracked against the first member team
+    let bidTeamId: number | null = null;
+    if (typeof currentOrderItem === 'string' && currentOrderItem.startsWith('b:')) {
+      const bundleId = currentOrderItem.slice(2);
+      const settings = session.settings as SessionSettings | null;
+      const bundle = settings?.bundles?.find((b: { id: string }) => b.id === bundleId);
+      bidTeamId = bundle?.teamIds?.[0] ?? null;
+    } else if (typeof currentOrderItem === 'number') {
+      bidTeamId = currentOrderItem;
+    }
+
+    if (bidTeamId != null) {
+      const { data } = await supabase
+        .from('auction_bids')
+        .select('bidder_id, amount, created_at')
+        .eq('session_id', sessionId)
+        .eq('team_id', bidTeamId)
+        .order('created_at', { ascending: true });
+      currentBids = data ?? [];
+    }
   }
 
   const isCommissioner = session.commissioner_id === user.id;
@@ -240,8 +272,10 @@ export async function getSessionState(sessionId: string) {
 
 export async function updateTeamOrder(
   sessionId: string,
-  teamOrder: (number | string)[]
+  teamOrderInput: (number | string)[]
 ) {
+  // Convert to string[] for text[] column
+  const teamOrder = teamOrderInput.map(String);
   const supabase = await createClient();
   const {
     data: { user },
