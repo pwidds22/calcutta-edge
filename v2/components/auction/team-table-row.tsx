@@ -38,9 +38,9 @@ function ProfitCell({
       </div>
       <div
         className="text-[10px] text-muted-foreground tabular-nums cursor-help"
-        title={`${formatPercent(odds)} chance to reach this round\n${formatPercent(roundValue)} of pot value from this round`}
+        title={`${formatPercent(odds)} chance to reach this round\n${formatPercent(roundValue)} of pot → adds ${roundValue > 0 ? '$' + (roundValue * 10000).toFixed(0) : '$0'} to fair value per $10k pot`}
       >
-        {formatPercent(odds)} ({formatPercent(roundValue)})
+        {formatPercent(odds)}
       </div>
     </TableCell>
   );

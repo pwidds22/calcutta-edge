@@ -179,13 +179,22 @@ export function calculateImpliedProbabilities(
   const roundKeys = config.rounds.map((r) => r.key);
 
   for (const team of teams) {
-    const ao = team.americanOdds;
     const raw: Record<string, number> = {};
     const odds: Record<string, number> = {};
 
-    for (const key of roundKeys) {
-      raw[key] = americanOddsToImpliedProbability(ao[key] ?? 0);
-      odds[key] = 0;
+    if (team.probabilities) {
+      // Direct probabilities provided (model-based data, no vig to remove)
+      for (const key of roundKeys) {
+        raw[key] = team.probabilities[key] ?? 0;
+        odds[key] = 0;
+      }
+    } else {
+      // Convert American odds → implied probabilities (includes vig)
+      const ao = team.americanOdds;
+      for (const key of roundKeys) {
+        raw[key] = americanOddsToImpliedProbability(ao[key] ?? 0);
+        odds[key] = 0;
+      }
     }
 
     team.rawImpliedProbabilities = raw;

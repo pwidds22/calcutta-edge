@@ -63,6 +63,10 @@ export interface BaseTeam {
   seed: number;
   group: GroupKey;
   americanOdds: Record<RoundKey, number>;
+  /** Direct probabilities (0–1) per round. When provided, these are used
+   *  instead of converting americanOdds. Useful for model-based data
+   *  (e.g., Evan Miya, KenPom) that already represents fair probabilities. */
+  probabilities?: Record<RoundKey, number>;
 }
 
 export interface Team extends BaseTeam {

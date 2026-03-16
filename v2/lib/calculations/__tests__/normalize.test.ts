@@ -35,6 +35,7 @@ const mockConfig: TournamentConfig = {
     { key: 'largestMargin', label: 'Largest Margin' },
     { key: 'customProp', label: 'Custom Prop' },
   ],
+  badge: 'Test',
   teamLabel: 'Team',
   groupLabel: 'Region',
   startDate: '2026-03-17',
