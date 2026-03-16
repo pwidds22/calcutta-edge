@@ -234,7 +234,14 @@ export function useAuctionChannel(
         setState((prev) => ({ ...prev, auctionStatus: 'completed' }));
       })
       .on('broadcast', { event: 'TEAM_ORDER_UPDATED' }, ({ payload }) => {
-        setState((prev) => ({ ...prev, teamOrder: payload.teamOrder }));
+        // Parse team order: DB returns text[] (all strings), but we need
+        // numeric IDs as numbers and bundle IDs (b:...) as strings
+        const parsed = (payload.teamOrder as string[]).map((item: string) => {
+          if (typeof item === 'string' && item.startsWith('b:')) return item;
+          const n = Number(item);
+          return isNaN(n) ? item : n;
+        });
+        setState((prev) => ({ ...prev, teamOrder: parsed }));
       })
       .on('broadcast', { event: 'TIMER_START' }, ({ payload }) => {
         setState((prev) => ({
