@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState, useEffect } from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -61,12 +61,26 @@ export const TeamTableRow = memo(function TeamTableRow({
     ? calculateRoundProfits(team.purchasePrice, payoutRules, potSize, config)
     : {};
 
-  const handlePriceChange = useCallback(
+  // Local state for price input — only dispatches on blur to prevent
+  // the team from disappearing mid-edit when "Available" filter is active
+  const [localPrice, setLocalPrice] = useState(team.purchasePrice || '');
+
+  // Sync from external state changes (e.g., auto-save load)
+  useEffect(() => {
+    setLocalPrice(team.purchasePrice || '');
+  }, [team.purchasePrice]);
+
+  const handleLocalPriceChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      onPriceChange(team.id, parseFloat(e.target.value) || 0);
+      setLocalPrice(e.target.value);
     },
-    [team.id, onPriceChange]
+    []
   );
+
+  const handlePriceBlur = useCallback(() => {
+    const price = parseFloat(String(localPrice)) || 0;
+    onPriceChange(team.id, price);
+  }, [team.id, localPrice, onPriceChange]);
 
   const handleMyTeamToggle = useCallback(
     (checked: boolean | 'indeterminate') => {
@@ -134,8 +148,9 @@ export const TeamTableRow = memo(function TeamTableRow({
           type="number"
           min={0}
           step={1}
-          value={team.purchasePrice || ''}
-          onChange={handlePriceChange}
+          value={localPrice}
+          onChange={handleLocalPriceChange}
+          onBlur={handlePriceBlur}
           placeholder="0"
           className="h-7 w-20 text-right text-xs tabular-nums"
         />
