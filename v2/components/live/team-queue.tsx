@@ -1,18 +1,19 @@
 'use client';
 
-import type { BaseTeam } from '@/lib/tournaments/types';
+import type { BaseTeam, TeamBundle } from '@/lib/tournaments/types';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import { presentTeam } from '@/actions/bidding';
 import { cn } from '@/lib/utils';
-import { List } from 'lucide-react';
+import { List, Package } from 'lucide-react';
 
 interface TeamQueueProps {
   sessionId: string;
-  teamOrder: number[];
+  teamOrder: (number | string)[];
   baseTeams: BaseTeam[];
   soldTeams: SoldTeam[];
   currentTeamIdx: number | null;
   auctionStatus: string;
+  bundles?: TeamBundle[];
 }
 
 export function TeamQueue({
@@ -22,9 +23,11 @@ export function TeamQueue({
   soldTeams,
   currentTeamIdx,
   auctionStatus,
+  bundles = [],
 }: TeamQueueProps) {
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
   const soldMap = new Map(soldTeams.map((s) => [s.teamId, s]));
+  const bundleMap = new Map(bundles.map((b) => [b.id, b]));
 
   const handleJump = async (idx: number) => {
     if (auctionStatus === 'active') {
@@ -41,10 +44,60 @@ export function TeamQueue({
         </h3>
       </div>
       <div className="max-h-[40vh] lg:max-h-[calc(100vh-16rem)] overflow-y-auto p-1.5">
-        {teamOrder.map((teamId, idx) => {
+        {teamOrder.map((item, idx) => {
+          const isBundle = typeof item === 'string' && item.startsWith('b:');
+          const isCurrent = idx === currentTeamIdx;
+
+          if (isBundle) {
+            const bundleId = item.slice(2);
+            const bundle = bundleMap.get(bundleId);
+            // A bundle is sold if ALL member teams are in soldMap
+            const allMembersSold = bundle
+              ? bundle.teamIds.every((tid) => soldMap.has(tid))
+              : false;
+            const totalSoldAmount = bundle
+              ? bundle.teamIds.reduce(
+                  (sum, tid) => sum + (soldMap.get(tid)?.amount ?? 0),
+                  0
+                )
+              : 0;
+
+            return (
+              <button
+                key={item}
+                onClick={() => handleJump(idx)}
+                disabled={auctionStatus !== 'active' || allMembersSold}
+                className={cn(
+                  'flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-sm transition-colors',
+                  isCurrent
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : allMembersSold
+                      ? 'text-white/25'
+                      : 'text-white/60 hover:bg-white/[0.04] hover:text-white/80'
+                )}
+              >
+                <span className="flex items-center gap-2 truncate">
+                  <span className="text-xs text-white/30 w-5 text-right">
+                    {idx + 1}
+                  </span>
+                  <Package className="size-3 flex-shrink-0 text-amber-400/60" />
+                  <span className="truncate">
+                    {bundle?.name ?? `Bundle ${bundleId}`}
+                  </span>
+                </span>
+                {allMembersSold && totalSoldAmount > 0 && (
+                  <span className="ml-2 flex-shrink-0 text-xs font-mono text-white/30">
+                    ${totalSoldAmount}
+                  </span>
+                )}
+              </button>
+            );
+          }
+
+          // Regular team
+          const teamId = item as number;
           const team = teamMap.get(teamId);
           const sold = soldMap.get(teamId);
-          const isCurrent = idx === currentTeamIdx;
 
           return (
             <button

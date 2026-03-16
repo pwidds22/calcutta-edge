@@ -32,7 +32,7 @@ export interface AuctionChannelState {
     displayName: string;
     isCommissioner: boolean;
   }>;
-  teamOrder: number[] | null;
+  teamOrder: (number | string)[] | null;
   // Timer state
   timerEndsAt: string | null;
   timerDurationMs: number;
@@ -54,7 +54,7 @@ export interface UseAuctionChannelOptions {
     bidHistory: BidEntry[];
     soldTeams: SoldTeam[];
     auctionStatus: string;
-    teamOrder?: number[];
+    teamOrder?: (number | string)[];
     timerEndsAt?: string | null;
     timerDurationMs?: number | null;
     autoMode?: boolean;
@@ -149,27 +149,42 @@ export function useAuctionChannel(
         }));
       })
       .on('broadcast', { event: 'TEAM_SOLD' }, ({ payload }) => {
-        setState((prev) => ({
-          ...prev,
-          soldTeams: [
-            ...prev.soldTeams,
-            {
+        setState((prev) => {
+          // Bundle sales include bundleTeamIds — add a SoldTeam entry for each member
+          const newSoldTeams: SoldTeam[] = [];
+          if (payload.bundleTeamIds && Array.isArray(payload.bundleTeamIds)) {
+            const splitAmount = Math.round(payload.amount / payload.bundleTeamIds.length);
+            const remainder = payload.amount - (splitAmount * payload.bundleTeamIds.length);
+            for (let i = 0; i < payload.bundleTeamIds.length; i++) {
+              newSoldTeams.push({
+                teamId: payload.bundleTeamIds[i],
+                winnerId: payload.winnerId,
+                winnerName: payload.winnerName,
+                amount: i === 0 ? splitAmount + remainder : splitAmount,
+              });
+            }
+          } else {
+            newSoldTeams.push({
               teamId: payload.teamId,
               winnerId: payload.winnerId,
               winnerName: payload.winnerName,
               amount: payload.amount,
-            },
-          ],
-          currentTeamIdx: payload.nextTeamIdx ?? prev.currentTeamIdx,
-          biddingStatus: 'waiting',
-          bidHistory: [],
-          currentHighestBid: 0,
-          currentHighestBidderName: null,
-          auctionStatus: payload.isComplete ? 'completed' : prev.auctionStatus,
-          timerEndsAt: null,
-          timerDurationMs: 0,
-          timerIsRunning: false,
-        }));
+            });
+          }
+          return {
+            ...prev,
+            soldTeams: [...prev.soldTeams, ...newSoldTeams],
+            currentTeamIdx: payload.nextTeamIdx ?? prev.currentTeamIdx,
+            biddingStatus: 'waiting',
+            bidHistory: [],
+            currentHighestBid: 0,
+            currentHighestBidderName: null,
+            auctionStatus: payload.isComplete ? 'completed' : prev.auctionStatus,
+            timerEndsAt: null,
+            timerDurationMs: 0,
+            timerIsRunning: false,
+          };
+        });
       })
       .on('broadcast', { event: 'TEAM_SKIPPED' }, ({ payload }) => {
         setState((prev) => ({
@@ -185,18 +200,26 @@ export function useAuctionChannel(
         }));
       })
       .on('broadcast', { event: 'SALE_UNDONE' }, ({ payload }) => {
-        setState((prev) => ({
-          ...prev,
-          soldTeams: prev.soldTeams.filter(
-            (t) => t.teamId !== payload.teamId
-          ),
-          currentTeamIdx: payload.teamIdx,
-          biddingStatus: 'waiting',
-          bidHistory: [],
-          currentHighestBid: 0,
-          currentHighestBidderName: null,
-          auctionStatus: 'active',
-        }));
+        setState((prev) => {
+          // Bundle undo includes bundleTeamIds — remove all member teams from soldTeams
+          const teamIdsToRemove: Set<number> = new Set(
+            payload.bundleTeamIds && Array.isArray(payload.bundleTeamIds)
+              ? payload.bundleTeamIds
+              : [payload.teamId]
+          );
+          return {
+            ...prev,
+            soldTeams: prev.soldTeams.filter(
+              (t) => !teamIdsToRemove.has(t.teamId)
+            ),
+            currentTeamIdx: payload.teamIdx,
+            biddingStatus: 'waiting',
+            bidHistory: [],
+            currentHighestBid: 0,
+            currentHighestBidderName: null,
+            auctionStatus: 'active',
+          };
+        });
       })
       .on('broadcast', { event: 'AUCTION_PAUSED' }, () => {
         setState((prev) => ({

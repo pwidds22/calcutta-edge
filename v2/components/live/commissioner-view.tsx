@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuctionChannel } from '@/lib/auction/live/use-auction-channel';
 import { useTimer } from '@/lib/auction/live/use-timer';
-import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import type { BaseTeam, TournamentConfig, PayoutRules, TeamBundle } from '@/lib/tournaments/types';
 import type { BidEntry, SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { SessionSettings } from '@/lib/auction/live/types';
 import { updateTeamOrder } from '@/actions/session';
@@ -30,7 +30,7 @@ interface CommissionerViewProps {
     name: string;
     join_code: string;
     status: string;
-    team_order: number[];
+    team_order: (number | string)[];
     current_team_idx: number;
     bidding_status: string;
     current_highest_bid: number;
@@ -123,10 +123,13 @@ export function CommissionerView({
   const activeTeamOrder = channel.teamOrder ?? session.team_order;
 
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
-  const currentTeamId =
-    channel.currentTeamIdx !== null
-      ? activeTeamOrder[channel.currentTeamIdx]
-      : null;
+  const bundles: TeamBundle[] = session.settings?.bundles ?? [];
+
+  const currentOrderItem = channel.currentTeamIdx !== null ? activeTeamOrder[channel.currentTeamIdx] : null;
+  const isCurrentBundle = typeof currentOrderItem === 'string' && currentOrderItem.startsWith('b:');
+  const currentBundleId = isCurrentBundle ? currentOrderItem.slice(2) : null;
+  const currentBundle = currentBundleId ? bundles.find(b => b.id === currentBundleId) : null;
+  const currentTeamId = currentOrderItem;  // number | string | null — passed to strategy overlay
 
   // Fisher-Yates shuffle
   const handleShuffle = useCallback(async () => {
@@ -171,7 +174,17 @@ export function CommissionerView({
     }
   }, [channel.timerIsRunning, channel.timerEndsAt, channel.timerDurationMs]);
 
-  const currentTeam = currentTeamId ? teamMap.get(currentTeamId) ?? null : null;
+  const currentTeam = !isCurrentBundle && typeof currentOrderItem === 'number'
+    ? teamMap.get(currentOrderItem) ?? null
+    : null;
+  const currentBundleInfo = currentBundle
+    ? {
+        name: currentBundle.name,
+        teams: currentBundle.teamIds
+          .map((tid) => teamMap.get(tid))
+          .filter((t): t is BaseTeam => !!t),
+      }
+    : undefined;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4 space-y-4">
@@ -258,6 +271,7 @@ export function CommissionerView({
               soldTeams={channel.soldTeams}
               currentTeamIdx={channel.currentTeamIdx}
               auctionStatus={channel.auctionStatus}
+              bundles={bundles}
             />
           </div>
 
@@ -268,6 +282,7 @@ export function CommissionerView({
               config={config}
               teamIndex={channel.currentTeamIdx ?? 0}
               totalTeams={activeTeamOrder.length}
+              bundleInfo={currentBundleInfo}
             />
 
             <StrategyOverlay

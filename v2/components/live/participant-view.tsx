@@ -3,7 +3,7 @@
 import { useCallback, useEffect } from 'react';
 import { useAuctionChannel } from '@/lib/auction/live/use-auction-channel';
 import { useTimer } from '@/lib/auction/live/use-timer';
-import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import type { BaseTeam, TournamentConfig, PayoutRules, TeamBundle } from '@/lib/tournaments/types';
 import type { BidEntry, SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { SessionSettings } from '@/lib/auction/live/types';
 import { AuctionStatusBar } from './auction-status-bar';
@@ -25,7 +25,7 @@ interface ParticipantViewProps {
     name: string;
     join_code: string;
     status: string;
-    team_order: number[];
+    team_order: (number | string)[];
     current_team_idx: number;
     bidding_status: string;
     current_highest_bid: number;
@@ -115,10 +115,13 @@ export function ParticipantView({
   const activeTeamOrder = channel.teamOrder ?? session.team_order;
 
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
-  const currentTeamId =
-    channel.currentTeamIdx !== null
-      ? activeTeamOrder[channel.currentTeamIdx]
-      : null;
+  const bundles: TeamBundle[] = session.settings?.bundles ?? [];
+
+  const currentOrderItem = channel.currentTeamIdx !== null ? activeTeamOrder[channel.currentTeamIdx] : null;
+  const isCurrentBundle = typeof currentOrderItem === 'string' && currentOrderItem.startsWith('b:');
+  const currentBundleId = isCurrentBundle ? currentOrderItem.slice(2) : null;
+  const currentBundle = currentBundleId ? bundles.find(b => b.id === currentBundleId) : null;
+  const currentTeamId = currentOrderItem;
   // Timer (participants don't trigger auto-close, just display)
   const timer = useTimer({
     isCommissioner: false,
@@ -134,7 +137,17 @@ export function ParticipantView({
     }
   }, [channel.timerIsRunning, channel.timerEndsAt, channel.timerDurationMs]);
 
-  const currentTeam = currentTeamId ? teamMap.get(currentTeamId) ?? null : null;
+  const currentTeam = !isCurrentBundle && typeof currentOrderItem === 'number'
+    ? teamMap.get(currentOrderItem) ?? null
+    : null;
+  const currentBundleInfo = currentBundle
+    ? {
+        name: currentBundle.name,
+        teams: currentBundle.teamIds
+          .map((tid) => teamMap.get(tid))
+          .filter((t): t is BaseTeam => !!t),
+      }
+    : undefined;
 
   if (channel.auctionStatus === 'lobby') {
     return (
@@ -197,6 +210,7 @@ export function ParticipantView({
               soldTeams={channel.soldTeams}
               currentTeamIdx={channel.currentTeamIdx}
               auctionStatus={channel.auctionStatus}
+              bundles={bundles}
             />
           </div>
 
@@ -207,6 +221,7 @@ export function ParticipantView({
               config={config}
               teamIndex={channel.currentTeamIdx ?? 0}
               totalTeams={activeTeamOrder.length}
+              bundleInfo={currentBundleInfo}
             />
 
             <StrategyOverlay

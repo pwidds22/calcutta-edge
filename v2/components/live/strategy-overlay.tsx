@@ -8,7 +8,7 @@ import { TrendingUp, Lock, ExternalLink } from 'lucide-react';
 
 interface StrategyOverlayProps {
   hasPaid: boolean;
-  currentTeamId: number | null;
+  currentTeamId: number | string | null;
   currentHighestBid: number;
   config: TournamentConfig;
   baseTeams: BaseTeam[];
@@ -74,6 +74,9 @@ export function StrategyOverlay({
   }
 
   if (currentTeamId === null) return null;
+
+  // Skip strategy overlay for bundles — no single-team fair value applies
+  if (typeof currentTeamId === 'string') return null;
 
   // Build saved data from sold teams for calculation engine
   const savedTeams = soldTeams.map((s) => ({

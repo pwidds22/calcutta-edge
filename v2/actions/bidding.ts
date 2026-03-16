@@ -220,7 +220,19 @@ export async function placeBid(sessionId: string, amount: number) {
     };
   }
 
-  const teamId = session.team_order[session.current_team_idx];
+  // Resolve team_id for bid tracking — bundles use first member team
+  const currentOrderItem = session.team_order[session.current_team_idx];
+  let teamId: number;
+  if (typeof currentOrderItem === 'string' && currentOrderItem.startsWith('b:')) {
+    const bundleId = currentOrderItem.slice(2);
+    const settings = session.settings as SessionSettings | null;
+    const bundle = settings?.bundles?.find((b: { id: string }) => b.id === bundleId);
+    if (!bundle || !bundle.teamIds?.length) return { error: 'Bundle not found' };
+    teamId = bundle.teamIds[0];
+  } else {
+    teamId = currentOrderItem as number;
+  }
+
   const admin = createAdminClient();
 
   // Atomic conditional update (handles race conditions)
@@ -342,20 +354,12 @@ export async function sellTeam(sessionId: string) {
     return { error: 'No bids placed' };
   }
 
-  const teamId = session.team_order[session.current_team_idx];
+  const currentOrderItem = session.team_order[session.current_team_idx];
   const winnerId = session.current_highest_bidder_id;
   const winAmount = session.current_highest_bid;
+  const isBundle = typeof currentOrderItem === 'string' && String(currentOrderItem).startsWith('b:');
 
   const admin = createAdminClient();
-
-  // 1. Mark winning bid
-  await admin
-    .from('auction_bids')
-    .update({ is_winning_bid: true })
-    .eq('session_id', sessionId)
-    .eq('team_id', teamId)
-    .eq('bidder_id', winnerId)
-    .eq('amount', winAmount);
 
   // 2. Get winner's display name
   const { data: winnerParticipant } = await admin
@@ -365,17 +369,78 @@ export async function sellTeam(sessionId: string) {
     .eq('user_id', winnerId)
     .single();
 
-  // 3. Auto-sync: update paid participants' auction_data
-  await syncAuctionData(
-    admin,
-    sessionId,
-    session.tournament_id,
-    teamId,
-    winnerId,
-    winAmount,
-    session.payout_rules,
-    session.estimated_pot_size
-  );
+  let bundleTeamIds: number[] | undefined;
+
+  if (isBundle) {
+    const bundleId = String(currentOrderItem).slice(2);
+    const settings = session.settings as SessionSettings | null;
+    const bundle = settings?.bundles?.find((b: { id: string }) => b.id === bundleId);
+    if (!bundle) return { error: 'Bundle not found' };
+
+    bundleTeamIds = bundle.teamIds;
+    const splitAmount = Math.round(winAmount / bundle.teamIds.length);
+    const remainder = winAmount - (splitAmount * bundle.teamIds.length);
+
+    // Bids were tracked against first team — mark winning bid there
+    await admin
+      .from('auction_bids')
+      .update({ is_winning_bid: true })
+      .eq('session_id', sessionId)
+      .eq('team_id', bundle.teamIds[0])
+      .eq('bidder_id', winnerId)
+      .eq('amount', winAmount);
+
+    // Record winning bid + sync for each member team
+    for (let i = 0; i < bundle.teamIds.length; i++) {
+      const memberTeamId = bundle.teamIds[i];
+      const amount = i === 0 ? splitAmount + remainder : splitAmount;
+
+      // Insert individual bid records for each member (for settlement/results tracking)
+      if (i > 0) {
+        await admin.from('auction_bids').insert({
+          session_id: sessionId,
+          team_id: memberTeamId,
+          bidder_id: winnerId,
+          amount,
+          is_winning_bid: true,
+        });
+      }
+
+      await syncAuctionData(
+        admin,
+        sessionId,
+        session.tournament_id,
+        memberTeamId,
+        winnerId,
+        amount,
+        session.payout_rules,
+        session.estimated_pot_size
+      );
+    }
+  } else {
+    const teamId = currentOrderItem as number;
+
+    // 1. Mark winning bid
+    await admin
+      .from('auction_bids')
+      .update({ is_winning_bid: true })
+      .eq('session_id', sessionId)
+      .eq('team_id', teamId)
+      .eq('bidder_id', winnerId)
+      .eq('amount', winAmount);
+
+    // 3. Auto-sync: update paid participants' auction_data
+    await syncAuctionData(
+      admin,
+      sessionId,
+      session.tournament_id,
+      teamId,
+      winnerId,
+      winAmount,
+      session.payout_rules,
+      session.estimated_pot_size
+    );
+  }
 
   // 4. Advance to next team
   const nextIdx = session.current_team_idx + 1;
@@ -397,12 +462,13 @@ export async function sellTeam(sessionId: string) {
   // 5. Stop timer + broadcast
   await broadcastToChannel(channelName(sessionId), 'TIMER_STOP', {});
   await broadcastToChannel(channelName(sessionId), 'TEAM_SOLD', {
-    teamId,
+    teamId: isBundle ? bundleTeamIds![0] : (currentOrderItem as number),
     winnerId,
     winnerName: winnerParticipant?.display_name ?? 'Unknown',
     amount: winAmount,
     nextTeamIdx: isLastTeam ? null : nextIdx,
     isComplete: isLastTeam,
+    ...(bundleTeamIds ? { bundleTeamIds } : {}),
   });
 
   if (isLastTeam) {
@@ -626,7 +692,7 @@ export async function undoLastSale(sessionId: string) {
 
   const { data: session } = await supabase
     .from('auction_sessions')
-    .select('commissioner_id, team_order, current_team_idx, tournament_id')
+    .select('commissioner_id, team_order, current_team_idx, tournament_id, settings')
     .eq('id', sessionId)
     .single();
 
@@ -634,11 +700,12 @@ export async function undoLastSale(sessionId: string) {
     return { error: 'Not authorized' };
 
   const admin = createAdminClient();
+  const settings = session.settings as SessionSettings | null;
 
   // Find most recent winning bid
   const { data: lastSale } = await admin
     .from('auction_bids')
-    .select('id, team_id, bidder_id, amount')
+    .select('id, team_id, bidder_id, amount, created_at')
     .eq('session_id', sessionId)
     .eq('is_winning_bid', true)
     .order('created_at', { ascending: false })
@@ -647,25 +714,58 @@ export async function undoLastSale(sessionId: string) {
 
   if (!lastSale) return { error: 'No sales to undo' };
 
-  // Unmark the winning bid (preserve bid history for audit trail)
-  await admin
-    .from('auction_bids')
-    .update({ is_winning_bid: false })
-    .eq('id', lastSale.id);
-
-  // Reverse the strategy tool sync — reset the team to unowned state
-  await reverseSyncAuctionData(
-    admin,
-    sessionId,
-    session.tournament_id,
-    lastSale.team_id
+  // Check if last sale was part of a bundle — find the bundle containing this team
+  const bundles = settings?.bundles ?? [];
+  const parentBundle = bundles.find((b: { teamIds: number[] }) =>
+    b.teamIds.includes(lastSale.team_id)
   );
 
-  // Find the team's index in the current order
-  const teamIdx = session.team_order.indexOf(lastSale.team_id);
+  let bundleTeamIds: number[] | undefined;
+
+  if (parentBundle) {
+    bundleTeamIds = parentBundle.teamIds;
+    // Undo ALL winning bids for member teams in this bundle
+    for (const memberTeamId of parentBundle.teamIds) {
+      await admin
+        .from('auction_bids')
+        .update({ is_winning_bid: false })
+        .eq('session_id', sessionId)
+        .eq('team_id', memberTeamId)
+        .eq('is_winning_bid', true);
+
+      await reverseSyncAuctionData(
+        admin,
+        sessionId,
+        session.tournament_id,
+        memberTeamId
+      );
+    }
+  } else {
+    // Single team: unmark the winning bid
+    await admin
+      .from('auction_bids')
+      .update({ is_winning_bid: false })
+      .eq('id', lastSale.id);
+
+    await reverseSyncAuctionData(
+      admin,
+      sessionId,
+      session.tournament_id,
+      lastSale.team_id
+    );
+  }
+
+  // Find the item's index in the current order
+  // For bundles, look for the b: prefixed entry; for teams, look for the team id
+  let teamIdx: number;
+  if (parentBundle) {
+    teamIdx = session.team_order.indexOf(`b:${parentBundle.id}`);
+  } else {
+    teamIdx = session.team_order.indexOf(lastSale.team_id);
+  }
 
   if (teamIdx < 0) {
-    // Team not found in order (e.g., after shuffle) — fall back to previous position
+    // Item not found in order (e.g., after shuffle) — fall back to previous position
     const fallbackIdx = Math.max(0, session.current_team_idx - 1);
     await admin
       .from('auction_sessions')
@@ -681,6 +781,7 @@ export async function undoLastSale(sessionId: string) {
     await broadcastToChannel(channelName(sessionId), 'SALE_UNDONE', {
       teamId: lastSale.team_id,
       teamIdx: fallbackIdx,
+      ...(bundleTeamIds ? { bundleTeamIds } : {}),
     });
   } else {
     await admin
@@ -697,6 +798,7 @@ export async function undoLastSale(sessionId: string) {
     await broadcastToChannel(channelName(sessionId), 'SALE_UNDONE', {
       teamId: lastSale.team_id,
       teamIdx,
+      ...(bundleTeamIds ? { bundleTeamIds } : {}),
     });
   }
 
@@ -754,7 +856,22 @@ export async function autoAdvance(sessionId: string) {
   if (session.status !== 'active') return { error: 'Auction not active' };
 
   const admin = createAdminClient();
-  const teamId = session.team_order[session.current_team_idx];
+  const currentOrderItem = session.team_order[session.current_team_idx];
+  const isBundle = typeof currentOrderItem === 'string' && String(currentOrderItem).startsWith('b:');
+
+  // Resolve teamId for bid tracking (bundles use first member team)
+  let teamId: number;
+  let bundleTeamIds: number[] | undefined;
+  if (isBundle) {
+    const bundleId = String(currentOrderItem).slice(2);
+    const autoSettings = session.settings as SessionSettings | null;
+    const bundle = autoSettings?.bundles?.find((b: { id: string }) => b.id === bundleId);
+    if (!bundle || !bundle.teamIds?.length) return { error: 'Bundle not found' };
+    teamId = bundle.teamIds[0];
+    bundleTeamIds = bundle.teamIds;
+  } else {
+    teamId = currentOrderItem as number;
+  }
 
   // 1. Close bidding
   await admin
@@ -776,7 +893,7 @@ export async function autoAdvance(sessionId: string) {
   const isLastTeam = nextIdx >= session.team_order.length;
 
   if (hasBids) {
-    // 2a. Sell team to highest bidder
+    // 2a. Sell team/bundle to highest bidder
     const winnerId = session.current_highest_bidder_id!;
     const winAmount = session.current_highest_bid;
 
@@ -797,17 +914,49 @@ export async function autoAdvance(sessionId: string) {
       .eq('user_id', winnerId)
       .single();
 
-    // Sync auction data
-    await syncAuctionData(
-      admin,
-      sessionId,
-      session.tournament_id,
-      teamId,
-      winnerId,
-      winAmount,
-      session.payout_rules,
-      session.estimated_pot_size
-    );
+    if (isBundle && bundleTeamIds) {
+      // Split price across member teams and sync each
+      const splitAmount = Math.round(winAmount / bundleTeamIds.length);
+      const remainder = winAmount - (splitAmount * bundleTeamIds.length);
+
+      for (let i = 0; i < bundleTeamIds.length; i++) {
+        const memberTeamId = bundleTeamIds[i];
+        const amount = i === 0 ? splitAmount + remainder : splitAmount;
+
+        if (i > 0) {
+          await admin.from('auction_bids').insert({
+            session_id: sessionId,
+            team_id: memberTeamId,
+            bidder_id: winnerId,
+            amount,
+            is_winning_bid: true,
+          });
+        }
+
+        await syncAuctionData(
+          admin,
+          sessionId,
+          session.tournament_id,
+          memberTeamId,
+          winnerId,
+          amount,
+          session.payout_rules,
+          session.estimated_pot_size
+        );
+      }
+    } else {
+      // Sync single team auction data
+      await syncAuctionData(
+        admin,
+        sessionId,
+        session.tournament_id,
+        teamId,
+        winnerId,
+        winAmount,
+        session.payout_rules,
+        session.estimated_pot_size
+      );
+    }
 
     // Advance
     await admin
@@ -828,6 +977,7 @@ export async function autoAdvance(sessionId: string) {
       amount: winAmount,
       nextTeamIdx: isLastTeam ? null : nextIdx,
       isComplete: isLastTeam,
+      ...(bundleTeamIds ? { bundleTeamIds } : {}),
     });
 
     if (isLastTeam) {
@@ -848,7 +998,7 @@ export async function autoAdvance(sessionId: string) {
       .eq('id', sessionId);
 
     await broadcastToChannel(channelName(sessionId), 'TEAM_SKIPPED', {
-      teamId,
+      teamId: isBundle ? teamId : (currentOrderItem as number),
       nextTeamIdx: isLastTeam ? null : nextIdx,
     });
 
