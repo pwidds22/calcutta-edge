@@ -209,20 +209,31 @@ export function StrategyOverlay({
         </div>
       )}
 
-      {/* Bundle: per-member fair value breakdown */}
+      {/* Bundle: per-member breakdown with odds + fair value */}
       {isBundle && bundleTeams.length > 0 && (
-        <div className="mt-3 space-y-1">
+        <div className="mt-3 space-y-2">
           {bundleTeams.map((member) => {
             const memberFV = member.valuePercentage * projectedPot;
             return (
-              <div
-                key={member.id}
-                className="flex items-center justify-between rounded-md bg-white/[0.04] px-2 py-1"
-              >
-                <span className="text-[10px] text-white/60">{member.name}</span>
-                <span className="text-[10px] font-medium text-white/80">
-                  {formatCurrency(memberFV)}
-                </span>
+              <div key={member.id} className="rounded-md bg-white/[0.04] px-2 py-1.5">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-medium text-white/70">{member.name}</span>
+                  <span className="text-[10px] font-medium text-emerald-400">
+                    FV {formatCurrency(memberFV)}
+                  </span>
+                </div>
+                <div className="flex gap-1">
+                  {config.rounds.map((round) => {
+                    const odds = member.odds?.[round.key] ?? 0;
+                    if (odds === 0) return null;
+                    return (
+                      <div key={round.key} className="flex-1 text-center">
+                        <p className="text-[8px] text-white/25">{round.label}</p>
+                        <p className="text-[9px] text-white/60">{(odds * 100).toFixed(1)}%</p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}

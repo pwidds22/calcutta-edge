@@ -35,45 +35,20 @@ export function TeamSpotlight({
           </div>
         </div>
 
-        {/* Member teams */}
-        <div className="mt-4 space-y-2">
+        {/* Member teams — identity only, strategy overlay handles numbers */}
+        <div className="mt-4 flex flex-wrap gap-2">
           {bundleInfo.teams.map((member) => (
             <div
               key={member.id}
-              className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-3"
+              className="flex items-center gap-1.5 rounded-lg bg-white/[0.03] border border-white/[0.04] px-3 py-1.5"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                  #{member.seed}
-                </span>
-                <span className="text-sm font-medium text-white">
-                  {member.name}
-                </span>
-                <span className="text-xs text-white/40">{member.group}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-                {config.rounds.map((round) => {
-                  const prob = member.probabilities?.[round.key];
-                  const americanOdds = member.americanOdds[round.key];
-                  const hasProb = prob !== undefined && prob > 0;
-                  const hasAmerican = americanOdds !== undefined && americanOdds !== 0;
-                  if (!hasProb && !hasAmerican) return null;
-                  const display = hasProb
-                    ? `${(prob * 100).toFixed(1)}%`
-                    : americanOdds > 0 ? `+${americanOdds}` : americanOdds.toString();
-                  return (
-                    <div
-                      key={round.key}
-                      className="rounded-md bg-white/[0.04] px-1.5 py-1 text-center"
-                    >
-                      <p className="text-[9px] text-white/40">{round.label}</p>
-                      <p className="text-[10px] font-medium text-white/80">
-                        {display}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+              <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                #{member.seed}
+              </span>
+              <span className="text-sm font-medium text-white">
+                {member.name}
+              </span>
+              <span className="text-xs text-white/30">{member.group}</span>
             </div>
           ))}
         </div>
@@ -81,7 +56,7 @@ export function TeamSpotlight({
     );
   }
 
-  // Single team display (existing)
+  // Single team display
   if (!team) {
     return (
       <div className="flex items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] py-12">
@@ -107,30 +82,6 @@ export function TeamSpotlight({
             </span>
           </div>
         </div>
-      </div>
-
-      {/* Odds by round */}
-      <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
-        {config.rounds.map((round) => {
-          const prob = team.probabilities?.[round.key];
-          const americanOdds = team.americanOdds[round.key];
-          // Prefer probabilities (model-based), fall back to American odds
-          const hasProb = prob !== undefined && prob > 0;
-          const hasAmerican = americanOdds !== undefined && americanOdds !== 0;
-          if (!hasProb && !hasAmerican) return null;
-          const display = hasProb
-            ? `${(prob * 100).toFixed(1)}%`
-            : americanOdds > 0 ? `+${americanOdds}` : americanOdds.toString();
-          return (
-            <div
-              key={round.key}
-              className="rounded-md bg-white/[0.04] px-2 py-1.5 text-center"
-            >
-              <p className="text-[10px] text-white/40">{round.label}</p>
-              <p className="text-xs font-medium text-white/80">{display}</p>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
