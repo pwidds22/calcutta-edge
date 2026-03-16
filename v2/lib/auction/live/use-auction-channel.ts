@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { ChatMessage } from './chat-types';
+import { CHAT_MAX_MESSAGES } from './chat-types';
 
 export interface BidEntry {
   bidderId: string;
@@ -39,6 +41,11 @@ export interface AuctionChannelState {
   timerIsRunning: boolean;
   // Auto-auction mode
   autoMode: boolean;
+  // Chat
+  chatMessages: ChatMessage[];
+  chatMuted: boolean;
+  // Payment tracking
+  paymentTracking: Record<string, boolean>;
 }
 
 export interface UseAuctionChannelOptions {
@@ -58,12 +65,18 @@ export interface UseAuctionChannelOptions {
     timerEndsAt?: string | null;
     timerDurationMs?: number | null;
     autoMode?: boolean;
+    paymentTracking?: Record<string, boolean>;
   };
+}
+
+export interface AuctionChannelActions {
+  sendChatMessage: (text: string) => void;
+  toggleChatMute: () => void;
 }
 
 export function useAuctionChannel(
   options: UseAuctionChannelOptions
-): AuctionChannelState {
+): AuctionChannelState & AuctionChannelActions {
   const { sessionId, userId, displayName, isCommissioner, initialState } =
     options;
 
@@ -83,6 +96,9 @@ export function useAuctionChannel(
     timerDurationMs: initialState.timerDurationMs ?? 0,
     timerIsRunning: !!(initialState.timerEndsAt && initialState.timerDurationMs && new Date(initialState.timerEndsAt) > new Date()),
     autoMode: initialState.autoMode ?? false,
+    chatMessages: [],
+    chatMuted: false,
+    paymentTracking: initialState.paymentTracking ?? {},
   });
 
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -270,6 +286,24 @@ export function useAuctionChannel(
       .on('broadcast', { event: 'AUTO_MODE_TOGGLED' }, ({ payload }) => {
         setState((prev) => ({ ...prev, autoMode: payload.autoMode }));
       })
+      .on('broadcast', { event: 'CHAT_MESSAGE' }, ({ payload }) => {
+        setState((prev) => {
+          const msg = payload as ChatMessage;
+          const updated = [msg, ...prev.chatMessages];
+          return {
+            ...prev,
+            chatMessages: updated.length > CHAT_MAX_MESSAGES
+              ? updated.slice(0, CHAT_MAX_MESSAGES)
+              : updated,
+          };
+        });
+      })
+      .on('broadcast', { event: 'CHAT_MUTED' }, () => {
+        setState((prev) => ({ ...prev, chatMuted: true }));
+      })
+      .on('broadcast', { event: 'CHAT_UNMUTED' }, () => {
+        setState((prev) => ({ ...prev, chatMuted: false }));
+      })
       .on('broadcast', { event: 'RESULT_UPDATED' }, ({ payload }) => {
         const handler = (window as unknown as Record<string, unknown>).__tournamentResultUpdate;
         if (typeof handler === 'function') handler(payload);
@@ -280,6 +314,18 @@ export function useAuctionChannel(
       })
       .on('broadcast', { event: 'TOURNAMENT_SETTLED' }, () => {
         // Could trigger a refresh or state update — for now the leaderboard reflects this
+      })
+      .on('broadcast', { event: 'PROP_RESULT_UPDATED' }, ({ payload }) => {
+        const handler = (window as unknown as Record<string, unknown>).__propResultUpdate;
+        if (typeof handler === 'function') handler(payload);
+      })
+      .on('broadcast', { event: 'PAYMENT_UPDATED' }, ({ payload }) => {
+        setState((prev) => ({
+          ...prev,
+          paymentTracking: (payload.paymentTracking as Record<string, boolean>) ?? prev.paymentTracking,
+        }));
+        const handler = (window as unknown as Record<string, unknown>).__paymentUpdate;
+        if (typeof handler === 'function') handler(payload);
       })
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState();
@@ -319,5 +365,35 @@ export function useAuctionChannel(
     };
   }, [sessionId, userId, displayName, isCommissioner]);
 
-  return state;
+  const sendChatMessage = useCallback(
+    (text: string) => {
+      const ch = channelRef.current;
+      if (!ch) return;
+      ch.send({
+        type: 'broadcast',
+        event: 'CHAT_MESSAGE',
+        payload: {
+          id: crypto.randomUUID(),
+          userId,
+          displayName,
+          text,
+          timestamp: Date.now(),
+        },
+      });
+    },
+    [userId, displayName]
+  );
+
+  const toggleChatMute = useCallback(() => {
+    const ch = channelRef.current;
+    if (!ch) return;
+    const nextMuted = !state.chatMuted;
+    ch.send({
+      type: 'broadcast',
+      event: nextMuted ? 'CHAT_MUTED' : 'CHAT_UNMUTED',
+      payload: {},
+    });
+  }, [state.chatMuted]);
+
+  return { ...state, sendChatMessage, toggleChatMute };
 }

@@ -14,6 +14,7 @@ interface BidPanelProps {
   currentHighestBidderName: string | null;
   userId: string;
   bidIncrements?: number[];
+  minimumBid?: number;
 }
 
 export function BidPanel({
@@ -23,13 +24,15 @@ export function BidPanel({
   currentHighestBidderName,
   userId,
   bidIncrements,
+  minimumBid: minimumBidProp,
 }: BidPanelProps) {
   const increments = bidIncrements ?? DEFAULT_BID_INCREMENTS;
   const [bidAmount, setBidAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const minBid = currentHighestBid + 1;
+  const floorBid = minimumBidProp ?? 1;
+  const minBid = currentHighestBid > 0 ? currentHighestBid + 1 : floorBid;
 
   const handleBid = async () => {
     const amount = Number(bidAmount);
@@ -48,7 +51,9 @@ export function BidPanel({
 
   const handleIncrement = (inc: number) => {
     const base = currentHighestBid || 0;
-    setBidAmount(String(base + inc));
+    const newAmount = base + inc;
+    // Ensure increment buttons never go below the minimum bid floor
+    setBidAmount(String(Math.max(newAmount, floorBid)));
   };
 
   const isOpen = biddingStatus === 'open';
@@ -77,6 +82,13 @@ export function BidPanel({
           </>
         )}
       </div>
+
+      {/* Minimum bid indicator */}
+      {isOpen && floorBid > 0 && (
+        <p className="mb-2 text-center text-[11px] text-white/30">
+          Min: ${floorBid.toLocaleString()}
+        </p>
+      )}
 
       {/* Bid input */}
       <div className="flex gap-2">

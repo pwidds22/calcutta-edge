@@ -1,35 +1,47 @@
 'use client';
 
+import { useState } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
+import { markPayment } from '@/actions/tournament-results';
+import type { PropResult } from '@/lib/tournaments/props';
 import {
   calculateActualSettlement,
   type Payment,
 } from '@/lib/auction/live/debt-simplification';
-import { ArrowRight, CheckCircle2, DollarSign, AlertTriangle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, DollarSign, AlertTriangle, Check } from 'lucide-react';
 
 interface SettlementMatrixProps {
+  sessionId: string;
   soldTeams: SoldTeam[];
   baseTeams: BaseTeam[];
   config: TournamentConfig;
   payoutRules: PayoutRules;
   results: TournamentResult[];
+  isCommissioner: boolean;
+  paymentTracking: Record<string, boolean>;
+  propResults?: PropResult[];
 }
 
 export function SettlementMatrix({
+  sessionId,
   soldTeams,
   baseTeams,
   config,
   payoutRules,
   results,
+  isCommissioner,
+  paymentTracking,
+  propResults = [],
 }: SettlementMatrixProps) {
   const settlement = calculateActualSettlement(
     soldTeams,
     baseTeams,
     results,
     config,
-    payoutRules
+    payoutRules,
+    propResults
   );
 
   const hasResults = results.some((r) => r.result !== 'pending');
@@ -47,6 +59,11 @@ export function SettlementMatrix({
       </div>
     );
   }
+
+  const totalPayments = settlement.payments.length;
+  const paidCount = settlement.payments.filter(
+    (p) => paymentTracking[`${p.fromId}->${p.toId}`]
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -114,14 +131,40 @@ export function SettlementMatrix({
       </div>
 
       {/* Payment Plan */}
-      {settlement.payments.length > 0 && (
+      {totalPayments > 0 && (
         <div>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/40">
-            Payment Plan ({settlement.payments.length} transaction{settlement.payments.length !== 1 ? 's' : ''})
-          </h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-white/40">
+              Payment Plan ({totalPayments} transaction{totalPayments !== 1 ? 's' : ''})
+            </h3>
+            {totalPayments > 0 && (
+              <span className="text-xs text-white/40">
+                <span className={paidCount === totalPayments ? 'text-emerald-400 font-medium' : ''}>
+                  {paidCount}/{totalPayments} settled
+                </span>
+              </span>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          {totalPayments > 0 && (
+            <div className="mb-3 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                style={{ width: `${(paidCount / totalPayments) * 100}%` }}
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
             {settlement.payments.map((payment, idx) => (
-              <PaymentRow key={`${payment.fromId}-${payment.toId}-${idx}`} payment={payment} />
+              <PaymentRow
+                key={`${payment.fromId}-${payment.toId}-${idx}`}
+                sessionId={sessionId}
+                payment={payment}
+                isPaid={!!paymentTracking[`${payment.fromId}->${payment.toId}`]}
+                isCommissioner={isCommissioner}
+              />
             ))}
           </div>
         </div>
@@ -133,6 +176,14 @@ export function SettlementMatrix({
           <CheckCircle2 className="size-8 text-emerald-400" />
           <p className="text-sm font-medium text-emerald-400">All Settled</p>
           <p className="text-xs text-white/40">No payments needed.</p>
+        </div>
+      )}
+
+      {/* All payments completed indicator */}
+      {totalPayments > 0 && paidCount === totalPayments && (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 py-6">
+          <CheckCircle2 className="size-6 text-emerald-400" />
+          <p className="text-sm font-medium text-emerald-400">All Payments Settled</p>
         </div>
       )}
     </div>
@@ -156,24 +207,78 @@ function StatCard({
   );
 }
 
-function PaymentRow({ payment }: { payment: Payment }) {
+function PaymentRow({
+  sessionId,
+  payment,
+  isPaid,
+  isCommissioner,
+}: {
+  sessionId: string;
+  payment: Payment;
+  isPaid: boolean;
+  isCommissioner: boolean;
+}) {
+  const [loading, setLoading] = useState(false);
+  const paymentKey = `${payment.fromId}->${payment.toId}`;
+
+  const handleToggle = async () => {
+    setLoading(true);
+    await markPayment(sessionId, paymentKey, !isPaid);
+    setLoading(false);
+  };
+
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-      <div className="flex-1 text-right">
-        <p className="text-sm font-medium text-red-400">{payment.fromName}</p>
+    <div
+      className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
+        isPaid
+          ? 'border-emerald-500/20 bg-emerald-500/5 opacity-60'
+          : 'border-white/[0.06] bg-white/[0.02]'
+      }`}
+    >
+      {/* Checkbox for commissioner */}
+      {isCommissioner && (
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={loading}
+          className={`flex size-5 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+            isPaid
+              ? 'border-emerald-500 bg-emerald-500 text-white'
+              : 'border-white/20 bg-white/[0.04] text-transparent hover:border-white/40'
+          } ${loading ? 'opacity-50' : ''}`}
+        >
+          {isPaid && <Check className="size-3" />}
+        </button>
+      )}
+
+      {/* Non-commissioner paid indicator */}
+      {!isCommissioner && isPaid && (
+        <CheckCircle2 className="size-4 flex-shrink-0 text-emerald-400" />
+      )}
+
+      <div className={`flex-1 text-right ${isPaid ? 'line-through decoration-white/20' : ''}`}>
+        <p className={`text-sm font-medium ${isPaid ? 'text-white/40' : 'text-red-400'}`}>
+          {payment.fromName}
+        </p>
       </div>
       <div className="flex items-center gap-2">
-        <ArrowRight className="size-3.5 text-white/30" />
-        <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1">
-          <DollarSign className="size-3 text-emerald-400" />
-          <span className="text-sm font-mono font-medium text-emerald-400">
+        <ArrowRight className={`size-3.5 ${isPaid ? 'text-white/15' : 'text-white/30'}`} />
+        <div className={`flex items-center gap-1 rounded-full px-3 py-1 ${
+          isPaid ? 'bg-emerald-500/5' : 'bg-emerald-500/10'
+        }`}>
+          <DollarSign className={`size-3 ${isPaid ? 'text-emerald-400/40' : 'text-emerald-400'}`} />
+          <span className={`text-sm font-mono font-medium ${
+            isPaid ? 'text-emerald-400/40' : 'text-emerald-400'
+          }`}>
             {Math.round(payment.amount).toLocaleString()}
           </span>
         </div>
-        <ArrowRight className="size-3.5 text-white/30" />
+        <ArrowRight className={`size-3.5 ${isPaid ? 'text-white/15' : 'text-white/30'}`} />
       </div>
-      <div className="flex-1">
-        <p className="text-sm font-medium text-emerald-400">{payment.toName}</p>
+      <div className={`flex-1 ${isPaid ? 'line-through decoration-white/20' : ''}`}>
+        <p className={`text-sm font-medium ${isPaid ? 'text-white/40' : 'text-emerald-400'}`}>
+          {payment.toName}
+        </p>
       </div>
     </div>
   );

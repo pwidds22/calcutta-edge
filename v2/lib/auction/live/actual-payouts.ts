@@ -1,6 +1,7 @@
 import type { SoldTeam } from './use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
+import type { PropResult } from '@/lib/tournaments/props';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -18,6 +19,12 @@ export interface TeamResult {
   earnings: number;
 }
 
+export interface PropEarning {
+  propKey: string;
+  propLabel: string;
+  amount: number;
+}
+
 export interface LeaderboardEntry {
   participantId: string;
   participantName: string;
@@ -28,6 +35,7 @@ export interface LeaderboardEntry {
   teamsAlive: number;
   teamsEliminated: number;
   teams: TeamResult[];
+  propEarnings: PropEarning[];
 }
 
 export interface LeaderboardData {
@@ -171,7 +179,8 @@ export function calculateLeaderboard(
   baseTeams: BaseTeam[],
   results: TournamentResult[],
   config: TournamentConfig,
-  payoutRules: PayoutRules
+  payoutRules: PayoutRules,
+  propResults: PropResult[] = []
 ): LeaderboardData {
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
   const actualPot = soldTeams.reduce((sum, t) => sum + t.amount, 0);
@@ -227,6 +236,20 @@ export function calculateLeaderboard(
       });
     }
 
+    // Add prop bet earnings for this participant
+    const participantPropEarnings: PropEarning[] = [];
+    for (const pr of propResults) {
+      if (pr.winnerParticipantId === participantId) {
+        const propPayout = actualPot * (pr.payoutPercentage / 100);
+        participantPropEarnings.push({
+          propKey: pr.key,
+          propLabel: pr.label,
+          amount: propPayout,
+        });
+        totalEarned += propPayout;
+      }
+    }
+
     entries.push({
       participantId,
       participantName: name,
@@ -237,6 +260,7 @@ export function calculateLeaderboard(
       teamsAlive,
       teamsEliminated,
       teams: teamResults.sort((a, b) => a.seed - b.seed),
+      propEarnings: participantPropEarnings,
     });
   }
 

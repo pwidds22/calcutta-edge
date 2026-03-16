@@ -19,8 +19,9 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Allow webhook routes (Stripe handles its own auth)
-  if (path.startsWith('/api/webhooks')) {
+  // Allow specific API routes — they handle their own auth.
+  // SECURITY: Allowlist only known prefixes, not blanket /api/
+  if (path.startsWith('/api/webhooks') || path.startsWith('/api/test-')) {
     return supabaseResponse
   }
 

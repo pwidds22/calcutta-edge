@@ -13,7 +13,8 @@ import {
 import { getPayoutPresets, type PayoutPreset } from '@/lib/tournaments/payout-presets';
 import { BUNDLE_PRESETS, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
 import { getTournament } from '@/lib/tournaments/registry';
-import { ArrowLeft, Gavel, Timer, DollarSign, Trophy, ChevronDown, ChevronUp, Zap, Lock, Layers } from 'lucide-react';
+import { getStandardProps, type EnabledProp } from '@/lib/tournaments/props';
+import { ArrowLeft, Gavel, Timer, DollarSign, Trophy, ChevronDown, ChevronUp, Zap, Lock, Layers, Dice5, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 
 /** Check if a tournament's hosting window is open (pure client-side check) */
@@ -50,6 +51,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const [name, setName] = useState('');
   const [tournamentId, setTournamentId] = useState(defaultTournament?.id ?? '');
   const [potSize, setPotSize] = useState('10000');
+  const [minimumBid, setMinimumBid] = useState('1');
 
   // Bundle preset
   const [bundlePreset, setBundlePreset] = useState<BundlePreset>('none');
@@ -74,8 +76,15 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const [customRules, setCustomRules] = useState<PayoutRules>({});
   const [showCustomEditor, setShowCustomEditor] = useState(false);
 
+  // Prop bets — which standard props are enabled + custom props
+  const [enabledPropKeys, setEnabledPropKeys] = useState<Set<string>>(new Set());
+  const [propPercentages, setPropPercentages] = useState<Record<string, number>>({});
+  const [customProps, setCustomProps] = useState<Array<{ id: string; label: string; percentage: number }>>([]);
+  const [showPropsSection, setShowPropsSection] = useState(false);
+
   const selectedTournament = tournaments.find((t) => t.id === tournamentId);
   const presets = selectedTournament ? getPayoutPresets(selectedTournament.id) : {};
+  const standardProps = selectedTournament ? getStandardProps(selectedTournament.id) : [];
 
   const getActiveRules = (): PayoutRules => {
     if (payoutMode === 'custom') return customRules;
@@ -109,10 +118,17 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
     ? countAuctionItems(tournamentTeams, currentBundles)
     : 0;
 
+  // Compute prop totals from enabled props
+  const enabledPropTotal = standardProps
+    .filter((p) => enabledPropKeys.has(p.key))
+    .reduce((sum, p) => sum + (propPercentages[p.key] ?? p.defaultPercentage), 0)
+    + customProps.reduce((sum, cp) => sum + cp.percentage, 0);
+
   const totalPercent = rounds.reduce(
     (sum, r) => sum + (activeRules[r.key] ?? 0) * r.teamsAdvancing,
     0
-  ) + propBets.reduce((sum, p) => sum + (activeRules[p.key] ?? 0), 0);
+  ) + propBets.reduce((sum, p) => sum + (activeRules[p.key] ?? 0), 0)
+    + enabledPropTotal;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +156,24 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
       ? generateBundles(bundlePreset, submitTeams, selectedTournament)
       : [];
 
+    // Build enabledProps from toggle state
+    const enabledProps: EnabledProp[] = [
+      ...standardProps
+        .filter((p) => enabledPropKeys.has(p.key))
+        .map((p) => ({
+          key: p.key,
+          label: p.label,
+          percentage: propPercentages[p.key] ?? p.defaultPercentage,
+        })),
+      ...customProps.map((cp) => ({
+        key: `custom_${cp.id}`,
+        label: cp.label,
+        percentage: cp.percentage,
+        isCustom: true as const,
+        customLabel: cp.label,
+      })),
+    ];
+
     const settings: SessionSettings = {
       bidIncrements: [...BID_INCREMENT_PRESETS[bidPreset].values],
       timer: {
@@ -150,6 +184,8 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
       autoMode: timerEnabled && autoMode,
       bundles,
       bundlePreset,
+      enabledProps: enabledProps.length > 0 ? enabledProps : undefined,
+      minimumBid: Math.max(0, Number(minimumBid) || 0) || undefined,
     };
 
     const result = await createSession({
@@ -257,6 +293,28 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
           </div>
           <p className="mt-1 text-xs text-white/30">
             This is just an estimate — the real pot size is calculated from actual sales.
+          </p>
+        </div>
+
+        {/* Minimum Bid */}
+        <div>
+          <label className="block text-sm font-medium text-white/60 mb-1.5">
+            Minimum Bid
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-white/40">
+              $
+            </span>
+            <input
+              type="number"
+              value={minimumBid}
+              onChange={(e) => setMinimumBid(e.target.value)}
+              min={0}
+              className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] pl-7 pr-3 text-sm text-white placeholder:text-white/20 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+            />
+          </div>
+          <p className="mt-1 text-xs text-white/30">
+            Floor price for all teams. Set to 0 for no minimum.
           </p>
         </div>
 
@@ -417,6 +475,157 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
             </div>
           )}
         </div>
+
+        {/* Prop Bets */}
+        {standardProps.length > 0 && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowPropsSection(!showPropsSection)}
+              className="flex w-full items-center justify-between mb-1.5"
+            >
+              <span className="flex items-center gap-1 text-sm font-medium text-white/60">
+                <Dice5 className="size-3.5" />
+                Prop Bets
+                <span className="text-[10px] text-white/30">(optional)</span>
+              </span>
+              {showPropsSection ? <ChevronUp className="size-4 text-white/30" /> : <ChevronDown className="size-4 text-white/30" />}
+            </button>
+            <p className="text-xs text-white/30 mb-2">
+              Side bets that pay out to a single winner — biggest upset, highest seed in Final Four, etc.
+            </p>
+
+            {showPropsSection && (
+              <div className="space-y-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
+                {/* Standard props */}
+                {standardProps.map((prop) => {
+                  const isEnabled = enabledPropKeys.has(prop.key);
+                  const pct = propPercentages[prop.key] ?? prop.defaultPercentage;
+                  return (
+                    <div key={prop.key} className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEnabledPropKeys((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(prop.key)) next.delete(prop.key);
+                            else next.add(prop.key);
+                            return next;
+                          });
+                        }}
+                        className={`mt-0.5 flex size-5 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+                          isEnabled
+                            ? 'border-emerald-500 bg-emerald-500 text-white'
+                            : 'border-white/20 bg-white/[0.04] text-transparent'
+                        }`}
+                      >
+                        {isEnabled && (
+                          <svg className="size-3" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium ${isEnabled ? 'text-white' : 'text-white/40'}`}>
+                            {prop.label}
+                          </span>
+                          {isEnabled && (
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min={0.5}
+                                max={50}
+                                step={0.5}
+                                value={pct}
+                                onChange={(e) =>
+                                  setPropPercentages((prev) => ({
+                                    ...prev,
+                                    [prop.key]: parseFloat(e.target.value) || 0,
+                                  }))
+                                }
+                                className="h-6 w-16 rounded border border-white/10 bg-white/[0.04] px-1.5 pr-5 text-right text-[11px] text-white focus:border-emerald-500/50 focus:outline-none"
+                              />
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/30">
+                                %
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-white/25 mt-0.5">{prop.description}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Custom props */}
+                {customProps.map((cp) => (
+                  <div key={cp.id} className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCustomProps((prev) => prev.filter((p) => p.id !== cp.id))}
+                      className="flex size-5 flex-shrink-0 items-center justify-center rounded border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                    >
+                      <X className="size-3" />
+                    </button>
+                    <input
+                      type="text"
+                      value={cp.label}
+                      onChange={(e) =>
+                        setCustomProps((prev) =>
+                          prev.map((p) => (p.id === cp.id ? { ...p, label: e.target.value } : p))
+                        )
+                      }
+                      placeholder="Prop name"
+                      className="h-7 flex-1 rounded border border-white/10 bg-white/[0.04] px-2 text-xs text-white placeholder:text-white/20 focus:border-emerald-500/50 focus:outline-none"
+                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0.5}
+                        max={50}
+                        step={0.5}
+                        value={cp.percentage}
+                        onChange={(e) =>
+                          setCustomProps((prev) =>
+                            prev.map((p) =>
+                              p.id === cp.id ? { ...p, percentage: parseFloat(e.target.value) || 0 } : p
+                            )
+                          )
+                        }
+                        className="h-6 w-16 rounded border border-white/10 bg-white/[0.04] px-1.5 pr-5 text-right text-[11px] text-white focus:border-emerald-500/50 focus:outline-none"
+                      />
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/30">
+                        %
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add custom prop button */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCustomProps((prev) => [
+                      ...prev,
+                      { id: crypto.randomUUID(), label: '', percentage: 5 },
+                    ])
+                  }
+                  className="flex items-center gap-1.5 text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                >
+                  <Plus className="size-3" />
+                  Add Custom Prop
+                </button>
+
+                {enabledPropTotal > 0 && (
+                  <p className="text-[10px] text-white/30 pt-1 border-t border-white/[0.06]">
+                    Props total: <span className="font-medium text-amber-400/70">{enabledPropTotal.toFixed(1)}%</span> of pot
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bid Increments */}
         <div>

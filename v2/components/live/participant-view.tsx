@@ -17,7 +17,9 @@ import { MyPortfolio } from './my-portfolio';
 import { StrategyOverlay } from './strategy-overlay';
 import { TimerDisplay } from './timer-display';
 import { TournamentDashboard } from './tournament-dashboard';
+import { ChatPanel } from './chat-panel';
 import type { TournamentResult } from '@/actions/tournament-results';
+import type { PropResult } from '@/lib/tournaments/props';
 
 interface ParticipantViewProps {
   session: {
@@ -36,6 +38,8 @@ interface ParticipantViewProps {
     settings: SessionSettings;
     timer_ends_at: string | null;
     timer_duration_ms: number | null;
+    payment_tracking?: Record<string, boolean>;
+    prop_results?: PropResult[];
   };
   participants: Array<{
     user_id: string;
@@ -168,6 +172,14 @@ export function ParticipantView({
           </p>
         </div>
         <ParticipantList onlineUsers={channel.onlineUsers} />
+
+        <ChatPanel
+          messages={channel.chatMessages}
+          onSend={channel.sendChatMessage}
+          chatMuted={channel.chatMuted}
+          isCommissioner={false}
+          userId={userId}
+        />
       </div>
     );
   }
@@ -198,6 +210,9 @@ export function ParticipantView({
           config={config}
           payoutRules={session.payout_rules}
           initialResults={tournamentResults}
+          initialPaymentTracking={session.payment_tracking ?? {}}
+          enabledProps={session.settings?.enabledProps}
+          initialPropResults={session.prop_results ?? []}
         />
       ) : (
         <div className="grid grid-cols-12 gap-4">
@@ -244,6 +259,7 @@ export function ParticipantView({
               currentHighestBidderName={channel.currentHighestBidderName}
               userId={userId}
               bidIncrements={session.settings?.bidIncrements}
+              minimumBid={session.settings?.minimumBid}
             />
 
             <BidLadder
@@ -268,6 +284,14 @@ export function ParticipantView({
           </div>
         </div>
       )}
+
+      <ChatPanel
+        messages={channel.chatMessages}
+        onSend={channel.sendChatMessage}
+        chatMuted={channel.chatMuted}
+        isCommissioner={false}
+        userId={userId}
+      />
     </div>
   );
 }

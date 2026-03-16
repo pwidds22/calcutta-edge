@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
+import type { PropResult } from '@/lib/tournaments/props';
 import { calculateLeaderboard } from '@/lib/auction/live/actual-payouts';
 import {
   ChevronDown,
@@ -22,6 +23,7 @@ interface LeaderboardProps {
   config: TournamentConfig;
   payoutRules: PayoutRules;
   results: TournamentResult[];
+  propResults?: PropResult[];
 }
 
 export function Leaderboard({
@@ -30,6 +32,7 @@ export function Leaderboard({
   config,
   payoutRules,
   results,
+  propResults = [],
 }: LeaderboardProps) {
   const [expandedParticipant, setExpandedParticipant] = useState<string | null>(
     null
@@ -40,7 +43,8 @@ export function Leaderboard({
     baseTeams,
     results,
     config,
-    payoutRules
+    payoutRules,
+    propResults
   );
 
   const { entries, actualPot, completedRounds, currentRound, isTournamentComplete } =
@@ -237,6 +241,18 @@ export function Leaderboard({
                       })}
                     </tbody>
                   </table>
+                  {/* Prop earnings */}
+                  {entry.propEarnings.length > 0 && (
+                    <div className="border-t border-white/[0.04] px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider text-white/20 mb-1">Prop Winnings</p>
+                      {entry.propEarnings.map((pe) => (
+                        <div key={pe.propKey} className="flex items-center justify-between text-xs py-0.5">
+                          <span className="text-amber-400/70">{pe.propLabel}</span>
+                          <span className="font-mono text-emerald-400/70">+${Math.round(pe.amount).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

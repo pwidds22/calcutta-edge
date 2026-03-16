@@ -146,6 +146,153 @@ export async function bulkUpdateResults(
 }
 
 /**
+ * Commissioner upserts a prop bet result.
+ * Stores in the `prop_results` JSONB column on `auction_sessions`.
+ */
+export async function updatePropResult(
+  sessionId: string,
+  propKey: string,
+  propLabel: string,
+  winnerParticipantId: string,
+  winnerTeamId: number | null,
+  metadata: string,
+  payoutPercentage: number
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated' };
+
+  // Verify commissioner
+  const { data: session } = await supabase
+    .from('auction_sessions')
+    .select('commissioner_id, prop_results')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session || session.commissioner_id !== user.id) {
+    return { error: 'Not authorized' };
+  }
+
+  // Read current prop_results, upsert the entry
+  const currentResults: Array<{
+    key: string;
+    label: string;
+    winnerParticipantId: string | null;
+    winnerTeamId: number | null;
+    metadata: string;
+    payoutPercentage: number;
+  }> = Array.isArray(session.prop_results) ? session.prop_results : [];
+
+  const idx = currentResults.findIndex((r) => r.key === propKey);
+  const entry = {
+    key: propKey,
+    label: propLabel,
+    winnerParticipantId,
+    winnerTeamId,
+    metadata,
+    payoutPercentage,
+  };
+
+  if (idx >= 0) {
+    currentResults[idx] = entry;
+  } else {
+    currentResults.push(entry);
+  }
+
+  const { error } = await supabase
+    .from('auction_sessions')
+    .update({ prop_results: currentResults })
+    .eq('id', sessionId);
+
+  if (error) return { error: error.message };
+
+  // Broadcast to all connected participants
+  await broadcastToChannel(`auction:${sessionId}`, 'PROP_RESULT_UPDATED', {
+    propKey,
+    propLabel,
+    winnerParticipantId,
+    winnerTeamId,
+    metadata,
+    payoutPercentage,
+  });
+
+  return { success: true };
+}
+
+/**
+ * Fetch payment tracking state for a session.
+ */
+export async function getPaymentTracking(sessionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated' };
+
+  const { data, error } = await supabase
+    .from('auction_sessions')
+    .select('payment_tracking')
+    .eq('id', sessionId)
+    .single();
+
+  if (error) return { error: error.message };
+  return { paymentTracking: (data?.payment_tracking ?? {}) as Record<string, boolean> };
+}
+
+/**
+ * Commissioner marks a payment as paid/unpaid.
+ * paymentKey format: "fromUserId->toUserId"
+ */
+export async function markPayment(
+  sessionId: string,
+  paymentKey: string,
+  paid: boolean
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated' };
+
+  // Verify commissioner
+  const { data: session } = await supabase
+    .from('auction_sessions')
+    .select('commissioner_id, payment_tracking')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session || session.commissioner_id !== user.id) {
+    return { error: 'Not authorized' };
+  }
+
+  // Read current tracking, update the specific payment
+  const tracking: Record<string, boolean> = (session.payment_tracking as Record<string, boolean>) ?? {};
+  if (paid) {
+    tracking[paymentKey] = true;
+  } else {
+    delete tracking[paymentKey];
+  }
+
+  const { error } = await supabase
+    .from('auction_sessions')
+    .update({ payment_tracking: tracking })
+    .eq('id', sessionId);
+
+  if (error) return { error: error.message };
+
+  // Broadcast to all connected participants
+  await broadcastToChannel(`auction:${sessionId}`, 'PAYMENT_UPDATED', {
+    paymentKey,
+    paid,
+    paymentTracking: tracking,
+  });
+
+  return { success: true };
+}
+
+/**
  * Mark the tournament as settled (all results entered, final payouts calculated).
  */
 export async function settleTournament(sessionId: string) {

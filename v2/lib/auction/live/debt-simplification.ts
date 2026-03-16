@@ -1,6 +1,7 @@
 import type { SoldTeam } from './use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
+import type { PropResult } from '@/lib/tournaments/props';
 import { calculateLeaderboard } from './actual-payouts';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -46,14 +47,16 @@ export function calculateActualSettlement(
   baseTeams: BaseTeam[],
   results: TournamentResult[],
   config: TournamentConfig,
-  payoutRules: PayoutRules
+  payoutRules: PayoutRules,
+  propResults: PropResult[] = []
 ): SettlementResult {
   const leaderboard = calculateLeaderboard(
     soldTeams,
     baseTeams,
     results,
     config,
-    payoutRules
+    payoutRules,
+    propResults
   );
 
   const balances: ParticipantBalance[] = leaderboard.entries.map((entry) => ({

@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
+import type { PropResult, EnabledProp } from '@/lib/tournaments/props';
 import { AuctionComplete } from './auction-complete';
 import { ResultsEntry } from './results-entry';
 import { BracketEntry } from './bracket-entry';
 import { Leaderboard } from './leaderboard';
 import { SettlementMatrix } from './settlement-matrix';
-import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign } from 'lucide-react';
+import { PropsEntry } from './props-entry';
+import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5 } from 'lucide-react';
 
 interface TournamentDashboardProps {
   sessionId: string;
@@ -20,9 +22,12 @@ interface TournamentDashboardProps {
   config: TournamentConfig;
   payoutRules: PayoutRules;
   initialResults: TournamentResult[];
+  enabledProps?: EnabledProp[];
+  initialPropResults?: PropResult[];
+  initialPaymentTracking?: Record<string, boolean>;
 }
 
-type TabKey = 'summary' | 'bracket' | 'results' | 'leaderboard' | 'settlement';
+type TabKey = 'summary' | 'bracket' | 'results' | 'props' | 'leaderboard' | 'settlement';
 
 export function TournamentDashboard({
   sessionId,
@@ -33,8 +38,12 @@ export function TournamentDashboard({
   config,
   payoutRules,
   initialResults,
+  enabledProps = [],
+  initialPropResults = [],
+  initialPaymentTracking = {},
 }: TournamentDashboardProps) {
   const hasBracket = !!config.bracketDevigConfig;
+  const hasProps = enabledProps.length > 0;
 
   const [activeTab, setActiveTab] = useState<TabKey>(
     initialResults.length > 0
@@ -44,6 +53,36 @@ export function TournamentDashboard({
         : 'summary'
   );
   const [results, setResults] = useState<TournamentResult[]>(initialResults);
+  const [propResults, setPropResults] = useState<PropResult[]>(initialPropResults);
+  const [paymentTracking, setPaymentTracking] = useState<Record<string, boolean>>(initialPaymentTracking);
+
+  const actualPot = soldTeams.reduce((sum, t) => sum + t.amount, 0);
+
+  // Handle prop result updates (from broadcast or local save)
+  const handlePropResultUpdate = useCallback(
+    (data: PropResult | { propKey: string; propLabel: string; winnerParticipantId: string; winnerTeamId: number | null; metadata: string; payoutPercentage: number }) => {
+      const result: PropResult = 'key' in data
+        ? data as PropResult
+        : {
+            key: data.propKey,
+            label: data.propLabel,
+            winnerParticipantId: data.winnerParticipantId,
+            winnerTeamId: data.winnerTeamId,
+            metadata: data.metadata,
+            payoutPercentage: data.payoutPercentage,
+          };
+      setPropResults((prev) => {
+        const idx = prev.findIndex((r) => r.key === result.key);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = result;
+          return next;
+        }
+        return [...prev, result];
+      });
+    },
+    []
+  );
 
   // Listen for real-time result updates from broadcast
   const handleResultUpdate = useCallback(
@@ -95,15 +134,27 @@ export function TournamentDashboard({
     []
   );
 
+  // Handle payment tracking updates from broadcast
+  const handlePaymentUpdate = useCallback(
+    (data: { paymentTracking: Record<string, boolean> }) => {
+      setPaymentTracking(data.paymentTracking ?? {});
+    },
+    []
+  );
+
   // Expose handlers for parent to wire up broadcast events
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__tournamentResultUpdate = handleResultUpdate;
     (window as unknown as Record<string, unknown>).__tournamentBulkUpdate = handleBulkUpdate;
+    (window as unknown as Record<string, unknown>).__propResultUpdate = handlePropResultUpdate;
+    (window as unknown as Record<string, unknown>).__paymentUpdate = handlePaymentUpdate;
     return () => {
       delete (window as unknown as Record<string, unknown>).__tournamentResultUpdate;
       delete (window as unknown as Record<string, unknown>).__tournamentBulkUpdate;
+      delete (window as unknown as Record<string, unknown>).__propResultUpdate;
+      delete (window as unknown as Record<string, unknown>).__paymentUpdate;
     };
-  }, [handleResultUpdate, handleBulkUpdate]);
+  }, [handleResultUpdate, handleBulkUpdate, handlePropResultUpdate, handlePaymentUpdate]);
 
   const tabs: Array<{ key: TabKey; label: string; icon: typeof Trophy; commissionerOnly?: boolean }> = [
     { key: 'summary', label: 'Auction Summary', icon: ClipboardList },
@@ -114,6 +165,9 @@ export function TournamentDashboard({
     // Flat results entry: only for commissioner on non-bracket tournaments (or as fallback)
     ...(isCommissioner && !hasBracket
       ? [{ key: 'results' as TabKey, label: 'Enter Results', icon: Calculator, commissionerOnly: true }]
+      : []),
+    ...(hasProps
+      ? [{ key: 'props' as TabKey, label: 'Props', icon: Dice5 }]
       : []),
     { key: 'leaderboard', label: 'Leaderboard', icon: BarChart3 },
     { key: 'settlement', label: 'Settlement', icon: DollarSign },
@@ -179,6 +233,19 @@ export function TournamentDashboard({
         />
       )}
 
+      {activeTab === 'props' && hasProps && (
+        <PropsEntry
+          sessionId={sessionId}
+          enabledProps={enabledProps}
+          propResults={propResults}
+          soldTeams={soldTeams}
+          baseTeams={baseTeams}
+          isCommissioner={isCommissioner}
+          actualPot={actualPot}
+          onPropResultUpdate={handlePropResultUpdate}
+        />
+      )}
+
       {activeTab === 'leaderboard' && (
         <Leaderboard
           soldTeams={soldTeams}
@@ -186,16 +253,21 @@ export function TournamentDashboard({
           config={config}
           payoutRules={payoutRules}
           results={results}
+          propResults={propResults}
         />
       )}
 
       {activeTab === 'settlement' && (
         <SettlementMatrix
+          sessionId={sessionId}
           soldTeams={soldTeams}
           baseTeams={baseTeams}
           config={config}
           payoutRules={payoutRules}
           results={results}
+          propResults={propResults}
+          isCommissioner={isCommissioner}
+          paymentTracking={paymentTracking}
         />
       )}
     </div>

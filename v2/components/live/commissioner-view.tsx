@@ -21,8 +21,10 @@ import { TimerDisplay } from './timer-display';
 import { closeBidding, autoAdvance, toggleAutoMode } from '@/actions/bidding';
 import { TournamentDashboard } from './tournament-dashboard';
 import type { TournamentResult } from '@/actions/tournament-results';
+import type { PropResult } from '@/lib/tournaments/props';
 import { Shuffle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ChatPanel } from './chat-panel';
 
 interface CommissionerViewProps {
   session: {
@@ -41,6 +43,8 @@ interface CommissionerViewProps {
     settings: SessionSettings;
     timer_ends_at: string | null;
     timer_duration_ms: number | null;
+    payment_tracking?: Record<string, boolean>;
+    prop_results?: PropResult[];
   };
   participants: Array<{
     user_id: string;
@@ -249,6 +253,9 @@ export function CommissionerView({
           config={config}
           payoutRules={session.payout_rules}
           initialResults={tournamentResults}
+          initialPaymentTracking={session.payment_tracking ?? {}}
+          enabledProps={session.settings?.enabledProps}
+          initialPropResults={session.prop_results ?? []}
         />
       ) : (
         <div className="grid grid-cols-12 gap-4">
@@ -318,6 +325,7 @@ export function CommissionerView({
               currentHighestBidderName={channel.currentHighestBidderName}
               userId={userId}
               bidIncrements={session.settings?.bidIncrements}
+              minimumBid={session.settings?.minimumBid}
             />
 
             <BidLadder
@@ -342,6 +350,15 @@ export function CommissionerView({
           </div>
         </div>
       )}
+
+      <ChatPanel
+        messages={channel.chatMessages}
+        onSend={channel.sendChatMessage}
+        chatMuted={channel.chatMuted}
+        onToggleMute={channel.toggleChatMute}
+        isCommissioner={true}
+        userId={userId}
+      />
     </div>
   );
 }

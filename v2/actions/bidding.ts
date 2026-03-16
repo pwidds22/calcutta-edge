@@ -231,6 +231,15 @@ export async function placeBid(sessionId: string, amount: number) {
   if (session.bidding_status !== 'open')
     return { error: 'Bidding is not open' };
   if (amount <= 0) return { error: 'Bid must be positive' };
+
+  // Enforce minimum bid floor (from session settings)
+  // minimumBid of 0 or undefined = no floor beyond the amount > 0 check above
+  const sessionSettings = session.settings as SessionSettings | null;
+  const minimumBid = sessionSettings?.minimumBid ?? 0;
+  if (minimumBid > 0 && amount < minimumBid) {
+    return { error: `Minimum bid is $${minimumBid}` };
+  }
+
   if (amount <= (session.current_highest_bid ?? 0)) {
     return {
       error: `Bid must be higher than $${session.current_highest_bid}`,

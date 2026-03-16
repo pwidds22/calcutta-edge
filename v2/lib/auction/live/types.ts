@@ -1,4 +1,5 @@
 import type { TeamBundle, BundlePreset } from '@/lib/tournaments/types';
+import type { EnabledProp } from '@/lib/tournaments/props';
 
 export interface TimerSettings {
   enabled: boolean;
@@ -12,6 +13,8 @@ export interface SessionSettings {
   autoMode?: boolean;
   bundles?: TeamBundle[];
   bundlePreset?: BundlePreset;
+  enabledProps?: EnabledProp[];
+  minimumBid?: number; // Global floor price, defaults to 1
 }
 
 export const DEFAULT_TIMER_SETTINGS: TimerSettings = {
