@@ -4,14 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createSession } from '@/actions/session';
-import type { TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import type { TournamentConfig, PayoutRules, BundlePreset } from '@/lib/tournaments/types';
 import {
   BID_INCREMENT_PRESETS,
   type BidIncrementPreset,
   type SessionSettings,
 } from '@/lib/auction/live/types';
 import { getPayoutPresets, type PayoutPreset } from '@/lib/tournaments/payout-presets';
-import { ArrowLeft, Gavel, Timer, DollarSign, Trophy, ChevronDown, ChevronUp, Zap, Lock } from 'lucide-react';
+import { BUNDLE_PRESETS, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
+import { getTournament } from '@/lib/tournaments/registry';
+import { ArrowLeft, Gavel, Timer, DollarSign, Trophy, ChevronDown, ChevronUp, Zap, Lock, Layers } from 'lucide-react';
 import Link from 'next/link';
 
 /** Check if a tournament's hosting window is open (pure client-side check) */
@@ -48,6 +50,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const [name, setName] = useState('');
   const [tournamentId, setTournamentId] = useState(defaultTournament?.id ?? '');
   const [potSize, setPotSize] = useState('10000');
+
+  // Bundle preset
+  const [bundlePreset, setBundlePreset] = useState<BundlePreset>('none');
 
   // Bid increment preset
   const [bidPreset, setBidPreset] = useState<BidIncrementPreset>('medium');
@@ -92,6 +97,18 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const propBets = selectedTournament?.propBets ?? [];
   const activeRules = getActiveRules();
 
+  // Look up tournament teams from registry for bundle computation
+  const tournamentEntry = selectedTournament ? getTournament(selectedTournament.id) : undefined;
+  const tournamentTeams = tournamentEntry?.teams ?? [];
+
+  // Compute bundles for the selected preset + tournament
+  const currentBundles = selectedTournament && tournamentTeams.length > 0
+    ? generateBundles(bundlePreset, tournamentTeams, selectedTournament)
+    : [];
+  const auctionItemCount = tournamentTeams.length > 0
+    ? countAuctionItems(tournamentTeams, currentBundles)
+    : 0;
+
   const totalPercent = rounds.reduce(
     (sum, r) => sum + (activeRules[r.key] ?? 0) * r.teamsAdvancing,
     0
@@ -117,6 +134,12 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
 
     const payoutRules = getActiveRules();
 
+    const submitEntry = getTournament(selectedTournament.id);
+    const submitTeams = submitEntry?.teams ?? [];
+    const bundles = submitTeams.length > 0
+      ? generateBundles(bundlePreset, submitTeams, selectedTournament)
+      : [];
+
     const settings: SessionSettings = {
       bidIncrements: [...BID_INCREMENT_PRESETS[bidPreset].values],
       timer: {
@@ -125,6 +148,8 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
         resetDurationSec: Math.max(3, Math.min(30, Number(resetDuration) || 8)),
       },
       autoMode: timerEnabled && autoMode,
+      bundles,
+      bundlePreset,
     };
 
     const result = await createSession({
@@ -233,6 +258,46 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
           <p className="mt-1 text-xs text-white/30">
             This is just an estimate — the real pot size is calculated from actual sales.
           </p>
+        </div>
+
+        {/* Team Bundling */}
+        <div>
+          <label className="block text-sm font-medium text-white/60 mb-1.5">
+            <Layers className="inline size-3.5 mr-1" />
+            Team Bundling
+          </label>
+          <p className="text-xs text-white/30 mb-2">
+            Bundle low-seed teams together to speed up the auction.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(Object.entries(BUNDLE_PRESETS) as [BundlePreset, typeof BUNDLE_PRESETS[BundlePreset]][]).map(
+              ([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setBundlePreset(key)}
+                  className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                    bundlePreset === key
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-white'
+                      : 'border-white/10 bg-white/[0.02] text-white/50 hover:border-white/20 hover:text-white/70'
+                  }`}
+                >
+                  <div className="text-xs font-medium">{preset.label}</div>
+                  <div className="text-[10px] opacity-60">{preset.description}</div>
+                </button>
+              )
+            )}
+          </div>
+          {selectedTournament && tournamentTeams.length > 0 && (
+            <p className="mt-1.5 text-xs text-white/30">
+              Auction items: <span className="font-medium text-white/50">{auctionItemCount}</span>
+              {currentBundles.length > 0 && (
+                <span>
+                  {' '}({tournamentTeams.length} teams → {auctionItemCount} items with {currentBundles.length} bundle{currentBundles.length !== 1 ? 's' : ''})
+                </span>
+              )}
+            </p>
+          )}
         </div>
 
         {/* Payout Rules */}

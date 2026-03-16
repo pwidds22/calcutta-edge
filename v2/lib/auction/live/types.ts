@@ -1,3 +1,5 @@
+import type { TeamBundle, BundlePreset } from '@/lib/tournaments/types';
+
 export interface TimerSettings {
   enabled: boolean;
   initialDurationSec: number;
@@ -8,6 +10,8 @@ export interface SessionSettings {
   timer?: TimerSettings;
   bidIncrements?: number[];
   autoMode?: boolean;
+  bundles?: TeamBundle[];
+  bundlePreset?: BundlePreset;
 }
 
 export const DEFAULT_TIMER_SETTINGS: TimerSettings = {

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
 import { getTournament, isHostable } from '@/lib/tournaments/registry';
+import { getUnbundledTeams } from '@/lib/tournaments/bundles';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { SessionSettings } from '@/lib/auction/live/types';
 
@@ -61,8 +62,13 @@ export async function createSession(input: {
     return { error: 'Could not generate unique join code. Please try again.' };
   }
 
-  // Default team order: as listed in tournament config
-  const teamOrder = tournament.teams.map((t) => t.id);
+  // Build team order: unbundled team IDs + bundle IDs (prefixed with b:)
+  const bundles = input.settings?.bundles ?? [];
+  const unbundledTeams = getUnbundledTeams(tournament.teams, bundles);
+  const teamOrder: (number | string)[] = [
+    ...unbundledTeams.map((t) => t.id),
+    ...bundles.map((b) => `b:${b.id}`),
+  ];
 
   const { data: session, error } = await supabase
     .from('auction_sessions')
@@ -234,7 +240,7 @@ export async function getSessionState(sessionId: string) {
 
 export async function updateTeamOrder(
   sessionId: string,
-  teamOrder: number[]
+  teamOrder: (number | string)[]
 ) {
   const supabase = await createClient();
   const {
