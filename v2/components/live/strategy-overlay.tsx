@@ -155,40 +155,41 @@ export function StrategyOverlay({
         </div>
       </div>
 
-      {/* Round-by-round profit at current bid */}
-      {currentHighestBid > 0 && (
-        <div className="mt-3 flex gap-1.5">
-          {config.rounds.map((round) => {
-            const roundOdds = currentTeam.odds?.[round.key] ?? 0;
-            const roundPayout =
-              (payoutRules[round.key] ?? 0) / 100;
-            const profit =
-              roundOdds * roundPayout * projectedPot - currentHighestBid;
-            const cumulativeProfit = config.rounds
-              .slice(0, config.rounds.indexOf(round) + 1)
-              .reduce((sum, r) => {
-                const o = currentTeam.odds?.[r.key] ?? 0;
-                const p = (payoutRules[r.key] ?? 0) / 100;
-                return sum + o * p * projectedPot;
-              }, 0) - currentHighestBid;
+      {/* Round-by-round odds + profit */}
+      <div className="mt-3 flex gap-1.5">
+        {config.rounds.map((round) => {
+          const roundOdds = currentTeam.odds?.[round.key] ?? 0;
+          const cumulativeProfit = currentHighestBid > 0
+            ? config.rounds
+                .slice(0, config.rounds.indexOf(round) + 1)
+                .reduce((sum, r) => {
+                  const o = currentTeam.odds?.[r.key] ?? 0;
+                  const p = (payoutRules[r.key] ?? 0) / 100;
+                  return sum + o * p * projectedPot;
+                }, 0) - currentHighestBid
+            : null;
 
-            return (
-              <div
-                key={round.key}
-                className="flex-1 rounded-md bg-white/[0.04] px-1 py-1 text-center"
-              >
-                <p className="text-[9px] text-white/30">{round.label}</p>
+          return (
+            <div
+              key={round.key}
+              className="flex-1 rounded-md bg-white/[0.04] px-1 py-1.5 text-center"
+            >
+              <p className="text-[9px] text-white/30">{round.label}</p>
+              <p className="text-[10px] font-bold text-white/80">
+                {(roundOdds * 100).toFixed(1)}%
+              </p>
+              {cumulativeProfit !== null && (
                 <p
-                  className={`text-[10px] font-medium ${cumulativeProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                  className={`text-[9px] font-medium ${cumulativeProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
                 >
                   {cumulativeProfit >= 0 ? '+' : ''}
                   {formatCurrency(cumulativeProfit)}
                 </p>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

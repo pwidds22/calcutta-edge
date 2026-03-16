@@ -11,6 +11,7 @@ import {
   skipTeam,
   undoLastSale,
   pauseAuction,
+  autoAdvance,
 } from '@/actions/bidding';
 import { Play, Gavel, XCircle, SkipForward, Undo2, Pause, Zap } from 'lucide-react';
 
@@ -112,12 +113,12 @@ export function BiddingControls({
         {biddingStatus === 'open' && (
           <>
             <Button
-              onClick={() => handle(() => closeBidding(sessionId), 'close')}
+              onClick={() => handle(() => autoMode ? autoAdvance(sessionId) : closeBidding(sessionId), 'close')}
               disabled={loading === 'close'}
               className="flex-1 gap-2 bg-amber-600 text-white hover:bg-amber-700"
             >
               <XCircle className="size-4" />
-              {autoMode ? 'Close Early (Override)' : timerIsRunning ? 'Close Early' : 'Close Bidding'}
+              {autoMode ? 'Close & Sell Now' : timerIsRunning ? 'Close Early' : 'Close Bidding'}
             </Button>
             <Button
               onClick={() => handle(() => skipTeam(sessionId), 'skip')}

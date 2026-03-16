@@ -49,11 +49,17 @@ export function BidPanel({
     setLoading(false);
   };
 
-  const handleIncrement = (inc: number) => {
+  const handleIncrement = async (inc: number) => {
     const base = currentHighestBid || 0;
-    const newAmount = base + inc;
-    // Ensure increment buttons never go below the minimum bid floor
-    setBidAmount(String(Math.max(newAmount, floorBid)));
+    const newAmount = Math.max(base + inc, floorBid);
+    // One-click auto-bid — submit immediately for fast bidding wars
+    setLoading(true);
+    setError(null);
+    setBidAmount(String(newAmount));
+    const result = await placeBid(sessionId, newAmount);
+    if (result.error) setError(result.error);
+    else setBidAmount('');
+    setLoading(false);
   };
 
   const isOpen = biddingStatus === 'open';

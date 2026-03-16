@@ -812,6 +812,11 @@ export async function undoLastSale(sessionId: string) {
       teamIdx: fallbackIdx,
       ...(bundleTeamIds ? { bundleTeamIds } : {}),
     });
+
+    // Auto-open bidding if auto-mode enabled
+    if (settings?.autoMode) {
+      await autoOpenBidding(admin, sessionId, settings);
+    }
   } else {
     await admin
       .from('auction_sessions')
@@ -829,6 +834,11 @@ export async function undoLastSale(sessionId: string) {
       teamIdx,
       ...(bundleTeamIds ? { bundleTeamIds } : {}),
     });
+
+    // Auto-open bidding if auto-mode enabled
+    if (settings?.autoMode) {
+      await autoOpenBidding(admin, sessionId, settings);
+    }
   }
 
   return { success: true };
