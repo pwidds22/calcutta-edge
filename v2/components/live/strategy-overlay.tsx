@@ -1,6 +1,6 @@
 'use client';
 
-import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import type { BaseTeam, TournamentConfig, PayoutRules, TeamBundle } from '@/lib/tournaments/types';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import { initializeTeams } from '@/lib/calculations/initialize';
 import { formatCurrency } from '@/lib/calculations/format';
@@ -15,6 +15,7 @@ interface StrategyOverlayProps {
   payoutRules: PayoutRules;
   estimatedPotSize: number;
   soldTeams: SoldTeam[];
+  bundles?: TeamBundle[];
 }
 
 export function StrategyOverlay({
@@ -26,6 +27,7 @@ export function StrategyOverlay({
   payoutRules,
   estimatedPotSize,
   soldTeams,
+  bundles = [],
 }: StrategyOverlayProps) {
   if (!hasPaid) {
     const paymentUrl = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL;
@@ -75,9 +77,6 @@ export function StrategyOverlay({
 
   if (currentTeamId === null) return null;
 
-  // Skip strategy overlay for bundles — no single-team fair value applies
-  if (typeof currentTeamId === 'string') return null;
-
   // Build saved data from sold teams for calculation engine
   const savedTeams = soldTeams.map((s) => ({
     id: s.teamId,
@@ -96,9 +95,6 @@ export function StrategyOverlay({
     config
   );
 
-  const currentTeam = teams.find((t) => t.id === currentTeamId);
-  if (!currentTeam) return null;
-
   // Calculate projected pot from actual sales
   const soldValuePct = savedTeams.reduce((sum, s) => {
     const t = teams.find((team) => team.id === s.id);
@@ -107,7 +103,27 @@ export function StrategyOverlay({
   const projectedPot =
     soldValuePct > 0 ? totalSpent / soldValuePct : estimatedPotSize;
 
-  const fairValue = currentTeam.valuePercentage * projectedPot;
+  // For bundles, aggregate fair values of all member teams
+  const isBundle = typeof currentTeamId === 'string' && currentTeamId.startsWith('b:');
+  const bundleId = isBundle ? currentTeamId.slice(2) : null;
+  const bundle = bundleId ? bundles.find((b) => b.id === bundleId) : null;
+
+  let bundleTeams: typeof teams = [];
+  let currentTeam: (typeof teams)[number] | null = null;
+
+  if (isBundle && bundle) {
+    bundleTeams = bundle.teamIds
+      .map((tid) => teams.find((t) => t.id === tid))
+      .filter((t): t is (typeof teams)[number] => !!t);
+    if (bundleTeams.length === 0) return null;
+  } else {
+    currentTeam = teams.find((t) => t.id === currentTeamId) ?? null;
+    if (!currentTeam) return null;
+  }
+
+  const fairValue = isBundle
+    ? bundleTeams.reduce((sum, t) => sum + t.valuePercentage * projectedPot, 0)
+    : currentTeam!.valuePercentage * projectedPot;
   const suggestedBid = fairValue * 0.95;
   const edge =
     currentHighestBid > 0
@@ -156,40 +172,62 @@ export function StrategyOverlay({
       </div>
 
       {/* Round-by-round odds + profit */}
-      <div className="mt-3 flex gap-1.5">
-        {config.rounds.map((round) => {
-          const roundOdds = currentTeam.odds?.[round.key] ?? 0;
-          const cumulativeProfit = currentHighestBid > 0
-            ? config.rounds
-                .slice(0, config.rounds.indexOf(round) + 1)
-                .reduce((sum, r) => {
-                  const o = currentTeam.odds?.[r.key] ?? 0;
-                  const p = (payoutRules[r.key] ?? 0) / 100;
-                  return sum + o * p * projectedPot;
-                }, 0) - currentHighestBid
-            : null;
+      {!isBundle && currentTeam && (
+        <div className="mt-3 flex gap-1.5">
+          {config.rounds.map((round) => {
+            const roundOdds = currentTeam.odds?.[round.key] ?? 0;
+            const cumulativeProfit = currentHighestBid > 0
+              ? config.rounds
+                  .slice(0, config.rounds.indexOf(round) + 1)
+                  .reduce((sum, r) => {
+                    const o = currentTeam.odds?.[r.key] ?? 0;
+                    const p = (payoutRules[r.key] ?? 0) / 100;
+                    return sum + o * p * projectedPot;
+                  }, 0) - currentHighestBid
+              : null;
 
-          return (
-            <div
-              key={round.key}
-              className="flex-1 rounded-md bg-white/[0.04] px-1 py-1.5 text-center"
-            >
-              <p className="text-[9px] text-white/30">{round.label}</p>
-              <p className="text-[10px] font-bold text-white/80">
-                {(roundOdds * 100).toFixed(1)}%
-              </p>
-              {cumulativeProfit !== null && (
-                <p
-                  className={`text-[9px] font-medium ${cumulativeProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
-                >
-                  {cumulativeProfit >= 0 ? '+' : ''}
-                  {formatCurrency(cumulativeProfit)}
+            return (
+              <div
+                key={round.key}
+                className="flex-1 rounded-md bg-white/[0.04] px-1 py-1.5 text-center"
+              >
+                <p className="text-[9px] text-white/30">{round.label}</p>
+                <p className="text-[10px] font-bold text-white/80">
+                  {(roundOdds * 100).toFixed(1)}%
                 </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {cumulativeProfit !== null && (
+                  <p
+                    className={`text-[9px] font-medium ${cumulativeProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                  >
+                    {cumulativeProfit >= 0 ? '+' : ''}
+                    {formatCurrency(cumulativeProfit)}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bundle: per-member fair value breakdown */}
+      {isBundle && bundleTeams.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {bundleTeams.map((member) => {
+            const memberFV = member.valuePercentage * projectedPot;
+            return (
+              <div
+                key={member.id}
+                className="flex items-center justify-between rounded-md bg-white/[0.04] px-2 py-1"
+              >
+                <span className="text-[10px] text-white/60">{member.name}</span>
+                <span className="text-[10px] font-medium text-white/80">
+                  {formatCurrency(memberFV)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

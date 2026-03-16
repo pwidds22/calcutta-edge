@@ -53,9 +53,14 @@ export function TeamSpotlight({
               </div>
               <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                 {config.rounds.map((round) => {
-                  const odds = member.americanOdds[round.key];
-                  if (odds === undefined) return null;
-                  const formatted = odds > 0 ? `+${odds}` : odds.toString();
+                  const prob = member.probabilities?.[round.key];
+                  const americanOdds = member.americanOdds[round.key];
+                  const hasProb = prob !== undefined && prob > 0;
+                  const hasAmerican = americanOdds !== undefined && americanOdds !== 0;
+                  if (!hasProb && !hasAmerican) return null;
+                  const display = hasProb
+                    ? `${(prob * 100).toFixed(1)}%`
+                    : americanOdds > 0 ? `+${americanOdds}` : americanOdds.toString();
                   return (
                     <div
                       key={round.key}
@@ -63,7 +68,7 @@ export function TeamSpotlight({
                     >
                       <p className="text-[9px] text-white/40">{round.label}</p>
                       <p className="text-[10px] font-medium text-white/80">
-                        {formatted}
+                        {display}
                       </p>
                     </div>
                   );
@@ -107,17 +112,22 @@ export function TeamSpotlight({
       {/* Odds by round */}
       <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
         {config.rounds.map((round) => {
-          const odds = team.americanOdds[round.key];
-          if (odds === undefined) return null;
-          const formatted =
-            odds > 0 ? `+${odds}` : odds.toString();
+          const prob = team.probabilities?.[round.key];
+          const americanOdds = team.americanOdds[round.key];
+          // Prefer probabilities (model-based), fall back to American odds
+          const hasProb = prob !== undefined && prob > 0;
+          const hasAmerican = americanOdds !== undefined && americanOdds !== 0;
+          if (!hasProb && !hasAmerican) return null;
+          const display = hasProb
+            ? `${(prob * 100).toFixed(1)}%`
+            : americanOdds > 0 ? `+${americanOdds}` : americanOdds.toString();
           return (
             <div
               key={round.key}
               className="rounded-md bg-white/[0.04] px-2 py-1.5 text-center"
             >
               <p className="text-[10px] text-white/40">{round.label}</p>
-              <p className="text-xs font-medium text-white/80">{formatted}</p>
+              <p className="text-xs font-medium text-white/80">{display}</p>
             </div>
           );
         })}

@@ -248,6 +248,7 @@ export function ParticipantView({
               payoutRules={session.payout_rules}
               estimatedPotSize={session.estimated_pot_size}
               soldTeams={channel.soldTeams}
+              bundles={bundles}
             />
 
             <TimerDisplay timer={timer.state} />
