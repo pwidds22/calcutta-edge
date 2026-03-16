@@ -69,6 +69,15 @@ export interface BaseTeam {
   probabilities?: Record<RoundKey, number>;
 }
 
+/** A group of teams auctioned as a single item */
+export interface TeamBundle {
+  id: string;
+  name: string;
+  teamIds: number[];
+}
+
+export type BundlePreset = 'none' | 'light' | 'standard' | 'heavy';
+
 export interface Team extends BaseTeam {
   rawImpliedProbabilities: Record<RoundKey, number>;
   odds: Record<RoundKey, number>;
