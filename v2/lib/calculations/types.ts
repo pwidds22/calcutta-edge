@@ -11,6 +11,8 @@ export type {
   BracketDevigConfig,
   TournamentConfig,
   BaseTeam,
+  TeamBundle,
+  BundlePreset,
   Team,
   SavedTeamData,
   PayoutRules,

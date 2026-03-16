@@ -18,7 +18,7 @@ import {
   type AuctionAction,
   type SummaryStats,
 } from './auction-state';
-import type { Team, TournamentConfig } from '@/lib/calculations/types';
+import type { Team, TeamBundle, BundlePreset, TournamentConfig } from '@/lib/calculations/types';
 
 interface AuctionContextValue {
   state: AuctionState;
@@ -27,6 +27,8 @@ interface AuctionContextValue {
   summaryStats: SummaryStats;
   effectivePotSize: number;
   config: TournamentConfig | null;
+  bundles: TeamBundle[];
+  bundlePreset: BundlePreset;
   hasPaid: boolean;
 }
 
@@ -56,7 +58,7 @@ export function AuctionProvider({ children, hasPaid = true }: { children: ReactN
   ]);
 
   const value = useMemo(
-    () => ({ state, dispatch, filteredTeams, summaryStats, effectivePotSize, config: state.config, hasPaid }),
+    () => ({ state, dispatch, filteredTeams, summaryStats, effectivePotSize, config: state.config, bundles: state.bundles, bundlePreset: state.bundlePreset, hasPaid }),
     [state, filteredTeams, summaryStats, effectivePotSize, hasPaid]
   );
 

@@ -19,16 +19,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { TeamTableRow } from './team-table-row';
+import { TeamTableRow, BundleRow } from './team-table-row';
+import { BUNDLE_PRESETS } from '@/lib/tournaments/bundles';
 import { ArrowUpDown, Lock } from 'lucide-react';
-import type { GroupFilter, StatusFilter, SortOption } from '@/lib/calculations/types';
+import type { GroupFilter, StatusFilter, SortOption, BundlePreset } from '@/lib/calculations/types';
 
 const PREVIEW_SEED_CUTOFF = 1; // Show only #1 seeds in free preview
 
 const STATUSES: StatusFilter[] = ['All', 'Available', 'Taken', 'My Teams'];
 
 export function TeamTable() {
-  const { state, dispatch, filteredTeams, effectivePotSize, config, hasPaid } = useAuction();
+  const { state, dispatch, filteredTeams, effectivePotSize, config, bundles, bundlePreset, hasPaid } = useAuction();
 
   const groups: GroupFilter[] = config
     ? ['All', ...config.groups.map((g) => g.key)]
@@ -141,8 +142,27 @@ export function TeamTable() {
           className="w-[180px]"
         />
 
+        <Select
+          value={bundlePreset}
+          onValueChange={(v) =>
+            dispatch({ type: 'SET_BUNDLE_PRESET', preset: v as BundlePreset })
+          }
+        >
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Bundling" />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(BUNDLE_PRESETS) as BundlePreset[]).map((key) => (
+              <SelectItem key={key} value={key}>
+                {BUNDLE_PRESETS[key].label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <span className="ml-auto text-xs text-muted-foreground">
           {filteredTeams.length} {config?.teamLabel?.toLowerCase() ?? 'team'}s
+          {bundles.length > 0 && ` (${bundles.length} bundle${bundles.length !== 1 ? 's' : ''})`}
         </span>
       </div>
 
@@ -186,17 +206,66 @@ export function TeamTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTeams.map((team) => (
-              <TeamTableRow
-                key={team.id}
-                team={team}
-                payoutRules={state.payoutRules}
-                potSize={effectivePotSize}
-                onPriceChange={handlePriceChange}
-                onMyTeamToggle={handleMyTeamToggle}
-                locked={!hasPaid && team.seed > PREVIEW_SEED_CUTOFF}
-              />
-            ))}
+            {bundles.length > 0 ? (
+              <>
+                {/* Unbundled teams */}
+                {(() => {
+                  const bundledTeamIds = new Set(bundles.flatMap((b) => b.teamIds));
+                  const unbundledTeams = filteredTeams.filter((t) => !bundledTeamIds.has(t.id));
+                  // Filter bundles to only those with at least one member in filteredTeams
+                  const visibleBundles = bundles.filter((b) =>
+                    b.teamIds.some((id) => filteredTeams.some((t) => t.id === id))
+                  );
+
+                  // Interleave: unbundled teams first, then bundles at the end
+                  // (bundles are typically low seeds, so they naturally sort after higher-seeded unbundled teams)
+                  return (
+                    <>
+                      {unbundledTeams.map((team) => (
+                        <TeamTableRow
+                          key={team.id}
+                          team={team}
+                          payoutRules={state.payoutRules}
+                          potSize={effectivePotSize}
+                          onPriceChange={handlePriceChange}
+                          onMyTeamToggle={handleMyTeamToggle}
+                          locked={!hasPaid && team.seed > PREVIEW_SEED_CUTOFF}
+                        />
+                      ))}
+                      {visibleBundles.map((bundle) => {
+                        const members = bundle.teamIds
+                          .map((id) => state.teams.find((t) => t.id === id))
+                          .filter((t): t is typeof state.teams[number] => t != null);
+                        return (
+                          <BundleRow
+                            key={bundle.id}
+                            bundle={bundle}
+                            memberTeams={members}
+                            payoutRules={state.payoutRules}
+                            potSize={effectivePotSize}
+                            onPriceChange={handlePriceChange}
+                            onMyTeamToggle={handleMyTeamToggle}
+                            locked={!hasPaid && members.every((t) => t.seed > PREVIEW_SEED_CUTOFF)}
+                          />
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+              </>
+            ) : (
+              filteredTeams.map((team) => (
+                <TeamTableRow
+                  key={team.id}
+                  team={team}
+                  payoutRules={state.payoutRules}
+                  potSize={effectivePotSize}
+                  onPriceChange={handlePriceChange}
+                  onMyTeamToggle={handleMyTeamToggle}
+                  locked={!hasPaid && team.seed > PREVIEW_SEED_CUTOFF}
+                />
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

@@ -2,6 +2,8 @@ import type {
   Team,
   PayoutRules,
   TournamentConfig,
+  TeamBundle,
+  BundlePreset,
   GroupFilter,
   StatusFilter,
   SortOption,
@@ -10,6 +12,7 @@ import type {
 } from '@/lib/calculations/types';
 import { calculateTeamValues } from '@/lib/calculations/values';
 import { calculateProjectedPotSize } from '@/lib/calculations/pot';
+import { generateBundles } from '@/lib/tournaments/bundles';
 
 // ─── State ───────────────────────────────────────────────────────────
 
@@ -19,6 +22,8 @@ export interface AuctionState {
   estimatedPotSize: number;
   projectedPotSize: number;
   config: TournamentConfig | null;
+  bundles: TeamBundle[];
+  bundlePreset: BundlePreset;
   groupFilter: GroupFilter;
   statusFilter: StatusFilter;
   sortOption: SortOption;
@@ -35,6 +40,8 @@ export const INITIAL_STATE: AuctionState = {
   estimatedPotSize: 10000,
   projectedPotSize: 0,
   config: null,
+  bundles: [],
+  bundlePreset: 'none',
   groupFilter: 'All',
   statusFilter: 'All',
   sortOption: 'seed',
@@ -57,6 +64,7 @@ export type AuctionAction =
   | { type: 'SET_STATUS_FILTER'; filter: StatusFilter }
   | { type: 'SET_SORT'; option: SortOption; direction: SortDirection }
   | { type: 'SET_SEARCH_TERM'; term: string }
+  | { type: 'SET_BUNDLE_PRESET'; preset: BundlePreset }
   | { type: 'MARK_SAVED' }
   | { type: 'RESET_AUCTION' };
 
@@ -83,12 +91,16 @@ export function auctionReducer(
 ): AuctionState {
   switch (action.type) {
     case 'SET_INITIAL_DATA': {
+      const bundles = state.bundlePreset !== 'none'
+        ? generateBundles(state.bundlePreset, action.teams, action.config)
+        : [];
       const newState: AuctionState = {
         ...state,
         teams: action.teams,
         payoutRules: action.payoutRules,
         estimatedPotSize: action.estimatedPotSize,
         config: action.config,
+        bundles,
         isLoading: false,
         isDirty: false,
       };
@@ -150,6 +162,13 @@ export function auctionReducer(
 
     case 'SET_SEARCH_TERM':
       return { ...state, searchTerm: action.term };
+
+    case 'SET_BUNDLE_PRESET': {
+      const bundles = action.preset !== 'none' && state.config
+        ? generateBundles(action.preset, state.teams, state.config)
+        : [];
+      return { ...state, bundlePreset: action.preset, bundles };
+    }
 
     case 'MARK_SAVED':
       return { ...state, isDirty: false, lastSaved: new Date() };
