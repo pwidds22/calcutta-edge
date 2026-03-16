@@ -124,7 +124,6 @@ export function StrategyOverlay({
   const fairValue = isBundle
     ? bundleTeams.reduce((sum, t) => sum + t.valuePercentage * projectedPot, 0)
     : currentTeam!.valuePercentage * projectedPot;
-  const suggestedBid = fairValue * 0.95;
   const edge =
     currentHighestBid > 0
       ? ((fairValue - currentHighestBid) / fairValue) * 100
@@ -142,14 +141,8 @@ export function StrategyOverlay({
       <div className="grid grid-cols-3 gap-3">
         <div>
           <p className="text-[10px] text-white/40">Fair Value</p>
-          <p className="text-sm font-bold text-white">
-            {formatCurrency(fairValue)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] text-white/40">Suggested Bid</p>
           <p className="text-sm font-bold text-emerald-400">
-            {formatCurrency(suggestedBid)}
+            {formatCurrency(fairValue)}
           </p>
         </div>
         <div>
@@ -168,6 +161,12 @@ export function StrategyOverlay({
               {formatCurrency(projectedPot)}
             </p>
           )}
+        </div>
+        <div>
+          <p className="text-[10px] text-white/40">Proj. Pot</p>
+          <p className="text-sm font-bold text-white/60">
+            {formatCurrency(projectedPot)}
+          </p>
         </div>
       </div>
 
@@ -209,30 +208,25 @@ export function StrategyOverlay({
         </div>
       )}
 
-      {/* Bundle: per-member breakdown with odds + fair value */}
+      {/* Bundle: compact per-member fair value */}
       {isBundle && bundleTeams.length > 0 && (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-0.5">
           {bundleTeams.map((member) => {
             const memberFV = member.valuePercentage * projectedPot;
+            const topOdds = member.odds?.[config.rounds[0]?.key] ?? 0;
             return (
-              <div key={member.id} className="rounded-md bg-white/[0.04] px-2 py-1.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-medium text-white/70">{member.name}</span>
-                  <span className="text-[10px] font-medium text-emerald-400">
-                    FV {formatCurrency(memberFV)}
+              <div
+                key={member.id}
+                className="flex items-center justify-between rounded bg-white/[0.03] px-2 py-1"
+              >
+                <span className="text-[10px] text-white/60">{member.name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[9px] text-white/30">
+                    {(topOdds * 100).toFixed(0)}% {config.rounds[0]?.label}
                   </span>
-                </div>
-                <div className="flex gap-1">
-                  {config.rounds.map((round) => {
-                    const odds = member.odds?.[round.key] ?? 0;
-                    if (odds === 0) return null;
-                    return (
-                      <div key={round.key} className="flex-1 text-center">
-                        <p className="text-[8px] text-white/25">{round.label}</p>
-                        <p className="text-[9px] text-white/60">{(odds * 100).toFixed(1)}%</p>
-                      </div>
-                    );
-                  })}
+                  <span className="text-[10px] font-medium text-white/80">
+                    {formatCurrency(memberFV)}
+                  </span>
                 </div>
               </div>
             );
