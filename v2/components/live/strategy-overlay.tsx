@@ -4,13 +4,22 @@ import { useState, useEffect, useMemo } from 'react';
 import type { BaseTeam, TournamentConfig, PayoutRules, TeamBundle } from '@/lib/tournaments/types';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
+import { blendProbabilities } from '@/lib/tournaments/odds-sources';
 import { initializeTeams } from '@/lib/calculations/initialize';
 import { formatCurrency } from '@/lib/calculations/format';
 import { TrendingUp, Lock, ExternalLink, ChevronDown, SlidersHorizontal } from 'lucide-react';
 
 const SUGGESTED_BID_KEY = 'calcutta_suggested_bid_pct';
 const ODDS_SOURCE_KEY = 'calcutta_odds_source';
+const BLEND_WEIGHTS_KEY = 'calcutta_blend_weights';
 const DEFAULT_BID_PCT = 95;
+const DEFAULT_BLEND_WEIGHTS: Record<string, number> = {
+  evan_miya: 34,
+  team_rankings: 33,
+  fanduel: 0,
+  draftkings: 0,
+  pinnacle: 33,
+};
 
 /** Renders round-by-round odds + cumulative profit for a single team */
 function RoundOddsRow({
@@ -91,6 +100,15 @@ export function StrategyOverlay({
   });
   const [showSourcePicker, setShowSourcePicker] = useState(false);
 
+  // --- Local state: blend weights ---
+  const [blendWeights, setBlendWeights] = useState<Record<string, number>>(() => {
+    if (typeof window === 'undefined') return DEFAULT_BLEND_WEIGHTS;
+    try {
+      const stored = localStorage.getItem(BLEND_WEIGHTS_KEY);
+      return stored ? JSON.parse(stored) : DEFAULT_BLEND_WEIGHTS;
+    } catch { return DEFAULT_BLEND_WEIGHTS; }
+  });
+
   // --- Local state: suggested bid % ---
   const [bidPct, setBidPct] = useState<number>(() => {
     if (typeof window === 'undefined') return DEFAULT_BID_PCT;
@@ -106,11 +124,41 @@ export function StrategyOverlay({
   useEffect(() => {
     localStorage.setItem(SUGGESTED_BID_KEY, String(bidPct));
   }, [bidPct]);
+  useEffect(() => {
+    localStorage.setItem(BLEND_WEIGHTS_KEY, JSON.stringify(blendWeights));
+  }, [blendWeights]);
+
+  // Blendable sources (models + sportsbooks only)
+  const blendableSources = useMemo(
+    () => oddsRegistry?.sources.filter(s => s.type === 'model' || s.type === 'sportsbook') ?? [],
+    [oddsRegistry]
+  );
 
   // --- Apply selected odds source to base teams ---
   const adjustedTeams = useMemo(() => {
-    if (!oddsRegistry || selectedSource === oddsRegistry.defaultSourceId) {
-      return baseTeams; // Default source — use as-is
+    if (!oddsRegistry) return baseTeams;
+
+    // Blend mode: compute weighted average
+    if (selectedSource === 'blend') {
+      const activeSources = blendableSources
+        .filter(s => (blendWeights[s.id] ?? 0) > 0)
+        .map(s => ({ data: oddsRegistry.staticData[s.id], weight: blendWeights[s.id] }))
+        .filter(s => s.data);
+      if (activeSources.length === 0) return baseTeams;
+
+      const teamIds = baseTeams.map(t => t.id);
+      const roundKeys = config.rounds.map(r => r.key);
+      const blended = blendProbabilities(activeSources, teamIds, roundKeys);
+
+      return baseTeams.map((bt) => {
+        const teamProbs = blended.teams[bt.id];
+        if (!teamProbs) return bt;
+        return { ...bt, probabilities: teamProbs, americanOdds: {} as Record<string, number> };
+      });
+    }
+
+    if (selectedSource === oddsRegistry.defaultSourceId) {
+      return baseTeams;
     }
     const sourceData = oddsRegistry.staticData[selectedSource];
     if (!sourceData) return baseTeams;
@@ -120,9 +168,11 @@ export function StrategyOverlay({
       if (!teamProbs) return bt;
       return { ...bt, probabilities: teamProbs, americanOdds: {} as Record<string, number> };
     });
-  }, [baseTeams, selectedSource, oddsRegistry]);
+  }, [baseTeams, selectedSource, oddsRegistry, blendWeights, blendableSources, config.rounds]);
 
-  const currentSourceName = oddsRegistry?.sources.find(s => s.id === selectedSource)?.name ?? 'Default';
+  const currentSourceName = selectedSource === 'blend'
+    ? 'Blend'
+    : (oddsRegistry?.sources.find(s => s.id === selectedSource)?.name ?? 'Default');
 
   if (!hasPaid) {
     const paymentUrl = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL;
@@ -248,12 +298,12 @@ export function StrategyOverlay({
               {showSourcePicker && (
                 <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-white/[0.08] bg-zinc-900 p-1 shadow-xl">
                   {oddsRegistry.sources
-                    .filter(s => s.id !== 'blend' && s.id !== 'custom')
+                    .filter(s => s.id !== 'custom')
                     .map((src) => (
                     <button
                       key={src.id}
                       type="button"
-                      onClick={() => { setSelectedSource(src.id); setShowSourcePicker(false); }}
+                      onClick={() => { setSelectedSource(src.id); if (src.id !== 'blend') setShowSourcePicker(false); }}
                       className={`w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-colors ${
                         selectedSource === src.id
                           ? 'bg-emerald-500/10 text-emerald-400'
@@ -261,7 +311,9 @@ export function StrategyOverlay({
                       }`}
                     >
                       <span className="font-medium">{src.name}</span>
-                      <span className="ml-1.5 text-[10px] text-white/30">{src.type === 'model' ? '📊' : '🏈'}</span>
+                      <span className="ml-1.5 text-[10px] text-white/30">
+                        {src.type === 'model' ? '📊' : src.type === 'blend' ? '⚖️' : '🏈'}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -283,6 +335,34 @@ export function StrategyOverlay({
           </button>
         </div>
       </div>
+
+      {/* Blend weights panel */}
+      {selectedSource === 'blend' && oddsRegistry && (
+        <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-medium text-emerald-300">Blend Weights</span>
+          </div>
+          <div className="space-y-2">
+            {blendableSources.map((src) => (
+              <div key={src.id} className="flex items-center gap-2">
+                <span className="w-20 text-[10px] text-white/50 truncate">{src.name}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={blendWeights[src.id] ?? 0}
+                  onChange={(e) => setBlendWeights(prev => ({ ...prev, [src.id]: Number(e.target.value) }))}
+                  className="flex-1 h-1 rounded-full appearance-none bg-white/10 accent-emerald-500 cursor-pointer"
+                />
+                <span className="w-8 text-right text-[10px] font-mono text-emerald-400">
+                  {blendWeights[src.id] ?? 0}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Suggested bid settings panel */}
       {showBidSettings && (
