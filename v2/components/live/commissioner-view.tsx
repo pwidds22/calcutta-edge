@@ -20,6 +20,7 @@ import { StrategyOverlay } from './strategy-overlay';
 import { TimerDisplay } from './timer-display';
 import { closeBidding, autoAdvance, toggleAutoMode } from '@/actions/bidding';
 import { TournamentDashboard } from './tournament-dashboard';
+import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
 import { Shuffle, Zap } from 'lucide-react';
@@ -67,6 +68,7 @@ interface CommissionerViewProps {
   userId: string;
   hasPaid: boolean;
   tournamentResults: TournamentResult[];
+  oddsRegistry?: OddsSourceRegistry;
 }
 
 export function CommissionerView({
@@ -80,6 +82,7 @@ export function CommissionerView({
   userId,
   hasPaid,
   tournamentResults,
+  oddsRegistry,
 }: CommissionerViewProps) {
   const myParticipant = participants.find((p) => p.user_id === userId);
 
@@ -302,6 +305,7 @@ export function CommissionerView({
               estimatedPotSize={session.estimated_pot_size}
               soldTeams={channel.soldTeams}
               bundles={bundles}
+              oddsRegistry={oddsRegistry}
             />
 
             <TimerDisplay timer={timer.state} />

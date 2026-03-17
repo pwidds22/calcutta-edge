@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSessionState } from '@/actions/session';
 import { getTournament } from '@/lib/tournaments/registry';
+import { getOddsRegistry } from '@/lib/tournaments/registry';
 import { ParticipantView } from '@/components/live/participant-view';
 
 export default async function LiveAuctionPage({
@@ -19,6 +20,8 @@ export default async function LiveAuctionPage({
   const tournament = getTournament(result.session.tournament_id);
   if (!tournament) redirect('/host');
 
+  const oddsRegistry = getOddsRegistry(result.session.tournament_id);
+
   return (
     <ParticipantView
       session={result.session}
@@ -31,6 +34,7 @@ export default async function LiveAuctionPage({
       userId={result.userId}
       hasPaid={result.hasPaid}
       tournamentResults={result.tournamentResults}
+      oddsRegistry={oddsRegistry}
     />
   );
 }

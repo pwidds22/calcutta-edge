@@ -79,15 +79,30 @@ export async function startAuction(sessionId: string) {
 
   // When resuming from paused, keep current team position; from lobby, start at 0
   const resumeIdx = session.status === 'paused' ? session.current_team_idx : 0;
+  const settings = session.settings as SessionSettings | null;
+  const isAutoMode = !!settings?.autoMode;
+
+  // Auto-mode: skip 'waiting' → go directly to 'open' to avoid race condition
+  // (two rapid broadcasts can cause the second one to be lost)
+  const initialBiddingStatus = isAutoMode ? 'open' : 'waiting';
+
+  // If auto-mode + timer, compute timer end time upfront
+  let timerEndsAt: string | null = null;
+  let timerDurationMs: number | null = null;
+  if (isAutoMode && settings?.timer?.enabled) {
+    timerDurationMs = settings.timer.initialDurationSec * 1000;
+    timerEndsAt = new Date(Date.now() + timerDurationMs).toISOString();
+  }
 
   const { error } = await supabase
     .from('auction_sessions')
     .update({
       status: 'active',
       current_team_idx: resumeIdx,
-      bidding_status: 'waiting',
+      bidding_status: initialBiddingStatus,
       current_highest_bid: 0,
       current_highest_bidder_id: null,
+      ...(timerEndsAt ? { timer_ends_at: timerEndsAt, timer_duration_ms: timerDurationMs } : {}),
     })
     .eq('id', sessionId);
 
@@ -98,11 +113,15 @@ export async function startAuction(sessionId: string) {
     teamId: session.team_order[resumeIdx],
   });
 
-  // Auto-mode: immediately open bidding on the first team
-  const settings = session.settings as SessionSettings | null;
-  if (settings?.autoMode) {
-    const admin = createAdminClient();
-    await autoOpenBidding(admin, sessionId, settings);
+  // Auto-mode: broadcast open + timer events (DB already has the right state)
+  if (isAutoMode) {
+    await broadcastToChannel(channelName(sessionId), 'BIDDING_OPEN', {});
+    if (timerEndsAt && timerDurationMs) {
+      await broadcastToChannel(channelName(sessionId), 'TIMER_START', {
+        endsAt: timerEndsAt,
+        durationMs: timerDurationMs,
+      });
+    }
   }
 
   return { success: true };

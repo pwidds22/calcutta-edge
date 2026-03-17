@@ -18,6 +18,7 @@ import { StrategyOverlay } from './strategy-overlay';
 import { TimerDisplay } from './timer-display';
 import { TournamentDashboard } from './tournament-dashboard';
 import { ChatPanel } from './chat-panel';
+import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
 
@@ -62,6 +63,7 @@ interface ParticipantViewProps {
   userId: string;
   hasPaid: boolean;
   tournamentResults: TournamentResult[];
+  oddsRegistry?: OddsSourceRegistry;
 }
 
 export function ParticipantView({
@@ -75,6 +77,7 @@ export function ParticipantView({
   userId,
   hasPaid,
   tournamentResults,
+  oddsRegistry,
 }: ParticipantViewProps) {
   const myParticipant = participants.find((p) => p.user_id === userId);
 
@@ -249,6 +252,7 @@ export function ParticipantView({
               estimatedPotSize={session.estimated_pot_size}
               soldTeams={channel.soldTeams}
               bundles={bundles}
+              oddsRegistry={oddsRegistry}
             />
 
             <TimerDisplay timer={timer.state} />

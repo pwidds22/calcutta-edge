@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSessionState } from '@/actions/session';
-import { getTournament } from '@/lib/tournaments/registry';
+import { getTournament, getOddsRegistry } from '@/lib/tournaments/registry';
 import { CommissionerView } from '@/components/live/commissioner-view';
 
 export default async function CommissionerPage({
@@ -17,6 +17,8 @@ export default async function CommissionerPage({
   const tournament = getTournament(result.session.tournament_id);
   if (!tournament) redirect('/host');
 
+  const oddsRegistry = getOddsRegistry(result.session.tournament_id);
+
   return (
     <CommissionerView
       session={result.session}
@@ -29,6 +31,7 @@ export default async function CommissionerPage({
       userId={result.userId}
       hasPaid={result.hasPaid}
       tournamentResults={result.tournamentResults}
+      oddsRegistry={oddsRegistry}
     />
   );
 }

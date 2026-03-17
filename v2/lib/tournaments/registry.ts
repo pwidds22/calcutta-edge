@@ -1,4 +1,6 @@
 import type { TournamentConfig, BaseTeam } from './types';
+import type { OddsSourceRegistry } from './odds-sources';
+import { buildMarchMadness2026Registry } from './odds-sources';
 import {
   MARCH_MADNESS_2026_CONFIG,
   MARCH_MADNESS_2026_TEAMS,
@@ -78,4 +80,12 @@ export function isHostable(config: TournamentConfig): boolean {
 /** List only tournaments whose hosting window is open */
 export function listHostableTournaments(): TournamentConfig[] {
   return listTournaments().filter(isHostable);
+}
+
+/** Get odds source registry for a tournament (if available) */
+export function getOddsRegistry(tournamentId: string): OddsSourceRegistry | undefined {
+  if (tournamentId === 'march_madness_2026') {
+    return buildMarchMadness2026Registry();
+  }
+  return undefined;
 }
