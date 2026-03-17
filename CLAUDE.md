@@ -148,30 +148,35 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 
 ## Session Notes (2026-03-17)
 
-### Completed (Live Testing Session)
-- **8 bugs fixed** from first real live auction test — 6 commits deployed (`605bcef`)
-- **Auto-mode fixes**: undo now reopens bidding, "Close Early" uses `autoAdvance()` instead of `closeBidding()`
-- **Strategy overlay rework**: single source of truth for all numbers (fair value, edge, projected pot, round odds, cumulative profit)
-- **TeamSpotlight stripped to identity-only**: no odds, no values — prevents duplication
-- **Bundle strategy parity**: bundles now show full round-by-round odds per member (same format as individual teams)
-- **One-click auto-bid**: increment buttons (`+$5`, etc.) submit bids directly via `placeBid()`
-- **Removed arbitrary "Suggested Bid"** (was 95% of fair value — not useful)
-- **Stripe attribution issue identified**: needs `client_reference_id` to link payment to logged-in session
+### Completed (2026-03-17 — Odds + Live Auction Polish Session)
+- **Static sportsbook odds pipeline** — replaced broken live Odds API with devigged FanDuel, DraftKings, Pinnacle data (`v2/lib/tournaments/devig-pipeline.ts`, `v2/lib/tournaments/data/`)
+- **5 odds sources** — Evan Miya, TeamRankings, FanDuel, DraftKings, Pinnacle with proper devigging (binary YES/NO, outright with expectedWinners, matchup, regional)
+- **Custom odds editor** — user can enter custom probabilities per team in strategy tool (`v2/components/auction/odds-source-selector.tsx`)
+- **103 unit tests passing** — including 38 devig pipeline tests + 5 cross-source validation tests
+- **Auto-mode start fix** — eliminated race condition: `startAuction()` now sets `bidding_status='open'` directly when autoMode is on, skipping intermediate 'waiting' state (`v2/actions/bidding.ts`)
+- **Live auction odds source selector** — dropdown in strategy overlay lets participants pick their preferred odds source during live bidding (`v2/components/live/strategy-overlay.tsx`)
+- **Blend mode in live auction** — custom weight sliders for all 5 sources, localStorage-persisted
+- **Suggested bid %** — configurable 50-100% slider (default 95%), shown as amber metric in strategy overlay, localStorage-persisted
+- **Odds registry plumbing** — `getOddsRegistry()` in registry.ts, threaded through page → view → strategy-overlay for both commissioner and participant views
+- **Deleted live Odds API** — removed `v2/app/api/odds/ncaab/route.ts` and `v2/lib/odds-api/client.ts`
+- **Commits**: `6195db6`, `3d0e2cf`, `8269e94`, `1febc0f` — all deployed to Vercel
 
-### Previous Session (2026-03-16)
-- Fixed `team_order` column type (integer[] → text[]) for bundle ID support
-- Added `parseTeamOrder()` to all server actions and broadcast handlers
-- Fixed shuffle breaking team names
-- Verified production DB with real users
+### Previous Sessions
+- **2026-03-17 (earlier)**: 8 bugs fixed from live testing, auto-mode fixes, strategy overlay rework, bundle parity
+- **2026-03-16**: team_order text[] fix, parseTeamOrder, shuffle fix, production DB verified
 
 ### Next Steps (Priority Order)
-1. **Stripe `client_reference_id`** — link payment to logged-in user session, not just email match
-2. **Post-auction tournament management** — entering game results, advancing teams, actual payout settlement
-3. **Strategy tool completeness** — live odds refresh, portfolio tracking during tournament
+1. **MARKETING LAUNCH** — blog posts, Reddit/X posts, email outreach to 106 prior customers (see Stripe screenshot), competitive research on content others publish
+2. **Blog section on landing page** — educate users about Calcuttas + how the tool works
+3. **Email campaign** — re-engage last year's customers (had strategy only, now have hosting + management)
+4. **Stripe `client_reference_id`** — link payment to logged-in user session, not just email match
+5. **Post-tournament features** — results tracking, payout management (partially built)
 
 ### Anti-Patterns Learned
 - **Parse at EVERY data boundary**: DB returns text[] for team_order — must run parseTeamOrder on page load, real-time broadcasts, AND initial channel state
 - **Broadcast payloads bypass server action parsing**: Always parse/transform on the client side
-- **Auto-mode invariant**: every flow setting `bidding_status: 'waiting'` MUST call `autoOpenBidding()` — missing it freezes the auction
+- **Auto-mode race condition**: Don't use two rapid broadcasts (waiting→open). Instead, set final state in one DB write and broadcast after. Applied in `startAuction()`.
 - **`americanOdds` may be zeros**: March Madness 2026 uses `probabilities` field instead. Never read raw odds in UI — use `initializeTeams()` output
 - **Strategy display single source of truth**: `strategy-overlay.tsx` owns all numbers, `team-spotlight.tsx` is identity-only
+- **Reach-round devigging needs expectedWinners**: 16 teams reach S16, 8 reach E8, etc. — outright normalization to sum=1 is wrong for reach markets. Use `devigOutright(odds, expectedWinners)`
+- **DK R32 odds are game moneylines, not futures**: Must devig as matchup pairs, not outright across 68 teams
