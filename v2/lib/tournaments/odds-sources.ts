@@ -14,7 +14,7 @@ export interface OddsSource {
   id: string;
   name: string;
   description: string;
-  type: 'model' | 'sportsbook';
+  type: 'model' | 'sportsbook' | 'blend' | 'custom';
   /** Whether this source requires an API call to fetch */
   isRemote: boolean;
   /** For sportsbook sources: which bookmaker key in The Odds API */
@@ -44,9 +44,10 @@ export function buildMarchMadness2026Registry(): OddsSourceRegistry {
     sources: [
       { id: 'evan_miya', name: 'Evan Miya', description: 'Statistical model (updated 3/17)', type: 'model', isRemote: false },
       { id: 'team_rankings', name: 'TeamRankings', description: 'Composite model', type: 'model', isRemote: false },
-      { id: 'pinnacle', name: 'Pinnacle', description: 'Sharp sportsbook odds (devigged)', type: 'sportsbook', isRemote: true, bookmakerKey: 'pinnacle' },
-      { id: 'draftkings', name: 'DraftKings', description: 'Sportsbook odds (devigged)', type: 'sportsbook', isRemote: true, bookmakerKey: 'draftkings' },
-      { id: 'fanduel', name: 'FanDuel', description: 'Sportsbook odds (devigged)', type: 'sportsbook', isRemote: true, bookmakerKey: 'fanduel' },
+      // Sportsbook sources are discovered dynamically from the API response
+      // The UI adds them at runtime after the first fetch
+      { id: 'sportsbook', name: 'Sportsbooks', description: 'Live devigged sportsbook odds', type: 'sportsbook', isRemote: true },
+      { id: 'blend', name: 'Blend', description: 'Custom weighted blend of sources', type: 'blend', isRemote: false },
     ],
     defaultSourceId: 'evan_miya',
     staticData: {
@@ -54,4 +55,40 @@ export function buildMarchMadness2026Registry(): OddsSourceRegistry {
       team_rankings: TEAM_RANKINGS_2026,
     },
   };
+}
+
+/**
+ * Compute a weighted blend of multiple probability sources.
+ * Weights are normalized to sum to 1.
+ */
+export function blendProbabilities(
+  sources: Array<{ data: OddsSourceProbabilities; weight: number }>,
+  teamIds: number[],
+  roundKeys: string[]
+): OddsSourceProbabilities {
+  const totalWeight = sources.reduce((s, src) => s + src.weight, 0);
+  if (totalWeight === 0) {
+    return { teams: {}, updatedAt: new Date().toISOString() };
+  }
+
+  const teams: Record<number, Record<string, number>> = {};
+
+  for (const teamId of teamIds) {
+    const blended: Record<string, number> = {};
+    for (const rk of roundKeys) {
+      let weightedSum = 0;
+      let activeWeight = 0;
+      for (const { data, weight } of sources) {
+        const prob = data.teams[teamId]?.[rk];
+        if (prob !== undefined && prob > 0) {
+          weightedSum += prob * weight;
+          activeWeight += weight;
+        }
+      }
+      blended[rk] = activeWeight > 0 ? weightedSum / activeWeight : 0;
+    }
+    teams[teamId] = blended;
+  }
+
+  return { teams, updatedAt: new Date().toISOString() };
 }
