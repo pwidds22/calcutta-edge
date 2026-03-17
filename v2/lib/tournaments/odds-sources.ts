@@ -1,6 +1,11 @@
 import type { RoundKey } from './types';
 import { MARCH_MADNESS_2026_TEAMS } from './configs/march-madness-2026';
 import { TEAM_RANKINGS_2026 } from './data/team-rankings-2026';
+import {
+  buildFanDuelProbabilities,
+  buildDraftKingsProbabilities,
+  buildPinnacleProbabilities,
+} from './devig-pipeline';
 
 /** Per-team probability data from a single source */
 export interface OddsSourceProbabilities {
@@ -42,17 +47,21 @@ function buildEvanMiyaData(): OddsSourceProbabilities {
 export function buildMarchMadness2026Registry(): OddsSourceRegistry {
   return {
     sources: [
-      { id: 'evan_miya', name: 'Evan Miya', description: 'Statistical model (updated 3/17)', type: 'model', isRemote: false },
-      { id: 'team_rankings', name: 'TeamRankings', description: 'Composite model', type: 'model', isRemote: false },
-      // Sportsbook sources are discovered dynamically from the API response
-      // The UI adds them at runtime after the first fetch
-      { id: 'sportsbook', name: 'Sportsbooks', description: 'Live devigged sportsbook odds', type: 'sportsbook', isRemote: true },
-      { id: 'blend', name: 'Blend', description: 'Custom weighted blend of sources', type: 'blend', isRemote: false },
+      { id: 'evan_miya', name: 'Evan Miya', description: 'Statistical model (3/17)', type: 'model', isRemote: false },
+      { id: 'team_rankings', name: 'TeamRankings', description: 'Composite model (3/17)', type: 'model', isRemote: false },
+      { id: 'fanduel', name: 'FanDuel', description: 'Sportsbook odds (3/17)', type: 'sportsbook', isRemote: false },
+      { id: 'draftkings', name: 'DraftKings', description: 'Sportsbook odds (3/17)', type: 'sportsbook', isRemote: false },
+      { id: 'pinnacle', name: 'Pinnacle', description: 'Sharp book odds (3/17)', type: 'sportsbook', isRemote: false },
+      { id: 'blend', name: 'Blend', description: 'Custom weighted blend', type: 'blend', isRemote: false },
+      { id: 'custom', name: 'Custom', description: 'Your own probabilities', type: 'custom', isRemote: false },
     ],
     defaultSourceId: 'evan_miya',
     staticData: {
       evan_miya: buildEvanMiyaData(),
       team_rankings: TEAM_RANKINGS_2026,
+      fanduel: buildFanDuelProbabilities(),
+      draftkings: buildDraftKingsProbabilities(),
+      pinnacle: buildPinnacleProbabilities(),
     },
   };
 }
