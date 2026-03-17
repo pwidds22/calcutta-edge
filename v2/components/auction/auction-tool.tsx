@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { AuctionProvider, useAuction } from '@/lib/auction/auction-context';
 import { useAutoSave } from '@/lib/auction/use-auto-save';
@@ -8,7 +8,9 @@ import { PotSizeSection } from './pot-size-section';
 import { PayoutRulesEditor } from './payout-rules-editor';
 import { SummaryStatsCards } from './summary-stats-cards';
 import { TeamTable } from './team-table';
+import { OddsSourceSelector } from './odds-source-selector';
 import { initializeTeams } from '@/lib/calculations/initialize';
+import { buildMarchMadness2026Registry } from '@/lib/tournaments/odds-sources';
 import { Lock } from 'lucide-react';
 import type { SavedTeamData, PayoutRules, TournamentConfig, BaseTeam } from '@/lib/calculations/types';
 
@@ -31,6 +33,7 @@ function AuctionToolInner({
 }: AuctionToolInnerProps) {
   const { state, dispatch } = useAuction();
   const { isSaving, lastSaved, error } = useAutoSave();
+  const oddsRegistry = useMemo(() => buildMarchMadness2026Registry(), []);
 
   // Initialize on mount
   useEffect(() => {
@@ -98,6 +101,9 @@ function AuctionToolInner({
           {error && <span className="text-red-400"> Error: {error}</span>}
         </span>
       </div>
+
+      {/* Odds source selector */}
+      <OddsSourceSelector registry={oddsRegistry} />
 
       {/* Pot size */}
       <PotSizeSection />

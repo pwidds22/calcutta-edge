@@ -88,204 +88,204 @@ export const MARCH_MADNESS_2026_TEAMS: BaseTeam[] = [
   // ===== EAST REGION (Washington D.C.) =====
   // 1-seed Duke vs 16-seed Siena
   { id: 1, name: 'Duke', seed: 1, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9975, s16: 0.8849, e8: 0.7143, f4: 0.5586, f2: 0.3667, champ: 0.1884 } },
+    probabilities: { r32: 0.9958, s16: 0.8814, e8: 0.7143, f4: 0.5608, f2: 0.3562, champ: 0.1896 } },
   { id: 2, name: 'Siena', seed: 16, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0025, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0042, s16: 0.0004, e8: 0, f4: 0, f2: 0, champ: 0 } },
 
   // 8-seed Ohio State vs 9-seed TCU
   { id: 3, name: 'Ohio State', seed: 8, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.6437, s16: 0.0786, e8: 0.0327, f4: 0.0106, f2: 0.0031, champ: 0.0004 } },
+    probabilities: { r32: 0.6387, s16: 0.0789, e8: 0.0344, f4: 0.0125, f2: 0.0028, champ: 0.0008 } },
   { id: 4, name: 'TCU', seed: 9, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.3563, s16: 0.0365, e8: 0.0100, f4: 0.0029, f2: 0.0010, champ: 0.0002 } },
+    probabilities: { r32: 0.3613, s16: 0.0393, e8: 0.0119, f4: 0.0038, f2: 0.0006, champ: 0 } },
 
   // 5-seed St. John's vs 12-seed Northern Iowa
   { id: 5, name: "St. John's", seed: 5, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.8584, s16: 0.5543, e8: 0.1624, f4: 0.0900, f2: 0.0357, champ: 0.0102 } },
+    probabilities: { r32: 0.8528, s16: 0.551, e8: 0.157, f4: 0.0886, f2: 0.0355, champ: 0.0098 } },
   { id: 6, name: 'Northern Iowa', seed: 12, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.1416, s16: 0.0365, e8: 0.0022, f4: 0.0004, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.1472, s16: 0.039, e8: 0.0024, f4: 0.0002, f2: 0, champ: 0 } },
 
   // 4-seed Kansas vs 13-seed Cal Baptist
   { id: 7, name: 'Kansas', seed: 4, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9288, s16: 0.4031, e8: 0.0784, f4: 0.0300, f2: 0.0063, champ: 0.0020 } },
+    probabilities: { r32: 0.9239, s16: 0.4037, e8: 0.0799, f4: 0.0367, f2: 0.0092, champ: 0.0019 } },
   { id: 8, name: 'California Baptist', seed: 13, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0712, s16: 0.0061, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0761, s16: 0.0063, e8: 0.0001, f4: 0, f2: 0, champ: 0 } },
 
   // 6-seed Louisville vs 11-seed South Florida
   { id: 9, name: 'Louisville', seed: 6, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.7312, s16: 0.2896, e8: 0.1151, f4: 0.0178, f2: 0.0022, champ: 0 } },
+    probabilities: { r32: 0.7057, s16: 0.278, e8: 0.1178, f4: 0.022, f2: 0.0037, champ: 0.0007 } },
   { id: 10, name: 'South Florida', seed: 11, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.2688, s16: 0.0678, e8: 0.0196, f4: 0.0024, f2: 0.0004, champ: 0 } },
+    probabilities: { r32: 0.2943, s16: 0.0892, e8: 0.0293, f4: 0.0042, f2: 0.0004, champ: 0 } },
 
   // 3-seed Michigan State vs 14-seed North Dakota State
   { id: 11, name: 'Michigan State', seed: 3, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9416, s16: 0.6373, e8: 0.3682, f4: 0.1275, f2: 0.0492, champ: 0.0163 } },
+    probabilities: { r32: 0.9327, s16: 0.627, e8: 0.3474, f4: 0.1166, f2: 0.0446, champ: 0.0141 } },
   { id: 12, name: 'North Dakota State', seed: 14, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0584, s16: 0.0053, e8: 0.0006, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0673, s16: 0.0058, e8: 0.0004, f4: 0, f2: 0, champ: 0 } },
 
   // 7-seed UCLA vs 10-seed UCF
   { id: 13, name: 'UCLA', seed: 7, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.7233, s16: 0.2194, e8: 0.0708, f4: 0.0124, f2: 0.0020, champ: 0.0002 } },
+    probabilities: { r32: 0.7124, s16: 0.21, e8: 0.0707, f4: 0.0098, f2: 0.0015, champ: 0.0002 } },
   { id: 14, name: 'UCF', seed: 10, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.2767, s16: 0.0406, e8: 0.0073, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.2876, s16: 0.0456, e8: 0.0083, f4: 0.0007, f2: 0, champ: 0 } },
 
   // 2-seed UConn vs 15-seed Furman
   { id: 15, name: 'Connecticut', seed: 2, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9720, s16: 0.7355, e8: 0.4182, f4: 0.1475, f2: 0.0525, champ: 0.0163 } },
+    probabilities: { r32: 0.9642, s16: 0.7398, e8: 0.426, f4: 0.1441, f2: 0.056, champ: 0.0168 } },
   { id: 16, name: 'Furman', seed: 15, group: 'East', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0280, s16: 0.0045, e8: 0.0002, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0358, s16: 0.0046, e8: 0.0001, f4: 0, f2: 0, champ: 0 } },
 
   // ===== WEST REGION (San Jose) =====
   // 1-seed Arizona vs 16-seed Long Island
   { id: 17, name: 'Arizona', seed: 1, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9945, s16: 0.9084, e8: 0.7714, f4: 0.5849, f2: 0.3024, champ: 0.1741 } },
+    probabilities: { r32: 0.9927, s16: 0.8975, e8: 0.742, f4: 0.5327, f2: 0.3001, champ: 0.1804 } },
   { id: 18, name: 'Long Island', seed: 16, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0055, s16: 0.0008, e8: 0.0002, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0073, s16: 0.0005, e8: 0, f4: 0, f2: 0, champ: 0 } },
 
   // 8-seed Villanova vs 9-seed Utah State
   { id: 19, name: 'Villanova', seed: 8, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.3984, s16: 0.0237, e8: 0.0061, f4: 0.0006, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.4164, s16: 0.0304, e8: 0.0102, f4: 0.0024, f2: 0.0002, champ: 0 } },
   { id: 20, name: 'Utah State', seed: 9, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.6016, s16: 0.0671, e8: 0.0247, f4: 0.0082, f2: 0.0012, champ: 0.0002 } },
+    probabilities: { r32: 0.5836, s16: 0.0716, e8: 0.0302, f4: 0.0088, f2: 0.0011, champ: 0.0003 } },
 
   // 5-seed Wisconsin vs 12-seed High Point
   { id: 21, name: 'Wisconsin', seed: 5, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.7359, s16: 0.2884, e8: 0.0508, f4: 0.0147, f2: 0.0018, champ: 0.0008 } },
+    probabilities: { r32: 0.7436, s16: 0.2771, e8: 0.0524, f4: 0.0165, f2: 0.0033, champ: 0.0008 } },
   { id: 22, name: 'High Point', seed: 12, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.2641, s16: 0.0439, e8: 0.0024, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.2564, s16: 0.0415, e8: 0.0028, f4: 0.0003, f2: 0, champ: 0 } },
 
   // 4-seed Arkansas vs 13-seed Hawaii
   { id: 23, name: 'Arkansas', seed: 4, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9529, s16: 0.6567, e8: 0.1445, f4: 0.0567, f2: 0.0118, champ: 0.0020 } },
+    probabilities: { r32: 0.9532, s16: 0.6697, e8: 0.1624, f4: 0.0612, f2: 0.0158, champ: 0.0041 } },
   { id: 24, name: 'Hawaii', seed: 13, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0471, s16: 0.0110, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0468, s16: 0.0117, e8: 0, f4: 0, f2: 0, champ: 0 } },
 
   // 6-seed BYU vs 11-seed Texas/NC State (play-in)
   { id: 25, name: 'BYU', seed: 6, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.4943, s16: 0.1265, e8: 0.0278, f4: 0.0037, f2: 0.0004, champ: 0 } },
+    probabilities: { r32: 0.4854, s16: 0.1225, e8: 0.0281, f4: 0.0046, f2: 0.0004, champ: 0.0001 } },
   { id: 26, name: 'Texas', seed: 11, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.2582, s16: 0.0700, e8: 0.0155, f4: 0.0020, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.2669, s16: 0.0745, e8: 0.0152, f4: 0.0021, f2: 0.0002, champ: 0.0001 } },
   { id: 27, name: 'NC State', seed: 11, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.2475, s16: 0.0510, e8: 0.0082, f4: 0.0010, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.2477, s16: 0.055, e8: 0.0098, f4: 0.0012, f2: 0.0001, champ: 0 } },
 
   // 3-seed Gonzaga vs 14-seed Kennesaw State
   { id: 28, name: 'Gonzaga', seed: 3, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9725, s16: 0.7498, e8: 0.3237, f4: 0.0951, f2: 0.0210, champ: 0.0043 } },
+    probabilities: { r32: 0.9681, s16: 0.744, e8: 0.3058, f4: 0.1015, f2: 0.0286, champ: 0.0094 } },
   { id: 29, name: 'Kennesaw State', seed: 14, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0275, s16: 0.0027, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0319, s16: 0.004, e8: 0.0004, f4: 0, f2: 0, champ: 0 } },
 
   // 7-seed Miami (Fla.) vs 10-seed Missouri
   { id: 30, name: 'Miami (Fla.)', seed: 7, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.6755, s16: 0.1314, e8: 0.0449, f4: 0.0043, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.6669, s16: 0.1224, e8: 0.0454, f4: 0.0082, f2: 0.0014, champ: 0.0004 } },
   { id: 31, name: 'Missouri', seed: 10, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.3245, s16: 0.0286, e8: 0.0061, f4: 0.0006, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.3331, s16: 0.0342, e8: 0.0071, f4: 0.0009, f2: 0.0002, champ: 0 } },
 
   // 2-seed Purdue vs 15-seed Queens
   { id: 32, name: 'Purdue', seed: 2, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9976, s16: 0.8400, e8: 0.5737, f4: 0.2282, f2: 0.0839, champ: 0.0329 } },
+    probabilities: { r32: 0.9972, s16: 0.8431, e8: 0.5882, f4: 0.2596, f2: 0.112, champ: 0.0478 } },
   { id: 33, name: 'Queens', seed: 15, group: 'West', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0024, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0028, s16: 0.0003, e8: 0, f4: 0, f2: 0, champ: 0 } },
 
   // ===== SOUTH REGION (Houston) =====
   // 1-seed Florida vs 16-seed Prairie View/Lehigh (play-in)
   { id: 34, name: 'Florida', seed: 1, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9982, s16: 0.8643, e8: 0.6557, f4: 0.3994, f2: 0.2216, champ: 0.1059 } },
+    probabilities: { r32: 0.9966, s16: 0.8665, e8: 0.6661, f4: 0.4098, f2: 0.2269, champ: 0.1121 } },
   { id: 35, name: 'Prairie View', seed: 16, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0002, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0004, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
   { id: 36, name: 'Lehigh', seed: 16, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0016, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.003, s16: 0.0002, e8: 0, f4: 0, f2: 0, champ: 0 } },
 
   // 8-seed Clemson vs 9-seed Iowa
   { id: 37, name: 'Clemson', seed: 8, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.3918, s16: 0.0453, e8: 0.0149, f4: 0.0025, f2: 0.0002, champ: 0 } },
+    probabilities: { r32: 0.3977, s16: 0.0479, e8: 0.0162, f4: 0.0033, f2: 0.0004, champ: 0 } },
   { id: 38, name: 'Iowa', seed: 9, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.6082, s16: 0.0904, e8: 0.0320, f4: 0.0043, f2: 0.0010, champ: 0.0002 } },
+    probabilities: { r32: 0.6023, s16: 0.0854, e8: 0.0336, f4: 0.0076, f2: 0.0016, champ: 0.0001 } },
 
   // 5-seed Vanderbilt vs 12-seed McNeese
   { id: 39, name: 'Vanderbilt', seed: 5, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.8673, s16: 0.5418, e8: 0.1786, f4: 0.0631, f2: 0.0210, champ: 0.0051 } },
+    probabilities: { r32: 0.8571, s16: 0.5148, e8: 0.1626, f4: 0.0576, f2: 0.0173, champ: 0.0047 } },
   { id: 40, name: 'McNeese', seed: 12, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.1327, s16: 0.0298, e8: 0.0025, f4: 0.0002, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.1429, s16: 0.0392, e8: 0.0028, f4: 0.0003, f2: 0, champ: 0 } },
 
   // 4-seed Nebraska vs 13-seed Troy
   { id: 41, name: 'Nebraska', seed: 4, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.8710, s16: 0.4161, e8: 0.1155, f4: 0.0361, f2: 0.0082, champ: 0.0014 } },
+    probabilities: { r32: 0.8686, s16: 0.432, e8: 0.1178, f4: 0.0347, f2: 0.0087, champ: 0.0021 } },
   { id: 42, name: 'Troy', seed: 13, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.1290, s16: 0.0124, e8: 0.0008, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.1314, s16: 0.014, e8: 0.0009, f4: 0, f2: 0, champ: 0 } },
 
   // 6-seed North Carolina vs 11-seed VCU
   { id: 43, name: 'North Carolina', seed: 6, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.4763, s16: 0.0573, e8: 0.0059, f4: 0.0006, f2: 0.0002, champ: 0 } },
+    probabilities: { r32: 0.4658, s16: 0.0607, e8: 0.0064, f4: 0.0006, f2: 0.0002, champ: 0 } },
   { id: 44, name: 'VCU', seed: 11, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.5237, s16: 0.0767, e8: 0.0127, f4: 0.0029, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.5342, s16: 0.087, e8: 0.0152, f4: 0.0024, f2: 0, champ: 0 } },
 
   // 3-seed Illinois vs 14-seed Penn
   { id: 45, name: 'Illinois', seed: 3, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9955, s16: 0.8653, e8: 0.3804, f4: 0.1698, f2: 0.0676, champ: 0.0222 } },
+    probabilities: { r32: 0.9906, s16: 0.851, e8: 0.3787, f4: 0.174, f2: 0.0752, champ: 0.0261 } },
   { id: 46, name: 'Penn', seed: 14, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0045, s16: 0.0008, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0094, s16: 0.0013, e8: 0.0001, f4: 0, f2: 0, champ: 0 } },
 
   // 7-seed Saint Mary's vs 10-seed Texas A&M
   { id: 47, name: "Saint Mary's", seed: 7, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.6337, s16: 0.1296, e8: 0.0449, f4: 0.0114, f2: 0.0031, champ: 0 } },
+    probabilities: { r32: 0.6271, s16: 0.1348, e8: 0.0453, f4: 0.012, f2: 0.003, champ: 0.0006 } },
   { id: 48, name: 'Texas A&M', seed: 10, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.3663, s16: 0.0390, e8: 0.0082, f4: 0.0031, f2: 0.0004, champ: 0 } },
+    probabilities: { r32: 0.3729, s16: 0.0429, e8: 0.0094, f4: 0.0018, f2: 0.0003, champ: 0.0001 } },
 
   // 2-seed Houston vs 15-seed Idaho
   { id: 49, name: 'Houston', seed: 2, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9949, s16: 0.8310, e8: 0.5478, f4: 0.3065, f2: 0.1576, champ: 0.0639 } },
+    probabilities: { r32: 0.9942, s16: 0.8221, e8: 0.5449, f4: 0.2959, f2: 0.1559, champ: 0.067 } },
   { id: 50, name: 'Idaho', seed: 15, group: 'South', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0051, s16: 0.0004, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0058, s16: 0.0002, e8: 0, f4: 0, f2: 0, champ: 0 } },
 
   // ===== MIDWEST REGION (Chicago) =====
   // 1-seed Michigan vs 16-seed UMBC/Howard (play-in)
   { id: 51, name: 'Michigan', seed: 1, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9975, s16: 0.9369, e8: 0.8631, f4: 0.6869, f2: 0.4661, champ: 0.3143 } },
+    probabilities: { r32: 0.9972, s16: 0.9198, e8: 0.8284, f4: 0.6418, f2: 0.41, champ: 0.2647 } },
   { id: 52, name: 'UMBC', seed: 16, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0020, s16: 0.0002, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0023, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
   { id: 53, name: 'Howard', seed: 16, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0006, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0005, s16: 0, e8: 0, f4: 0, f2: 0, champ: 0 } },
 
   // 8-seed Georgia vs 9-seed Saint Louis
   { id: 54, name: 'Georgia', seed: 8, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.5104, s16: 0.0251, e8: 0.0094, f4: 0.0014, f2: 0.0002, champ: 0 } },
+    probabilities: { r32: 0.5168, s16: 0.0402, e8: 0.0184, f4: 0.0046, f2: 0.0007, champ: 0.0002 } },
   { id: 55, name: 'Saint Louis', seed: 9, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.4896, s16: 0.0378, e8: 0.0180, f4: 0.0033, f2: 0.0008, champ: 0 } },
+    probabilities: { r32: 0.4832, s16: 0.04, e8: 0.0154, f4: 0.0038, f2: 0.0004, champ: 0 } },
 
   // 5-seed Texas Tech vs 12-seed Akron
   { id: 56, name: 'Texas Tech', seed: 5, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.6710, s16: 0.2390, e8: 0.0218, f4: 0.0045, f2: 0.0006, champ: 0 } },
+    probabilities: { r32: 0.6697, s16: 0.241, e8: 0.0285, f4: 0.009, f2: 0.0022, champ: 0.0002 } },
   { id: 57, name: 'Akron', seed: 12, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.3290, s16: 0.0569, e8: 0.0018, f4: 0.0002, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.3303, s16: 0.0635, e8: 0.0037, f4: 0.0002, f2: 0, champ: 0 } },
 
   // 4-seed Alabama vs 13-seed Hofstra
   { id: 58, name: 'Alabama', seed: 4, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.8708, s16: 0.6586, e8: 0.0829, f4: 0.0322, f2: 0.0086, champ: 0.0020 } },
+    probabilities: { r32: 0.8587, s16: 0.6412, e8: 0.1039, f4: 0.0392, f2: 0.0094, champ: 0.003 } },
   { id: 59, name: 'Hofstra', seed: 13, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.1292, s16: 0.0455, e8: 0.0029, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.1413, s16: 0.0543, e8: 0.0017, f4: 0, f2: 0, champ: 0 } },
 
   // 6-seed Tennessee vs 11-seed Miami (OH)/SMU (play-in)
   { id: 60, name: 'Tennessee', seed: 6, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.7796, s16: 0.3922, e8: 0.1435, f4: 0.0290, f2: 0.0078, champ: 0.0020 } },
+    probabilities: { r32: 0.7688, s16: 0.3805, e8: 0.149, f4: 0.0326, f2: 0.0086, champ: 0.0024 } },
   { id: 61, name: 'SMU', seed: 11, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.1941, s16: 0.0659, e8: 0.0125, f4: 0.0012, f2: 0.0002, champ: 0 } },
+    probabilities: { r32: 0.198, s16: 0.06, e8: 0.0136, f4: 0.0023, f2: 0.0005, champ: 0 } },
   { id: 62, name: 'Miami (OH)', seed: 11, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0263, s16: 0.0043, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0332, s16: 0.0057, e8: 0.0003, f4: 0.0001, f2: 0, champ: 0 } },
 
   // 3-seed Virginia vs 14-seed Wright State
   { id: 63, name: 'Virginia', seed: 3, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9551, s16: 0.5357, e8: 0.2335, f4: 0.0602, f2: 0.0169, champ: 0.0037 } },
+    probabilities: { r32: 0.9489, s16: 0.5505, e8: 0.236, f4: 0.0668, f2: 0.0233, champ: 0.0076 } },
   { id: 64, name: 'Wright State', seed: 14, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0449, s16: 0.0020, e8: 0, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0511, s16: 0.0033, e8: 0.0001, f4: 0, f2: 0, champ: 0 } },
 
   // 7-seed Kentucky vs 10-seed Santa Clara
   { id: 65, name: 'Kentucky', seed: 7, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.6057, s16: 0.1163, e8: 0.0420, f4: 0.0047, f2: 0.0006, champ: 0 } },
+    probabilities: { r32: 0.6172, s16: 0.136, e8: 0.0496, f4: 0.0061, f2: 0.0014, champ: 0.0003 } },
   { id: 66, name: 'Santa Clara', seed: 10, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.3943, s16: 0.0643, e8: 0.0198, f4: 0.0020, f2: 0.0002, champ: 0.0002 } },
+    probabilities: { r32: 0.3828, s16: 0.0614, e8: 0.0191, f4: 0.002, f2: 0.0001, champ: 0 } },
 
   // 2-seed Iowa State vs 15-seed Tennessee State
   { id: 67, name: 'Iowa State', seed: 2, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.9880, s16: 0.8186, e8: 0.5484, f4: 0.1745, f2: 0.0757, champ: 0.0310 } },
+    probabilities: { r32: 0.9862, s16: 0.8021, e8: 0.5323, f4: 0.1915, f2: 0.08, champ: 0.0315 } },
   { id: 68, name: 'Tennessee State', seed: 15, group: 'Midwest', americanOdds: ODDS_UNUSED,
-    probabilities: { r32: 0.0120, s16: 0.0008, e8: 0.0002, f4: 0, f2: 0, champ: 0 } },
+    probabilities: { r32: 0.0138, s16: 0.0005, e8: 0, f4: 0, f2: 0, champ: 0 } },
 ];

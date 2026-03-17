@@ -11,6 +11,7 @@ import type {
   SavedTeamData,
 } from '@/lib/calculations/types';
 import { calculateTeamValues } from '@/lib/calculations/values';
+import { calculateImpliedProbabilities } from '@/lib/calculations/odds';
 import { calculateProjectedPotSize } from '@/lib/calculations/pot';
 import { generateBundles } from '@/lib/tournaments/bundles';
 
@@ -29,6 +30,7 @@ export interface AuctionState {
   sortOption: SortOption;
   sortDirection: SortDirection;
   searchTerm: string;
+  oddsSource: string;
   isDirty: boolean;
   isLoading: boolean;
   lastSaved: Date | null;
@@ -47,6 +49,7 @@ export const INITIAL_STATE: AuctionState = {
   sortOption: 'seed',
   sortDirection: 'asc',
   searchTerm: '',
+  oddsSource: 'evan_miya',
   isDirty: false,
   isLoading: true,
   lastSaved: null,
@@ -65,6 +68,7 @@ export type AuctionAction =
   | { type: 'SET_SORT'; option: SortOption; direction: SortDirection }
   | { type: 'SET_SEARCH_TERM'; term: string }
   | { type: 'SET_BUNDLE_PRESET'; preset: BundlePreset }
+  | { type: 'SET_ODDS_SOURCE'; sourceId: string; probabilities: Record<number, Record<string, number>> }
   | { type: 'MARK_SAVED' }
   | { type: 'RESET_AUCTION' };
 
@@ -168,6 +172,21 @@ export function auctionReducer(
         ? generateBundles(action.preset, state.teams, state.config)
         : [];
       return { ...state, bundlePreset: action.preset, bundles };
+    }
+
+    case 'SET_ODDS_SOURCE': {
+      // Swap probabilities on each team from the selected source, then recalculate
+      const teams = state.teams.map((t) => {
+        const sourceProbs = action.probabilities[t.id];
+        if (!sourceProbs) return t;
+        return { ...t, probabilities: sourceProbs };
+      });
+      const newState: AuctionState = { ...state, teams, oddsSource: action.sourceId };
+      if (state.config) {
+        calculateImpliedProbabilities(newState.teams, state.config);
+        recalculateValues(newState);
+      }
+      return newState;
     }
 
     case 'MARK_SAVED':
