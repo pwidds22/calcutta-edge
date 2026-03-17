@@ -116,6 +116,15 @@ Config-driven: adding a tournament = one file in `v2/lib/tournaments/configs/`. 
 - **DON'T** put Windows-only `*-win32-x64-msvc` packages in `dependencies` or `devDependencies` — use `optionalDependencies` or Vercel Linux build fails with EBADPLATFORM
 - **DON'T** initialize Stripe SDK at module level — lazy init with `getStripe()` or build fails without env vars
 
+### Live Auction Auto-Mode
+- **DON'T** add a state transition to `bidding_status: 'waiting'` without calling `autoOpenBidding()` when `settings.autoMode` is true — auction will freeze. Every flow (start, sell, skip, undo) must check this.
+- **DON'T** use `closeBidding()` for "Close Early" in auto-mode — it only sets status to 'closed' with nothing to trigger the sell. Use `autoAdvance()` (atomic close+sell+advance).
+
+### Live Auction UI
+- **DON'T** display odds/values in `team-spotlight.tsx` — it's identity-only. All numbers go in `strategy-overlay.tsx` (single source of truth).
+- **DON'T** read `americanOdds` directly in UI components — some tournaments use `probabilities` instead (March Madness 2026 has `ODDS_UNUSED` = all zeros). Always use `initializeTeams()` output which handles both.
+- **DON'T** show a compact/abbreviated strategy view for bundles — bundle members must get the same full round-by-round odds grid as individual teams.
+
 ### Git
 - **DON'T** commit `.env` files or secrets
 - **DON'T** force push to main
@@ -137,25 +146,32 @@ Config-driven: adding a tournament = one file in `v2/lib/tournaments/configs/`. 
 ## Legacy Stack (Express + MongoDB)
 Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + vanilla JS. The `v2/` directory is the active codebase — all new development happens there. Legacy will be deprecated after March Madness 2026 launch.
 
-## Session Notes (2026-03-16)
+## Session Notes (2026-03-17)
 
-### Completed
-- **Fixed `team_order` column type** — changed from `integer[]` to `text[]` via Supabase migration to support bundle IDs like `b:playin-Midwest-11` (`v2/actions/session.ts`, `v2/actions/bidding.ts`)
-- **Added `parseTeamOrder()`** to all server actions — converts DB text[] back to `(number | string)[]` so teamMap lookups work (`v2/actions/session.ts:16-25`, `v2/actions/bidding.ts`)
-- **Fixed shuffle breaking team names** — `TEAM_ORDER_UPDATED` broadcast handler now parses string[] to typed array (`v2/lib/auction/live/use-auction-channel.ts:236-244`)
-- **Verified production DB** — real users active (e.g. "Kid CalCutti King" session), bundle data storing correctly
-- **All 12 pages verified** — import audit confirms no broken dependencies across all (auth) and (protected) routes
+### Completed (Live Testing Session)
+- **8 bugs fixed** from first real live auction test — 6 commits deployed (`605bcef`)
+- **Auto-mode fixes**: undo now reopens bidding, "Close Early" uses `autoAdvance()` instead of `closeBidding()`
+- **Strategy overlay rework**: single source of truth for all numbers (fair value, edge, projected pot, round odds, cumulative profit)
+- **TeamSpotlight stripped to identity-only**: no odds, no values — prevents duplication
+- **Bundle strategy parity**: bundles now show full round-by-round odds per member (same format as individual teams)
+- **One-click auto-bid**: increment buttons (`+$5`, etc.) submit bids directly via `placeBid()`
+- **Removed arbitrary "Suggested Bid"** (was 95% of fair value — not useful)
+- **Stripe attribution issue identified**: needs `client_reference_id` to link payment to logged-in session
 
-### In Progress
-- **E2E testing not complete** — browser automation blocked by NordPass extension on production; preview tool can't submit server action login forms on localhost
-- **Test session (85SD9N)** reset to lobby with 54 items (46 teams + 8 bundles, Light Bundling)
+### Previous Session (2026-03-16)
+- Fixed `team_order` column type (integer[] → text[]) for bundle ID support
+- Added `parseTeamOrder()` to all server actions and broadcast handlers
+- Fixed shuffle breaking team names
+- Verified production DB with real users
 
 ### Next Steps (Priority Order)
-1. **E2E test on dev server** — solve auth automation (dev-only login route or direct cookie injection), test full flow: create → join → shuffle → start → bid → sell → skip → undo → pause → resume → complete → export
-2. **Competitive feature audit** — research Calcutta Gold, CalcuttaBoard for feature gaps
-3. **Post-auction tournament management** — entering game results, advancing teams, actual payout settlement
-4. **Strategy tool completeness** — live odds refresh, portfolio tracking during tournament
+1. **Stripe `client_reference_id`** — link payment to logged-in user session, not just email match
+2. **Post-auction tournament management** — entering game results, advancing teams, actual payout settlement
+3. **Strategy tool completeness** — live odds refresh, portfolio tracking during tournament
 
 ### Anti-Patterns Learned
-- **Parse at EVERY data boundary**: DB returns text[] for team_order — must run parseTeamOrder on page load, real-time broadcasts, AND initial channel state. Missing any entry point causes silent failures (team names show as "Team 22" instead of "Duke")
-- **Broadcast payloads bypass server action parsing**: Real-time events go directly from server → client without the same data transformations applied during page load. Always parse/transform broadcast payloads on the client side.
+- **Parse at EVERY data boundary**: DB returns text[] for team_order — must run parseTeamOrder on page load, real-time broadcasts, AND initial channel state
+- **Broadcast payloads bypass server action parsing**: Always parse/transform on the client side
+- **Auto-mode invariant**: every flow setting `bidding_status: 'waiting'` MUST call `autoOpenBidding()` — missing it freezes the auction
+- **`americanOdds` may be zeros**: March Madness 2026 uses `probabilities` field instead. Never read raw odds in UI — use `initializeTeams()` output
+- **Strategy display single source of truth**: `strategy-overlay.tsx` owns all numbers, `team-spotlight.tsx` is identity-only
