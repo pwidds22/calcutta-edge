@@ -24,7 +24,7 @@ import { BUNDLE_PRESETS } from '@/lib/tournaments/bundles';
 import { ArrowUpDown, Lock } from 'lucide-react';
 import type { GroupFilter, StatusFilter, SortOption, BundlePreset } from '@/lib/calculations/types';
 
-const PREVIEW_SEED_CUTOFF = 1; // Show only #1 seeds in free preview
+const PREVIEW_SEED_CUTOFF = 2; // Show seeds 1-2 (8 teams) in free preview
 
 const STATUSES: StatusFilter[] = ['All', 'Available', 'Taken', 'My Teams'];
 

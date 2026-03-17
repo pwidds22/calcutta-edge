@@ -6,6 +6,54 @@ import { initializeTeams } from '@/lib/calculations/initialize';
 import { formatCurrency } from '@/lib/calculations/format';
 import { TrendingUp, Lock, ExternalLink } from 'lucide-react';
 
+/** Renders round-by-round odds + cumulative profit for a single team */
+function RoundOddsRow({
+  team,
+  config,
+  payoutRules,
+  projectedPot,
+  purchasePrice,
+}: {
+  team: { odds?: Record<string, number> };
+  config: TournamentConfig;
+  payoutRules: PayoutRules;
+  projectedPot: number;
+  purchasePrice: number;
+}) {
+  // Precompute cumulative payouts (deterministic: "if team reaches round R")
+  let cumulativePayout = 0;
+  const roundData = config.rounds.map((round) => {
+    cumulativePayout += (payoutRules[round.key] ?? 0) / 100 * projectedPot;
+    const roundOdds = team.odds?.[round.key] ?? 0;
+    const profit = purchasePrice > 0 ? cumulativePayout - purchasePrice : null;
+    return { round, roundOdds, profit };
+  });
+
+  return (
+    <div className="mt-3 flex gap-1.5">
+      {roundData.map(({ round, roundOdds, profit }) => (
+        <div
+          key={round.key}
+          className="flex-1 rounded-md bg-white/[0.04] px-1 py-1.5 text-center"
+        >
+          <p className="text-[9px] text-white/30">{round.label}</p>
+          <p className="text-[10px] font-bold text-white/80">
+            {(roundOdds * 100).toFixed(1)}%
+          </p>
+          {profit !== null && (
+            <p
+              className={`text-[9px] font-medium ${profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+            >
+              {profit >= 0 ? '+' : ''}
+              {formatCurrency(profit)}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface StrategyOverlayProps {
   hasPaid: boolean;
   currentTeamId: number | string | null;
@@ -166,42 +214,15 @@ export function StrategyOverlay({
         </div>
       </div>
 
-      {/* Round-by-round odds + profit */}
+      {/* Round-by-round odds + profit if team reaches that round */}
       {!isBundle && currentTeam && (
-        <div className="mt-3 flex gap-1.5">
-          {config.rounds.map((round) => {
-            const roundOdds = currentTeam.odds?.[round.key] ?? 0;
-            const cumulativeProfit = currentHighestBid > 0
-              ? config.rounds
-                  .slice(0, config.rounds.indexOf(round) + 1)
-                  .reduce((sum, r) => {
-                    const o = currentTeam.odds?.[r.key] ?? 0;
-                    const p = (payoutRules[r.key] ?? 0) / 100;
-                    return sum + o * p * projectedPot;
-                  }, 0) - currentHighestBid
-              : null;
-
-            return (
-              <div
-                key={round.key}
-                className="flex-1 rounded-md bg-white/[0.04] px-1 py-1.5 text-center"
-              >
-                <p className="text-[9px] text-white/30">{round.label}</p>
-                <p className="text-[10px] font-bold text-white/80">
-                  {(roundOdds * 100).toFixed(1)}%
-                </p>
-                {cumulativeProfit !== null && (
-                  <p
-                    className={`text-[9px] font-medium ${cumulativeProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
-                  >
-                    {cumulativeProfit >= 0 ? '+' : ''}
-                    {formatCurrency(cumulativeProfit)}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <RoundOddsRow
+          team={currentTeam}
+          config={config}
+          payoutRules={payoutRules}
+          projectedPot={projectedPot}
+          purchasePrice={currentHighestBid}
+        />
       )}
 
       {/* Bundle: per-member with full round-by-round odds */}

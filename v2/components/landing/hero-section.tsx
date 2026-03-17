@@ -145,7 +145,7 @@ export function HeroSection() {
                 </Link>
               </Button>
               <Button variant="outline" size="lg" asChild className="border-white/10 bg-transparent text-white hover:bg-white/[0.06] hover:text-white">
-                <Link href="/register">See Strategy Demo</Link>
+                <Link href="/auction">See Strategy Tool</Link>
               </Button>
             </div>
 

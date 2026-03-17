@@ -5,7 +5,7 @@ import { AuctionTool } from '@/components/auction/auction-tool'
 import { getActiveTournament, listTournaments } from '@/lib/tournaments/registry'
 import { normalizePayoutRules } from '@/lib/calculations/normalize'
 import Link from 'next/link'
-import { Clock, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
 
 interface AuctionPageProps {
   searchParams: Promise<{ tournament?: string }>
@@ -74,17 +74,6 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
           })}
         </div>
       )}
-
-      {/* Selection Sunday info banner */}
-      <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-4 py-3">
-        <Clock className="mt-0.5 size-4 shrink-0 text-amber-400" />
-        <div className="text-sm">
-          <p className="font-medium text-amber-400">Bracket updates on Selection Sunday, March 15</p>
-          <p className="mt-0.5 text-white/50">
-            Odds shown are pre-bracket projections from sportsbooks. The full 64-team field and seed-adjusted odds will be updated once the bracket is released.
-          </p>
-        </div>
-      </div>
 
       <AuctionTool
         initialTeams={auctionData?.teams ?? []}
