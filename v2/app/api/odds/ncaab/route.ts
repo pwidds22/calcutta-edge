@@ -78,35 +78,22 @@ export async function GET() {
       }
     }
 
-    // Derive missing round probabilities from championship odds
-    // Uses "anchored scaling": scale the Evan Miya model proportionally based on
-    // championship ratio, but clamp early rounds to preserve realistic values.
+    // Fill non-championship rounds from the base model (Evan Miya).
+    // Sportsbooks only offer championship winner markets — we can't accurately
+    // derive per-round odds from a single futures price. Using the model's
+    // round-by-round probabilities with the sportsbook's championship number
+    // is more honest than fabricating scaled values.
     for (const sourceData of Object.values(byBookmaker)) {
       for (const [teamIdStr, probs] of Object.entries(sourceData.teams)) {
         const teamId = parseInt(teamIdStr, 10);
         const baseTeam = MARCH_MADNESS_2026_TEAMS.find((t) => t.id === teamId);
         if (!baseTeam?.probabilities) continue;
 
-        const baseChamp = baseTeam.probabilities.champ;
-        if (baseChamp <= 0 || probs.champ <= 0) continue;
-
-        const champScale = probs.champ / baseChamp;
-        // Blend the scale toward 1.0 for earlier rounds (they're less affected by futures)
-        // R32 uses 10% of the scale, S16 uses 30%, E8 uses 60%, F4+ uses 100%
-        const roundBlend: Record<string, number> = {
-          r32: 0.1,
-          s16: 0.3,
-          e8: 0.6,
-          f4: 0.85,
-          f2: 0.95,
-        };
-
-        for (const [rk, blend] of Object.entries(roundBlend)) {
+        // Use model probabilities for all non-championship rounds
+        const roundKeys = ['r32', 's16', 'e8', 'f4', 'f2'] as const;
+        for (const rk of roundKeys) {
           if (probs[rk] === 0) {
-            const baseProb = baseTeam.probabilities[rk] ?? 0;
-            // Blended scale: lerp between 1.0 (no change) and champScale
-            const roundScale = 1 + (champScale - 1) * blend;
-            probs[rk] = Math.min(0.999, Math.max(0.0001, baseProb * roundScale));
+            probs[rk] = baseTeam.probabilities[rk] ?? 0;
           }
         }
 
