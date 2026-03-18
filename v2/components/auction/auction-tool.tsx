@@ -42,7 +42,7 @@ function AuctionToolInner({
   const { isSaving, lastSaved, error } = useAutoSave();
   const oddsRegistry = useMemo(() => buildMarchMadness2026Registry(), []);
 
-  // Initialize on mount
+  // Initialize on mount AND when league changes (URL nav triggers new server props)
   useEffect(() => {
     const teams = initializeTeams(
       baseTeams,
@@ -59,7 +59,7 @@ function AuctionToolInner({
       config,
       leagueName,
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [leagueName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (state.isLoading) {
     return (
