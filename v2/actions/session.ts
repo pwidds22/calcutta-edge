@@ -310,6 +310,61 @@ export async function updateTeamOrder(
   return { success: true };
 }
 
+export async function updateSessionSettings(
+  sessionId: string,
+  updates: {
+    payoutRules?: PayoutRules;
+    estimatedPotSize?: number;
+    settings?: Partial<SessionSettings>;
+  }
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated' };
+
+  const { data: session } = await supabase
+    .from('auction_sessions')
+    .select('commissioner_id, status, settings, payout_rules, estimated_pot_size')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session || session.commissioner_id !== user.id) {
+    return { error: 'Not authorized' };
+  }
+  if (session.status !== 'lobby') {
+    return { error: 'Settings can only be changed before the auction starts' };
+  }
+
+  // Merge settings (preserve bundles and other fields not being edited)
+  const currentSettings = (session.settings ?? {}) as SessionSettings;
+  const mergedSettings: SessionSettings = {
+    ...currentSettings,
+    ...(updates.settings ?? {}),
+  };
+
+  const dbUpdate: Record<string, unknown> = { settings: mergedSettings };
+  if (updates.payoutRules !== undefined) dbUpdate.payout_rules = updates.payoutRules;
+  if (updates.estimatedPotSize !== undefined) dbUpdate.estimated_pot_size = updates.estimatedPotSize;
+
+  const { error } = await supabase
+    .from('auction_sessions')
+    .update(dbUpdate)
+    .eq('id', sessionId);
+
+  if (error) return { error: error.message };
+
+  // Broadcast to all participants
+  await broadcastToChannel(`auction:${sessionId}`, 'SETTINGS_UPDATED', {
+    settings: mergedSettings,
+    payoutRules: updates.payoutRules ?? session.payout_rules,
+    estimatedPotSize: updates.estimatedPotSize ?? session.estimated_pot_size,
+  });
+
+  return { success: true };
+}
+
 export async function deleteSession(sessionId: string) {
   const supabase = await createClient();
   const {
@@ -376,6 +431,90 @@ export async function getMyHostedSessions() {
 }
 
 /** Check if a session requires a password (for join form UI) */
+export async function leaveSession(sessionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated' };
+
+  // Verify participant exists and is NOT the commissioner
+  const { data: participant } = await supabase
+    .from('auction_participants')
+    .select('id, is_commissioner')
+    .eq('session_id', sessionId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!participant) return { error: 'Not a participant' };
+  if (participant.is_commissioner) return { error: 'Commissioner cannot leave their own auction' };
+
+  // Only allow leaving in lobby or completed state
+  const { data: session } = await supabase
+    .from('auction_sessions')
+    .select('status')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session) return { error: 'Session not found' };
+  if (session.status === 'active') {
+    return { error: 'Cannot leave during an active auction' };
+  }
+
+  const { error } = await supabase
+    .from('auction_participants')
+    .delete()
+    .eq('id', participant.id);
+
+  if (error) return { error: error.message };
+
+  await broadcastToChannel(`auction:${sessionId}`, 'PARTICIPANT_LEFT', {
+    userId: user.id,
+  });
+
+  return { success: true };
+}
+
+export async function kickParticipant(sessionId: string, targetUserId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated' };
+
+  // Verify caller is commissioner
+  const { data: session } = await supabase
+    .from('auction_sessions')
+    .select('commissioner_id, status')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session || session.commissioner_id !== user.id) {
+    return { error: 'Not authorized' };
+  }
+  if (session.status !== 'lobby') {
+    return { error: 'Can only remove participants before the auction starts' };
+  }
+
+  if (targetUserId === user.id) {
+    return { error: 'Cannot remove yourself' };
+  }
+
+  const { error } = await supabase
+    .from('auction_participants')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('user_id', targetUserId);
+
+  if (error) return { error: error.message };
+
+  await broadcastToChannel(`auction:${sessionId}`, 'PARTICIPANT_KICKED', {
+    userId: targetUserId,
+  });
+
+  return { success: true };
+}
+
 export async function checkSessionRequiresPassword(joinCode: string) {
   const supabase = await createClient();
   const {

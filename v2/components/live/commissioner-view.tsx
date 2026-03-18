@@ -23,9 +23,10 @@ import { TournamentDashboard } from './tournament-dashboard';
 import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
-import { Shuffle, Zap, ArrowDownNarrowWide, MapPin, ArrowUpDown } from 'lucide-react';
+import { Shuffle, Zap, ArrowDownNarrowWide, MapPin, ArrowUpDown, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatPanel } from './chat-panel';
+import { EditSettingsModal } from './edit-settings-modal';
 
 /** Build a team order sorted by seed ascending (default) */
 function orderBySeed(
@@ -266,6 +267,24 @@ export function CommissionerView({
     }, [session.id]),
   });
 
+  // Edit settings modal
+  const [showEditSettings, setShowEditSettings] = useState(false);
+  const [localPayoutRules, setLocalPayoutRules] = useState(session.payout_rules);
+  const [localPotSize, setLocalPotSize] = useState(session.estimated_pot_size);
+  const [localSettings, setLocalSettings] = useState(session.settings);
+
+  // Listen for settings broadcasts from other clients
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__settingsUpdate = (payload: Record<string, unknown>) => {
+      if (payload.payoutRules) setLocalPayoutRules(payload.payoutRules as PayoutRules);
+      if (payload.estimatedPotSize) setLocalPotSize(payload.estimatedPotSize as number);
+      if (payload.settings) setLocalSettings(payload.settings as SessionSettings);
+    };
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__settingsUpdate;
+    };
+  }, []);
+
   // Toggle auto-mode handler
   const [togglingAutoMode, setTogglingAutoMode] = useState(false);
   const handleToggleAutoMode = useCallback(async () => {
@@ -367,43 +386,54 @@ export function CommissionerView({
           {/* Left: Team Queue — pushed below on mobile */}
           <div className="col-span-12 order-3 lg:order-none lg:col-span-3">
             {channel.auctionStatus === 'lobby' && (
-              <div className="mb-2 grid grid-cols-2 gap-1.5">
+              <div className="mb-2 space-y-1.5">
                 <Button
-                  onClick={() => updateTeamOrder(session.id, orderBySeed(activeTeamOrder, teamMap, bundles))}
+                  onClick={() => setShowEditSettings(true)}
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                  className="w-full gap-1.5 border-amber-500/20 text-amber-400/80 hover:border-amber-500/40 hover:text-amber-300 text-[11px]"
                 >
-                  <ArrowDownNarrowWide className="size-3" />
-                  By Seed
+                  <Settings className="size-3" />
+                  Edit Settings
                 </Button>
-                <Button
-                  onClick={() => updateTeamOrder(session.id, orderByRegion(activeTeamOrder, teamMap, bundles, config))}
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
-                >
-                  <MapPin className="size-3" />
-                  By Region
-                </Button>
-                <Button
-                  onClick={() => updateTeamOrder(session.id, orderSerpentine(activeTeamOrder, teamMap, bundles))}
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
-                >
-                  <ArrowUpDown className="size-3" />
-                  Serpentine
-                </Button>
-                <Button
-                  onClick={handleShuffle}
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
-                >
-                  <Shuffle className="size-3" />
-                  Shuffle
-                </Button>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button
+                    onClick={() => updateTeamOrder(session.id, orderBySeed(activeTeamOrder, teamMap, bundles))}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                  >
+                    <ArrowDownNarrowWide className="size-3" />
+                    By Seed
+                  </Button>
+                  <Button
+                    onClick={() => updateTeamOrder(session.id, orderByRegion(activeTeamOrder, teamMap, bundles, config))}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                  >
+                    <MapPin className="size-3" />
+                    By Region
+                  </Button>
+                  <Button
+                    onClick={() => updateTeamOrder(session.id, orderSerpentine(activeTeamOrder, teamMap, bundles))}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                  >
+                    <ArrowUpDown className="size-3" />
+                    Serpentine
+                  </Button>
+                  <Button
+                    onClick={handleShuffle}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                  >
+                    <Shuffle className="size-3" />
+                    Shuffle
+                  </Button>
+                </div>
               </div>
             )}
             <TeamQueue
@@ -435,8 +465,8 @@ export function CommissionerView({
               currentHighestBid={channel.currentHighestBid}
               config={config}
               baseTeams={baseTeams}
-              payoutRules={session.payout_rules}
-              estimatedPotSize={session.estimated_pot_size}
+              payoutRules={localPayoutRules}
+              estimatedPotSize={localPotSize}
               soldTeams={channel.soldTeams}
               bundles={bundles}
               oddsRegistry={oddsRegistry}
@@ -463,8 +493,8 @@ export function CommissionerView({
               currentHighestBid={channel.currentHighestBid}
               currentHighestBidderName={channel.currentHighestBidderName}
               userId={userId}
-              bidIncrements={session.settings?.bidIncrements}
-              minimumBid={session.settings?.minimumBid}
+              bidIncrements={localSettings?.bidIncrements}
+              minimumBid={localSettings?.minimumBid}
             />
 
             <BidLadder
@@ -476,7 +506,13 @@ export function CommissionerView({
 
           {/* Right: Participants + Chat + Results — second on mobile */}
           <div className="col-span-12 order-2 lg:order-none space-y-4 lg:col-span-3">
-            <ParticipantList onlineUsers={channel.onlineUsers} />
+            <ParticipantList
+              onlineUsers={channel.onlineUsers}
+              sessionId={session.id}
+              isCommissioner={true}
+              isLobby={channel.auctionStatus === 'lobby'}
+              userId={userId}
+            />
             <ChatPanel
               messages={channel.chatMessages}
               onSend={channel.sendChatMessage}
@@ -496,6 +532,21 @@ export function CommissionerView({
             />
           </div>
         </div>
+      )}
+      {showEditSettings && (
+        <EditSettingsModal
+          sessionId={session.id}
+          config={config}
+          currentPayoutRules={localPayoutRules}
+          currentEstimatedPotSize={localPotSize}
+          currentSettings={localSettings}
+          onClose={() => setShowEditSettings(false)}
+          onSaved={(updates) => {
+            setLocalPayoutRules(updates.payoutRules);
+            setLocalPotSize(updates.estimatedPotSize);
+            setLocalSettings(updates.settings);
+          }}
+        />
       )}
     </div>
   );

@@ -27,32 +27,58 @@ export async function POST(request: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
+    const supabase = createAdminClient()
 
     const email =
       session.customer_email || session.customer_details?.email
+    const clientRefId = session.client_reference_id
 
-    if (!email) {
-      console.error('No email found in Stripe session:', session.id)
-      return NextResponse.json(
-        { error: 'No email in session' },
-        { status: 400 }
-      )
+    console.log('Processing payment — client_reference_id:', clientRefId, 'email:', email)
+
+    // Strategy: client_reference_id → email → recent unpaid
+    let profileId: string | null = null
+
+    // 1. Primary: client_reference_id is the Supabase user ID
+    if (clientRefId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, has_paid')
+        .eq('id', clientRefId)
+        .single()
+
+      if (profile) {
+        if (profile.has_paid) {
+          console.log('User already paid (via client_reference_id):', clientRefId)
+          return NextResponse.json({ received: true })
+        }
+        profileId = profile.id
+        console.log('Matched user via client_reference_id:', clientRefId)
+      } else {
+        console.warn('client_reference_id did not match any profile:', clientRefId)
+      }
     }
 
-    console.log('Processing payment for:', email)
+    // 2. Fallback: email match
+    if (!profileId && email) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, has_paid')
+        .eq('email', email.toLowerCase())
+        .single()
 
-    const supabase = createAdminClient()
+      if (profile) {
+        if (profile.has_paid) {
+          console.log('User already paid (via email):', email)
+          return NextResponse.json({ received: true })
+        }
+        profileId = profile.id
+        console.log('Matched user via email:', email)
+      }
+    }
 
-    // Primary lookup: match by email
-    const { data: profile, error: fetchError } = await supabase
-      .from('profiles')
-      .select('id, email, has_paid')
-      .eq('email', email.toLowerCase())
-      .single()
-
-    if (fetchError || !profile) {
-      // Fallback: find most recent unpaid user created in the last hour
-      console.log('No profile found by email, checking recent signups...')
+    // 3. Last resort: most recent unpaid user created in the last hour
+    if (!profileId) {
+      console.log('No match by ID or email, checking recent signups...')
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
       const { data: recentProfiles } = await supabase
@@ -64,51 +90,33 @@ export async function POST(request: NextRequest) {
         .limit(1)
 
       if (recentProfiles && recentProfiles.length > 0) {
-        const recentProfile = recentProfiles[0]
-        console.log('Found recent unpaid user:', recentProfile.email)
-
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            has_paid: true,
-            payment_date: new Date().toISOString(),
-          })
-          .eq('id', recentProfile.id)
-
-        if (updateError) {
-          console.error('Failed to update profile:', updateError)
-          return NextResponse.json(
-            { error: 'Update failed' },
-            { status: 500 }
-          )
-        }
-      } else {
-        console.error('No matching user found for payment:', email)
+        profileId = recentProfiles[0].id
+        console.log('Matched recent unpaid user:', recentProfiles[0].email)
       }
-    } else {
-      if (profile.has_paid) {
-        console.log('User already marked as paid:', profile.email)
-        return NextResponse.json({ received: true })
-      }
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          has_paid: true,
-          payment_date: new Date().toISOString(),
-        })
-        .eq('id', profile.id)
-
-      if (updateError) {
-        console.error('Failed to update profile:', updateError)
-        return NextResponse.json(
-          { error: 'Update failed' },
-          { status: 500 }
-        )
-      }
-
-      console.log('Successfully marked user as paid:', profile.email)
     }
+
+    if (!profileId) {
+      console.error('No matching user found for payment. email:', email, 'client_reference_id:', clientRefId)
+      return NextResponse.json({ received: true })
+    }
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        has_paid: true,
+        payment_date: new Date().toISOString(),
+      })
+      .eq('id', profileId)
+
+    if (updateError) {
+      console.error('Failed to update profile:', updateError)
+      return NextResponse.json(
+        { error: 'Update failed' },
+        { status: 500 }
+      )
+    }
+
+    console.log('Successfully marked user as paid:', profileId)
   }
 
   return NextResponse.json({ received: true })

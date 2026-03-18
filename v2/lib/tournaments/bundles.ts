@@ -19,6 +19,10 @@ export const BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: 
     label: 'Heavy Bundling',
     description: 'Seeds 9-16 bundled per region for a fast auction',
   },
+  custom: {
+    label: 'Custom',
+    description: 'Define your own team groupings',
+  },
 };
 
 // ─── Play-In Detection ──────────────────────────────────────────────
@@ -184,6 +188,11 @@ export function generateBundles(
       );
       return [...extraPlayIns, ...regionBundles];
     }
+
+    case 'custom':
+      // Custom bundles are managed in the UI — just return play-in bundles here.
+      // The actual custom bundles are passed directly via settings.bundles.
+      return playInBundles;
   }
 }
 

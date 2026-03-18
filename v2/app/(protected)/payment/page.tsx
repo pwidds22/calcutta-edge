@@ -31,6 +31,13 @@ export default async function PaymentPage() {
 
   if (profile?.has_paid) redirect('/auction')
 
+  // Build payment URL with user attribution + prefilled email
+  const paymentUrl = new URL(PAYMENT_LINK_URL)
+  paymentUrl.searchParams.set('client_reference_id', user.id)
+  if (user.email) {
+    paymentUrl.searchParams.set('prefilled_email', user.email)
+  }
+
   return (
     <div className="flex flex-1 items-center justify-center p-4">
       <div className="relative w-full max-w-md">
@@ -64,7 +71,7 @@ export default async function PaymentPage() {
           </ul>
 
           <Button asChild className="mt-8 w-full gap-2" size="lg">
-            <Link href={PAYMENT_LINK_URL}>
+            <Link href={paymentUrl.toString()}>
               Continue to Payment
               <ArrowRight className="size-4" />
             </Link>

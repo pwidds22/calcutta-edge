@@ -53,8 +53,11 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const [potSize, setPotSize] = useState('10000');
   const [minimumBid, setMinimumBid] = useState('1');
 
-  // Bundle preset
+  // Bundle preset + custom bundles
   const [bundlePreset, setBundlePreset] = useState<BundlePreset>('none');
+  const [customBundles, setCustomBundles] = useState<import('@/lib/tournaments/types').TeamBundle[]>([]);
+  const [newBundleName, setNewBundleName] = useState('');
+  const [selectedTeamIds, setSelectedTeamIds] = useState<Set<number>>(new Set());
 
   // Bid increment preset
   const [bidPreset, setBidPreset] = useState<BidIncrementPreset>('medium');
@@ -111,12 +114,19 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const tournamentTeams = tournamentEntry?.teams ?? [];
 
   // Compute bundles for the selected preset + tournament
-  const currentBundles = selectedTournament && tournamentTeams.length > 0
-    ? generateBundles(bundlePreset, tournamentTeams, selectedTournament)
+  const playInBundles = selectedTournament && tournamentTeams.length > 0
+    ? generateBundles(bundlePreset === 'custom' ? 'custom' : bundlePreset, tournamentTeams, selectedTournament)
     : [];
+  // For custom mode, combine play-in bundles with user-defined bundles
+  const currentBundles = bundlePreset === 'custom'
+    ? [...playInBundles, ...customBundles]
+    : playInBundles;
   const auctionItemCount = tournamentTeams.length > 0
     ? countAuctionItems(tournamentTeams, currentBundles)
     : 0;
+
+  // IDs already in a bundle (play-in or custom) — used to filter team picker
+  const bundledTeamIds = new Set(currentBundles.flatMap((b) => b.teamIds));
 
   // Compute prop totals from enabled props
   const enabledPropTotal = standardProps
@@ -152,9 +162,13 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
 
     const submitEntry = getTournament(selectedTournament.id);
     const submitTeams = submitEntry?.teams ?? [];
-    const bundles = submitTeams.length > 0
-      ? generateBundles(bundlePreset, submitTeams, selectedTournament)
+    // For custom mode: play-in bundles + user-defined custom bundles
+    const baseBundles = submitTeams.length > 0
+      ? generateBundles(bundlePreset === 'custom' ? 'custom' : bundlePreset, submitTeams, selectedTournament)
       : [];
+    const bundles = bundlePreset === 'custom'
+      ? [...baseBundles, ...customBundles]
+      : baseBundles;
 
     // Build enabledProps from toggle state
     const enabledProps: EnabledProp[] = [
@@ -327,13 +341,20 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
           <p className="text-xs text-white/30 mb-2">
             Bundle low-seed teams together to speed up the auction.
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {(Object.entries(BUNDLE_PRESETS) as [BundlePreset, typeof BUNDLE_PRESETS[BundlePreset]][]).map(
               ([key, preset]) => (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setBundlePreset(key)}
+                  onClick={() => {
+                    setBundlePreset(key);
+                    if (key !== 'custom') {
+                      setCustomBundles([]);
+                      setSelectedTeamIds(new Set());
+                      setNewBundleName('');
+                    }
+                  }}
                   className={`rounded-md border px-3 py-2 text-left transition-colors ${
                     bundlePreset === key
                       ? 'border-emerald-500/50 bg-emerald-500/10 text-white'
@@ -346,6 +367,124 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
               )
             )}
           </div>
+          {/* Custom Bundle Builder */}
+          {bundlePreset === 'custom' && selectedTournament && tournamentTeams.length > 0 && (
+            <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
+              {/* Existing custom bundles */}
+              {customBundles.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-medium text-white/40 uppercase tracking-wide">
+                    Your Bundles ({customBundles.length})
+                  </p>
+                  {customBundles.map((bundle) => (
+                    <div
+                      key={bundle.id}
+                      className="flex items-center justify-between rounded border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-medium text-white/80">{bundle.name}</span>
+                        <span className="ml-2 text-[10px] text-white/30">
+                          {bundle.teamIds
+                            .map((id) => tournamentTeams.find((t) => t.id === id)?.name ?? `#${id}`)
+                            .join(', ')}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCustomBundles((prev) => prev.filter((b) => b.id !== bundle.id))
+                        }
+                        className="ml-2 flex-shrink-0 text-red-400/60 hover:text-red-400 transition-colors"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Create new bundle */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-white/40 uppercase tracking-wide">
+                  Create Bundle
+                </p>
+                <input
+                  type="text"
+                  value={newBundleName}
+                  onChange={(e) => setNewBundleName(e.target.value)}
+                  placeholder="Bundle name (e.g. Bottom Seeds)"
+                  className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2.5 text-xs text-white placeholder:text-white/20 focus:border-emerald-500/50 focus:outline-none"
+                />
+                <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 max-h-40 overflow-y-auto">
+                  {tournamentTeams
+                    .filter((t) => !bundledTeamIds.has(t.id) || selectedTeamIds.has(t.id))
+                    .sort((a, b) => a.seed - b.seed || a.group.localeCompare(b.group))
+                    .map((team) => {
+                      const isSelected = selectedTeamIds.has(team.id);
+                      const isAlreadyBundled = bundledTeamIds.has(team.id) && !isSelected;
+                      return (
+                        <button
+                          key={team.id}
+                          type="button"
+                          disabled={isAlreadyBundled}
+                          onClick={() => {
+                            setSelectedTeamIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(team.id)) next.delete(team.id);
+                              else next.add(team.id);
+                              return next;
+                            });
+                          }}
+                          className={`rounded border px-2 py-1 text-left text-[10px] transition-colors ${
+                            isSelected
+                              ? 'border-emerald-500/50 bg-emerald-500/10 text-white'
+                              : isAlreadyBundled
+                                ? 'border-white/[0.04] bg-white/[0.01] text-white/20 cursor-not-allowed'
+                                : 'border-white/[0.06] bg-white/[0.02] text-white/50 hover:border-white/10 hover:text-white/70'
+                          }`}
+                        >
+                          <span className="font-medium">{team.seed}</span>{' '}
+                          {team.name}
+                        </button>
+                      );
+                    })}
+                </div>
+                {selectedTeamIds.size >= 2 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ids = Array.from(selectedTeamIds);
+                      const name =
+                        newBundleName.trim() ||
+                        ids
+                          .map((id) => tournamentTeams.find((t) => t.id === id)?.name ?? `#${id}`)
+                          .join(' / ');
+                      setCustomBundles((prev) => [
+                        ...prev,
+                        {
+                          id: `custom-${crypto.randomUUID().slice(0, 8)}`,
+                          name,
+                          teamIds: ids,
+                        },
+                      ]);
+                      setSelectedTeamIds(new Set());
+                      setNewBundleName('');
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                  >
+                    <Plus className="size-3" />
+                    Create Bundle ({selectedTeamIds.size} teams)
+                  </button>
+                )}
+                {selectedTeamIds.size === 1 && (
+                  <p className="text-[10px] text-white/30">
+                    Select at least 2 teams to create a bundle
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {selectedTournament && tournamentTeams.length > 0 && (
             <p className="mt-1.5 text-xs text-white/30">
               Auction items: <span className="font-medium text-white/50">{auctionItemCount}</span>

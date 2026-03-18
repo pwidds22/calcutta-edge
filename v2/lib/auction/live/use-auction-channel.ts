@@ -319,6 +319,11 @@ export function useAuctionChannel(
         const handler = (window as unknown as Record<string, unknown>).__propResultUpdate;
         if (typeof handler === 'function') handler(payload);
       })
+      .on('broadcast', { event: 'SETTINGS_UPDATED' }, ({ payload }) => {
+        // Dispatcher passes the full updated session fields
+        const handler = (window as unknown as Record<string, unknown>).__settingsUpdate;
+        if (typeof handler === 'function') handler(payload);
+      })
       .on('broadcast', { event: 'PAYMENT_UPDATED' }, ({ payload }) => {
         setState((prev) => ({
           ...prev,

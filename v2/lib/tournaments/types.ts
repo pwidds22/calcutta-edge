@@ -76,7 +76,7 @@ export interface TeamBundle {
   teamIds: number[];
 }
 
-export type BundlePreset = 'none' | 'light' | 'standard' | 'heavy';
+export type BundlePreset = 'none' | 'light' | 'standard' | 'heavy' | 'custom';
 
 export interface Team extends BaseTeam {
   rawImpliedProbabilities: Record<RoundKey, number>;
