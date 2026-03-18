@@ -166,9 +166,9 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 - **2026-03-16**: team_order text[] fix, parseTeamOrder, shuffle fix, production DB verified
 
 ### Next Steps (Priority Order)
-1. **MARKETING LAUNCH** — blog posts, Reddit/X posts, email outreach to 106 prior customers (see Stripe screenshot), competitive research on content others publish
-2. **Blog section on landing page** — educate users about Calcuttas + how the tool works
-3. **Email campaign** — re-engage last year's customers (had strategy only, now have hosting + management)
+1. **AUTO-UPDATE TOURNAMENT RESULTS** — ESPN scoreboard API (`site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard`), map team names → tournament IDs, auto-insert into `tournament_results` table. Vercel cron or commissioner "sync" button. 3 real completed auctions (35 participants) need this NOW.
+2. **Welcome email on signup** — Resend API (`re_7sxsLdYq_...` key), trigger from register server action, branded HTML template matching existing email design
+3. **PostHog or Vercel Analytics** — track user behavior, traffic sources, conversion funnel
 4. **Stripe `client_reference_id`** — link payment to logged-in user session, not just email match
 5. **Post-tournament features** — results tracking, payout management (partially built)
 
@@ -180,3 +180,38 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 - **Strategy display single source of truth**: `strategy-overlay.tsx` owns all numbers, `team-spotlight.tsx` is identity-only
 - **Reach-round devigging needs expectedWinners**: 16 teams reach S16, 8 reach E8, etc. — outright normalization to sum=1 is wrong for reach markets. Use `devigOutright(odds, expectedWinners)`
 - **DK R32 odds are game moneylines, not futures**: Must devig as matchup pairs, not outright across 68 teams
+- **npm install on Windows breaks native modules**: `npm install resend` displaced `lightningcss-win32-x64-msvc.node`. Fix: `cp node_modules/lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node node_modules/lightningcss/` and clear `.next` cache
+
+## Session Notes (2026-03-17 Evening — Marketing Launch)
+
+### Completed (2026-03-17 Evening)
+- **Brand assets** — CE gavel logo added at all sizes (`v2/public/brand/`), favicon updated (`v2/app/favicon.ico`), both navbars show icon + text (`v2/components/layout/navbar.tsx`, `v2/components/layout/app-navbar.tsx`), OG/Twitter card images set (`v2/app/layout.tsx`)
+- **51 emails sent via Resend** — email scripts in `v2/scripts/send-*.ts`, sent from `support@calcuttaedge.com`:
+  - 14 prior Calcutta customers (launch announcement)
+  - 8 Survive the Chop subscribers (cross-sell)
+  - 27 completed auction users (thank you + feedback ask)
+  - 2 early signups (maintenance note)
+- **5 blog posts live** — 3 existing + 2 new (`v2/content/blog/calcutta-payout-rules-guide.mdx`, `v2/content/blog/calcutta-fair-value-explained.mdx`). Blog linked from navbar + footer.
+- **Reddit posts** — posted to r/CollegeBasketball, r/sportsbook, r/MarchMadness (manual by user)
+- **X/Twitter** — thread + standalone tweets posted, Cowork monitoring set up (manual by user)
+- **Competitive research** — full landscape analysis: Calcutta Time (hosting only), PoolGenius ($39-49 analytics only, 2 articles), BettorEdge (free calc, 3-4 articles), Auction Pro (free hosting, no analytics). CE is only all-in-one.
+- **Customer analysis** — 48 profiles, 44 real organic users. 3 completed auctions (35 participants, 2,061 bids). 1 organic paying customer (kshah31). Better Collective employee (svalukis) scouted the platform.
+- **Resend installed** — `resend` package added to dependencies (`v2/package.json`). API key: `re_7sxsLdYq_Jz4JEMhQmHLGywuERCNegN3z`. Domain verified for `support@calcuttaedge.com`.
+- **Commits**: `ef9ff6f` (brand assets), `b3d5f9e` (blog posts + nav links)
+
+### In Progress
+- **Resend welcome email** — need to add to register server action (`v2/actions/auth.ts`), branded HTML template ready (reuse email styles from `v2/scripts/send-outreach.ts`)
+- **Analytics** — PostHog recommended (free tier, session replay, funnels). User hasn't decided PostHog vs Vercel Analytics yet.
+
+### Next Steps (Priority Order)
+1. **ESPN auto-results** — poll `site.api.espn.com` scoreboard, map teams, auto-insert into `tournament_results`. Critical: 35 real users need this.
+2. **Welcome email on signup** — Resend trigger in register action
+3. **PostHog/Vercel Analytics** — track traffic sources + user behavior
+4. **Blog posts 5 & 6** — "How to Host a Calcutta Online (Free)" + "Best Calcutta Tools 2026" comparison post
+5. **Google Ads** — skip for now (gambling cert 21-45 days). X ads viable ($25 test).
+
+### Notes for Next Session
+- `lightningcss` native module fix: after any `npm install`, may need to `cp node_modules/lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node node_modules/lightningcss/` and `rm -rf .next`
+- Resend rate limit: 5 requests/second on free tier. Use 600ms+ delay between sends.
+- Email scripts in `v2/scripts/` are standalone (not part of app build) — don't need verification
+- User's Resend API key is in the scripts (not env var) — should move to env var before committing scripts

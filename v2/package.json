@@ -24,6 +24,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "reading-time": "^1.5.0",
+    "resend": "^6.9.4",
     "stripe": "^20.3.1",
     "tailwind-merge": "^3.5.0"
   },
@@ -43,6 +44,6 @@
   "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "^4.59.0",
     "@tailwindcss/oxide-win32-x64-msvc": "^4.2.1",
-    "lightningcss-win32-x64-msvc": "^1.31.1"
+    "lightningcss-win32-x64-msvc": "^1.32.0"
   }
 }
