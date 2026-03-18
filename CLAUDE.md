@@ -225,9 +225,23 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 - `RESEND_API_KEY` — enables welcome emails in production
 - Analytics enabled in Vercel dashboard
 
+### Marketing Push (2026-03-18 cont'd)
+- **10 blog posts now live** — 5 new SEO posts: hosting guide, sleeper picks, tool comparison, upset picks, bracket breakdown
+- **X thread drafted** — "i bid on math" angle with product screenshots
+- **Ads considered**: NO on display ads (48 users too small, hurts premium positioning)
+
+### Customer Feedback Received (2026-03-18)
+- **Luke Bannon** (14 participants): Timer jump on open, last-second sniping, wants team selection + decimal payouts
+- **Kunal Shah** (10 participants, PAYING CUSTOMER): Timer sniping confirmed, play-in bundle bug, wants edit-after-create + region shuffle
+- Replies sent. See `memory/feedback_customer_emails_0318.md` and `memory/project_feature_requests_0318.md`
+
 ### Next Steps (Priority Order)
-1. **Marketing push** — more blog posts ("How to Host a Calcutta Online (Free)", "Best Calcutta Tools 2026"), X ads ($25 test), community engagement
-2. **Stripe `client_reference_id`** — link payment to logged-in user session, not just email match
-3. **Post-tournament features** — results tracking UX polish, payout management
-4. **Consider Vercel Pro** ($20/mo) — unlocks every-10-min cron for automatic ESPN sync during games
-5. **PostHog** — add when traffic exceeds ~500 users/mo for session replay + funnels
+1. **Timer sniping fix (P0)** — server-side grace period so timer extension is guaranteed. Both customers reported.
+2. **Play-in bundle grouping fix (P1)** — 16-seed play-ins should respect 13-16 grouping setting
+3. **Display name in profile** — quick win, commissioners can't set display name
+4. **Strategy tool** — clear values, save custom blend for auction, multi-auction saves
+5. **Custom bundles** — commissioner-defined team groupings
+6. **Edit auction settings post-creation**
+7. **Region-based shuffle** — shuffle within one region at a time
+8. **Stripe `client_reference_id`** — payment attribution
+9. **Decimal payout percentages**
