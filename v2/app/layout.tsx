@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   icons: {
-    icon: '/logo-icon.svg',
-    apple: '/logo-icon.svg',
+    icon: '/favicon.ico',
+    apple: '/brand/calcutta_edge_180x180.png',
   },
   title: "Calcutta Edge — The Calcutta Auction Platform | Free Hosting + Strategy Analytics",
   description:
@@ -39,12 +39,21 @@ export const metadata: Metadata = {
     url: "https://calcuttaedge.com",
     siteName: "Calcutta Edge",
     type: "website",
+    images: [
+      {
+        url: "/brand/calcutta_edge_banner.png",
+        width: 1500,
+        height: 500,
+        alt: "Calcutta Edge — Host Free. Bid Smart.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Calcutta Edge — Free Calcutta Auction Hosting + Strategy Analytics",
     description:
       "Host your Calcutta auction for free. Upgrade to devigged odds, fair values, and profit projections for $29.99/event.",
+    images: ["/brand/calcutta_edge_banner.png"],
   },
 };
 

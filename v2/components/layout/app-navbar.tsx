@@ -24,7 +24,8 @@ export function AppNavbar() {
       <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="Calcutta Edge" width={160} height={32} priority />
+          <Image src="/brand/calcutta_edge_180x180.png" alt="Calcutta Edge" width={28} height={28} className="rounded" priority />
+          <span className="text-lg font-bold tracking-tight text-white">Calcutta Edge</span>
         </Link>
 
         {/* Desktop nav links */}
