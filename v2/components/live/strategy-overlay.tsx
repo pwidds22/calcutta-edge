@@ -7,7 +7,7 @@ import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import { blendProbabilities } from '@/lib/tournaments/odds-sources';
 import { initializeTeams } from '@/lib/calculations/initialize';
 import { formatCurrency } from '@/lib/calculations/format';
-import { TrendingUp, Lock, ExternalLink, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { TrendingUp, Lock, ExternalLink, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
 
 const SUGGESTED_BID_KEY = 'calcutta_suggested_bid_pct';
 const ODDS_SOURCE_KEY = 'calcutta_odds_source';
@@ -99,6 +99,7 @@ export function StrategyOverlay({
     return localStorage.getItem(ODDS_SOURCE_KEY) ?? oddsRegistry?.defaultSourceId ?? 'evan_miya';
   });
   const [showSourcePicker, setShowSourcePicker] = useState(false);
+  const [showBlendPanel, setShowBlendPanel] = useState(false);
 
   // --- Local state: blend weights ---
   const [blendWeights, setBlendWeights] = useState<Record<string, number>>(() => {
@@ -336,37 +337,59 @@ export function StrategyOverlay({
         </div>
       </div>
 
-      {/* Blend weights panel */}
+      {/* Blend weights — collapsible compact summary */}
       {selectedSource === 'blend' && oddsRegistry && (() => {
         const totalWeight = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        // Build compact summary: "EM 34% · TR 33% · Pin 33%"
+        const summaryParts = blendableSources
+          .filter(s => (blendWeights[s.id] ?? 0) > 0)
+          .map(s => {
+            const pct = totalWeight > 0 ? Math.round(((blendWeights[s.id] ?? 0) / totalWeight) * 100) : 0;
+            const abbrev = s.name.length > 6 ? s.name.slice(0, 3) : s.name;
+            return `${abbrev} ${pct}%`;
+          });
         return (
-          <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-            <div className="flex items-center justify-between mb-2">
+          <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+            {/* Header — always visible, click to expand */}
+            <button
+              type="button"
+              onClick={() => setShowBlendPanel(p => !p)}
+              className="flex w-full items-center justify-between px-3 py-1.5 text-left"
+            >
               <span className="text-[10px] font-medium text-emerald-300">Blend Weights</span>
-            </div>
-            <div className="space-y-2">
-              {blendableSources.map((src) => {
-                const weight = blendWeights[src.id] ?? 0;
-                const effectivePct = totalWeight > 0 ? Math.round((weight / totalWeight) * 100) : 0;
-                return (
-                  <div key={src.id} className="flex items-center gap-2">
-                    <span className="w-20 text-[10px] text-white/50 truncate">{src.name}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={weight}
-                      onChange={(e) => setBlendWeights(prev => ({ ...prev, [src.id]: Number(e.target.value) }))}
-                      className="flex-1 h-1 rounded-full appearance-none bg-white/10 accent-emerald-500 cursor-pointer"
-                    />
-                    <span className="w-12 text-right text-[10px] font-mono text-emerald-400">
-                      {weight > 0 ? `${effectivePct}%` : <span className="text-white/20">off</span>}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-mono text-emerald-400/60">
+                  {summaryParts.join(' · ')}
+                </span>
+                {showBlendPanel ? <ChevronUp className="size-3 text-white/30" /> : <ChevronDown className="size-3 text-white/30" />}
+              </div>
+            </button>
+            {/* Expanded sliders */}
+            {showBlendPanel && (
+              <div className="border-t border-emerald-500/10 px-3 pb-2 pt-1.5 space-y-1.5">
+                {blendableSources.map((src) => {
+                  const weight = blendWeights[src.id] ?? 0;
+                  const effectivePct = totalWeight > 0 ? Math.round((weight / totalWeight) * 100) : 0;
+                  return (
+                    <div key={src.id} className="flex items-center gap-1.5">
+                      <span className="w-16 text-[9px] text-white/50 truncate">{src.name}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={weight}
+                        onChange={(e) => setBlendWeights(prev => ({ ...prev, [src.id]: Number(e.target.value) }))}
+                        className="flex-1 h-1 rounded-full appearance-none bg-white/10 accent-emerald-500 cursor-pointer"
+                      />
+                      <span className="w-10 text-right text-[9px] font-mono text-emerald-400">
+                        {weight > 0 ? `${effectivePct}%` : <span className="text-white/20">off</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}

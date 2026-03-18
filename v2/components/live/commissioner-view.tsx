@@ -474,9 +474,17 @@ export function CommissionerView({
             />
           </div>
 
-          {/* Right: Participants + Results — second on mobile */}
+          {/* Right: Participants + Chat + Results — second on mobile */}
           <div className="col-span-12 order-2 lg:order-none space-y-4 lg:col-span-3">
             <ParticipantList onlineUsers={channel.onlineUsers} />
+            <ChatPanel
+              messages={channel.chatMessages}
+              onSend={channel.sendChatMessage}
+              chatMuted={channel.chatMuted}
+              onToggleMute={channel.toggleChatMute}
+              isCommissioner={true}
+              userId={userId}
+            />
             <MyPortfolio
               soldTeams={channel.soldTeams}
               baseTeams={baseTeams}
@@ -489,15 +497,6 @@ export function CommissionerView({
           </div>
         </div>
       )}
-
-      <ChatPanel
-        messages={channel.chatMessages}
-        onSend={channel.sendChatMessage}
-        chatMuted={channel.chatMuted}
-        onToggleMute={channel.toggleChatMute}
-        isCommissioner={true}
-        userId={userId}
-      />
     </div>
   );
 }
