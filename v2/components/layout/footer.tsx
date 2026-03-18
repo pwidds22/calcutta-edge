@@ -4,6 +4,7 @@ const PRODUCT_LINKS = [
   { label: 'Host Auction', href: '/host' },
   { label: 'Join Auction', href: '/join' },
   { label: 'Strategy Analytics', href: '/auction' },
+  { label: 'Blog', href: '/blog' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'Sign In', href: '/login' },
   { label: 'Create Account', href: '/register' },
