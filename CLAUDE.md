@@ -199,19 +199,35 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 - **Resend installed** — `resend` package added to dependencies (`v2/package.json`). API key: `re_7sxsLdYq_Jz4JEMhQmHLGywuERCNegN3z`. Domain verified for `support@calcuttaedge.com`.
 - **Commits**: `ef9ff6f` (brand assets), `b3d5f9e` (blog posts + nav links)
 
-### In Progress
-- **Resend welcome email** — need to add to register server action (`v2/actions/auth.ts`), branded HTML template ready (reuse email styles from `v2/scripts/send-outreach.ts`)
-- **Analytics** — PostHog recommended (free tier, session replay, funnels). User hasn't decided PostHog vs Vercel Analytics yet.
+## Session Notes (2026-03-18 — ESPN Auto-Results + Welcome Email + Analytics)
+
+### Completed (2026-03-18)
+- **ESPN auto-results pipeline** — `v2/lib/espn/scoreboard.ts` (API client), `v2/lib/espn/team-map.ts` (68 teams + 50+ aliases), `v2/app/api/espn/sync/route.ts` (dual-mode: cron + manual)
+- **"Sync ESPN" button** — emerald button on tournament dashboard tab bar, available to ALL participants (not just commissioner). Spinner animation, status messages (success/error/no-new-results), auto-clears after 4s
+- **Vercel cron job** — `v2/vercel.json` with daily schedule (`0 6 * * *`). Hobby plan limits to daily; Pro plan needed for every-10-min
+- **ESPN sync broadcasts** — after upserting results, broadcasts `RESULTS_BULK_UPDATED` so all connected clients update in real-time
+- **Middleware allowlist** — added `/api/espn` to middleware passthrough (was getting auth-redirected to /login)
+- **Welcome email on signup** — `v2/lib/email/welcome.ts` (branded dark HTML template), wired into `v2/actions/auth.ts` signup() as fire-and-forget
+- **Vercel Analytics + Speed Insights** — `@vercel/analytics` + `@vercel/speed-insights` in root layout. Zero-config, privacy-friendly
+- **Vercel CLI installed** — `npm i -g vercel`, linked to `calcutta-edge` project from repo root
+- **Deployed to production** — `vercel deploy --prod` from repo root (Git webhook wasn't triggering, CLI deploy worked)
+- **Commits**: `2053449` (main feature), `116f574` (trigger deploy), `df8b645` (cron fix)
+
+### Anti-Patterns Learned
+- **Vercel Hobby cron limit**: Only supports daily cron jobs. `*/10 * * * *` fails deployment. Use daily schedule + manual button for real-time.
+- **Vercel root directory doubling**: If project root dir is set to `v2/` in Vercel settings, running `vercel deploy` from inside `v2/` causes `v2/v2` path error. Always deploy from repo root.
+- **New API routes need middleware allowlist**: Any `/api/*` route outside `/api/webhooks` or `/api/test-*` gets caught by auth middleware and redirected to `/login` (returns HTML instead of JSON).
+- **Turbopack doesn't hot-reload new route files**: API routes created after `next dev` starts aren't picked up by Turbopack. Restart the dev server.
+- **npm install breaks native modules**: After `npm install --legacy-peer-deps`, must re-install Windows native modules: `npm install --os=win32 @tailwindcss/oxide-win32-x64-msvc lightningcss-win32-x64-msvc --legacy-peer-deps`, then copy `.node` files into parent packages and `rm -rf .next`
+
+### Env Vars Added to Vercel
+- `CRON_SECRET` — protects the ESPN sync cron endpoint
+- `RESEND_API_KEY` — enables welcome emails in production
+- Analytics enabled in Vercel dashboard
 
 ### Next Steps (Priority Order)
-1. **ESPN auto-results** — poll `site.api.espn.com` scoreboard, map teams, auto-insert into `tournament_results`. Critical: 35 real users need this.
-2. **Welcome email on signup** — Resend trigger in register action
-3. **PostHog/Vercel Analytics** — track traffic sources + user behavior
-4. **Blog posts 5 & 6** — "How to Host a Calcutta Online (Free)" + "Best Calcutta Tools 2026" comparison post
-5. **Google Ads** — skip for now (gambling cert 21-45 days). X ads viable ($25 test).
-
-### Notes for Next Session
-- `lightningcss` native module fix: after any `npm install`, may need to `cp node_modules/lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node node_modules/lightningcss/` and `rm -rf .next`
-- Resend rate limit: 5 requests/second on free tier. Use 600ms+ delay between sends.
-- Email scripts in `v2/scripts/` are standalone (not part of app build) — don't need verification
-- User's Resend API key is in the scripts (not env var) — should move to env var before committing scripts
+1. **Marketing push** — more blog posts ("How to Host a Calcutta Online (Free)", "Best Calcutta Tools 2026"), X ads ($25 test), community engagement
+2. **Stripe `client_reference_id`** — link payment to logged-in user session, not just email match
+3. **Post-tournament features** — results tracking UX polish, payout management
+4. **Consider Vercel Pro** ($20/mo) — unlocks every-10-min cron for automatic ESPN sync during games
+5. **PostHog** — add when traffic exceeds ~500 users/mo for session replay + funnels
