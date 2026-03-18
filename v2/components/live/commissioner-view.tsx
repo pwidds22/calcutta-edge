@@ -507,6 +507,11 @@ export function CommissionerView({
           {/* Right: Participants + Chat + Results — second on mobile */}
           <div className="col-span-12 order-2 lg:order-none space-y-4 lg:col-span-3">
             <ParticipantList
+              registeredParticipants={participants.map((p) => ({
+                userId: p.user_id,
+                displayName: p.display_name,
+                isCommissioner: p.is_commissioner,
+              }))}
               onlineUsers={channel.onlineUsers}
               sessionId={session.id}
               isCommissioner={true}
