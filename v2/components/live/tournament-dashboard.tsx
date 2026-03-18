@@ -11,7 +11,7 @@ import { BracketEntry } from './bracket-entry';
 import { Leaderboard } from './leaderboard';
 import { SettlementMatrix } from './settlement-matrix';
 import { PropsEntry } from './props-entry';
-import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5 } from 'lucide-react';
+import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5, RefreshCw } from 'lucide-react';
 
 interface TournamentDashboardProps {
   sessionId: string;
@@ -57,6 +57,37 @@ export function TournamentDashboard({
   const [paymentTracking, setPaymentTracking] = useState<Record<string, boolean>>(initialPaymentTracking);
 
   const actualPot = soldTeams.reduce((sum, t) => sum + t.amount, 0);
+
+  // ESPN auto-sync state
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const handleEspnSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch('/api/espn/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setSyncMessage(`Error: ${data.error}`);
+      } else if (data.inserted === 0 && data.updated === 0) {
+        setSyncMessage('No new results found');
+      } else {
+        setSyncMessage(`Synced ${data.games?.length ?? 0} games`);
+        // Results will update via broadcast — no manual refetch needed
+      }
+    } catch {
+      setSyncMessage('Sync failed — check connection');
+    } finally {
+      setSyncing(false);
+      // Clear message after 4 seconds
+      setTimeout(() => setSyncMessage(null), 4000);
+    }
+  }, [sessionId]);
 
   // Handle prop result updates (from broadcast or local save)
   const handlePropResultUpdate = useCallback(
@@ -175,27 +206,55 @@ export function TournamentDashboard({
 
   return (
     <div className="space-y-4">
-      {/* Tab bar */}
-      <div className="flex gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-white/[0.08] text-white'
-                  : 'text-white/40 hover:text-white/60'
-              }`}
-            >
-              <Icon className="size-3.5" />
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Tab bar + sync button */}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-white/[0.08] text-white'
+                    : 'text-white/40 hover:text-white/60'
+                }`}
+              >
+                <Icon className="size-3.5" />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ESPN Sync button — available to everyone */}
+        {config.id === 'march_madness_2026' && (
+          <button
+            onClick={handleEspnSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+            title="Sync game results from ESPN"
+          >
+            <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync ESPN'}</span>
+          </button>
+        )}
       </div>
+
+      {/* Sync status message */}
+      {syncMessage && (
+        <div className={`rounded-md px-3 py-2 text-xs ${
+          syncMessage.startsWith('Error') || syncMessage.includes('failed')
+            ? 'bg-red-500/10 text-red-400'
+            : syncMessage.includes('No new')
+              ? 'bg-white/[0.04] text-white/50'
+              : 'bg-emerald-500/10 text-emerald-400'
+        }`}>
+          {syncMessage}
+        </div>
+      )}
 
       {/* Tab content */}
       {activeTab === 'summary' && (
