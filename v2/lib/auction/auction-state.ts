@@ -31,6 +31,7 @@ export interface AuctionState {
   sortDirection: SortDirection;
   searchTerm: string;
   oddsSource: string;
+  leagueName: string;
   isDirty: boolean;
   isLoading: boolean;
   lastSaved: Date | null;
@@ -50,6 +51,7 @@ export const INITIAL_STATE: AuctionState = {
   sortDirection: 'asc',
   searchTerm: '',
   oddsSource: 'evan_miya',
+  leagueName: 'My Auction',
   isDirty: false,
   isLoading: true,
   lastSaved: null,
@@ -58,7 +60,7 @@ export const INITIAL_STATE: AuctionState = {
 // ─── Actions ─────────────────────────────────────────────────────────
 
 export type AuctionAction =
-  | { type: 'SET_INITIAL_DATA'; teams: Team[]; payoutRules: PayoutRules; estimatedPotSize: number; config: TournamentConfig }
+  | { type: 'SET_INITIAL_DATA'; teams: Team[]; payoutRules: PayoutRules; estimatedPotSize: number; config: TournamentConfig; leagueName?: string }
   | { type: 'UPDATE_PURCHASE_PRICE'; teamId: number; price: number }
   | { type: 'TOGGLE_MY_TEAM'; teamId: number; isMyTeam: boolean }
   | { type: 'UPDATE_PAYOUT_RULES'; payoutRules: PayoutRules }
@@ -70,6 +72,7 @@ export type AuctionAction =
   | { type: 'SET_BUNDLE_PRESET'; preset: BundlePreset }
   | { type: 'SET_ODDS_SOURCE'; sourceId: string; probabilities: Record<number, Record<string, number>> }
   | { type: 'CLEAR_ALL_PRICES' }
+  | { type: 'SET_LEAGUE_NAME'; leagueName: string }
   | { type: 'MARK_SAVED' }
   | { type: 'RESET_AUCTION' };
 
@@ -106,6 +109,7 @@ export function auctionReducer(
         estimatedPotSize: action.estimatedPotSize,
         config: action.config,
         bundles,
+        leagueName: action.leagueName ?? state.leagueName,
         isLoading: false,
         isDirty: false,
       };
@@ -189,6 +193,9 @@ export function auctionReducer(
       }
       return newState;
     }
+
+    case 'SET_LEAGUE_NAME':
+      return { ...state, leagueName: action.leagueName };
 
     case 'CLEAR_ALL_PRICES': {
       const teams = state.teams.map((t) => ({

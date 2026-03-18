@@ -23,9 +23,104 @@ import { TournamentDashboard } from './tournament-dashboard';
 import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
-import { Shuffle, Zap } from 'lucide-react';
+import { Shuffle, Zap, ArrowDownNarrowWide, MapPin, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatPanel } from './chat-panel';
+
+/** Build a team order sorted by seed ascending (default) */
+function orderBySeed(
+  teamOrder: (number | string)[],
+  teamMap: Map<number, BaseTeam>,
+  bundles: TeamBundle[]
+): (number | string)[] {
+  const seedForItem = (item: number | string): number => {
+    if (typeof item === 'string' && item.startsWith('b:')) {
+      const bundleId = item.slice(2);
+      const bundle = bundles.find((b) => b.id === bundleId);
+      if (!bundle?.teamIds?.length) return 99;
+      const seeds = bundle.teamIds.map((id) => teamMap.get(id)?.seed ?? 99);
+      return Math.min(...seeds);
+    }
+    return teamMap.get(item as number)?.seed ?? 99;
+  };
+  return [...teamOrder].sort((a, b) => seedForItem(a) - seedForItem(b));
+}
+
+/** Build a team order grouped by region, seeds ascending within each region */
+function orderByRegion(
+  teamOrder: (number | string)[],
+  teamMap: Map<number, BaseTeam>,
+  bundles: TeamBundle[],
+  config: TournamentConfig
+): (number | string)[] {
+  const groupOrder = config.groups.map((g) => g.key);
+  const groupForItem = (item: number | string): string => {
+    if (typeof item === 'string' && item.startsWith('b:')) {
+      const bundleId = item.slice(2);
+      const bundle = bundles.find((b) => b.id === bundleId);
+      if (!bundle?.teamIds?.length) return 'ZZZ';
+      return teamMap.get(bundle.teamIds[0])?.group ?? 'ZZZ';
+    }
+    return teamMap.get(item as number)?.group ?? 'ZZZ';
+  };
+  const seedForItem = (item: number | string): number => {
+    if (typeof item === 'string' && item.startsWith('b:')) {
+      const bundleId = item.slice(2);
+      const bundle = bundles.find((b) => b.id === bundleId);
+      if (!bundle?.teamIds?.length) return 99;
+      const seeds = bundle.teamIds.map((id) => teamMap.get(id)?.seed ?? 99);
+      return Math.min(...seeds);
+    }
+    return teamMap.get(item as number)?.seed ?? 99;
+  };
+  return [...teamOrder].sort((a, b) => {
+    const ga = groupOrder.indexOf(groupForItem(a));
+    const gb = groupOrder.indexOf(groupForItem(b));
+    if (ga !== gb) return ga - gb;
+    return seedForItem(a) - seedForItem(b);
+  });
+}
+
+/** Build a serpentine order: 1-seeds, 2-seeds, ..., 16-seeds, then reverse next pass */
+function orderSerpentine(
+  teamOrder: (number | string)[],
+  teamMap: Map<number, BaseTeam>,
+  bundles: TeamBundle[]
+): (number | string)[] {
+  // Group items by seed
+  const seedForItem = (item: number | string): number => {
+    if (typeof item === 'string' && item.startsWith('b:')) {
+      const bundleId = item.slice(2);
+      const bundle = bundles.find((b) => b.id === bundleId);
+      if (!bundle?.teamIds?.length) return 99;
+      const seeds = bundle.teamIds.map((id) => teamMap.get(id)?.seed ?? 99);
+      return Math.min(...seeds);
+    }
+    return teamMap.get(item as number)?.seed ?? 99;
+  };
+  // Sort by seed, then collect seed groups
+  const sorted = [...teamOrder].sort((a, b) => seedForItem(a) - seedForItem(b));
+  const seedGroups: (number | string)[][] = [];
+  let currentSeed = -1;
+  for (const item of sorted) {
+    const s = seedForItem(item);
+    if (s !== currentSeed) {
+      seedGroups.push([]);
+      currentSeed = s;
+    }
+    seedGroups[seedGroups.length - 1].push(item);
+  }
+  // Serpentine: even-index groups normal, odd-index groups reversed
+  const result: (number | string)[] = [];
+  for (let i = 0; i < seedGroups.length; i++) {
+    if (i % 2 === 0) {
+      result.push(...seedGroups[i]);
+    } else {
+      result.push(...seedGroups[i].reverse());
+    }
+  }
+  return result;
+}
 
 interface CommissionerViewProps {
   session: {
@@ -272,14 +367,44 @@ export function CommissionerView({
           {/* Left: Team Queue — pushed below on mobile */}
           <div className="col-span-12 order-3 lg:order-none lg:col-span-3">
             {channel.auctionStatus === 'lobby' && (
-              <Button
-                onClick={handleShuffle}
-                variant="outline"
-                className="mb-2 w-full gap-2 border-white/10 text-white/60 hover:border-white/20 hover:text-white/80"
-              >
-                <Shuffle className="size-3.5" />
-                Shuffle Team Order
-              </Button>
+              <div className="mb-2 grid grid-cols-2 gap-1.5">
+                <Button
+                  onClick={() => updateTeamOrder(session.id, orderBySeed(activeTeamOrder, teamMap, bundles))}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                >
+                  <ArrowDownNarrowWide className="size-3" />
+                  By Seed
+                </Button>
+                <Button
+                  onClick={() => updateTeamOrder(session.id, orderByRegion(activeTeamOrder, teamMap, bundles, config))}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                >
+                  <MapPin className="size-3" />
+                  By Region
+                </Button>
+                <Button
+                  onClick={() => updateTeamOrder(session.id, orderSerpentine(activeTeamOrder, teamMap, bundles))}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                >
+                  <ArrowUpDown className="size-3" />
+                  Serpentine
+                </Button>
+                <Button
+                  onClick={handleShuffle}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
+                >
+                  <Shuffle className="size-3" />
+                  Shuffle
+                </Button>
+              </div>
             )}
             <TeamQueue
               sessionId={session.id}
@@ -289,6 +414,8 @@ export function CommissionerView({
               currentTeamIdx={channel.currentTeamIdx}
               auctionStatus={channel.auctionStatus}
               bundles={bundles}
+              isCommissioner={true}
+              biddingStatus={channel.biddingStatus}
             />
           </div>
 

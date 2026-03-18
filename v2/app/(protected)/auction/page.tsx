@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { loadAuctionData } from '@/actions/auction'
+import { loadAuctionData, listUserLeagues } from '@/actions/auction'
 import { AuctionTool } from '@/components/auction/auction-tool'
 import { getActiveTournament, listTournaments } from '@/lib/tournaments/registry'
 import { normalizePayoutRules } from '@/lib/calculations/normalize'
@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { Lock } from 'lucide-react'
 
 interface AuctionPageProps {
-  searchParams: Promise<{ tournament?: string }>
+  searchParams: Promise<{ tournament?: string; league?: string }>
 }
 
 export default async function AuctionPage({ searchParams }: AuctionPageProps) {
@@ -34,8 +34,12 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
   // Get all tournaments for the selector
   const allTournaments = listTournaments()
 
-  // Load saved auction data (null if first visit)
-  const auctionData = await loadAuctionData(config.id)
+  // Load league list and selected league
+  const leagueList = await listUserLeagues(config.id)
+  const selectedLeague = params.league ?? leagueList[0] ?? 'My Auction'
+
+  // Load saved auction data for the selected league (null if first visit)
+  const auctionData = await loadAuctionData(config.id, selectedLeague)
 
   // Normalize payout rules: map legacy DB keys to current config keys
   const payoutRules = normalizePayoutRules(auctionData?.payoutRules, config)
@@ -82,6 +86,8 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
         config={config}
         baseTeams={baseTeams}
         hasPaid={profile?.has_paid ?? false}
+        leagueName={selectedLeague}
+        leagueList={leagueList}
       />
     </div>
   )

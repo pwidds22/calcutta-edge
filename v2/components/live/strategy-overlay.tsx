@@ -337,32 +337,39 @@ export function StrategyOverlay({
       </div>
 
       {/* Blend weights panel */}
-      {selectedSource === 'blend' && oddsRegistry && (
-        <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-medium text-emerald-300">Blend Weights</span>
+      {selectedSource === 'blend' && oddsRegistry && (() => {
+        const totalWeight = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        return (
+          <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-medium text-emerald-300">Blend Weights</span>
+            </div>
+            <div className="space-y-2">
+              {blendableSources.map((src) => {
+                const weight = blendWeights[src.id] ?? 0;
+                const effectivePct = totalWeight > 0 ? Math.round((weight / totalWeight) * 100) : 0;
+                return (
+                  <div key={src.id} className="flex items-center gap-2">
+                    <span className="w-20 text-[10px] text-white/50 truncate">{src.name}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={weight}
+                      onChange={(e) => setBlendWeights(prev => ({ ...prev, [src.id]: Number(e.target.value) }))}
+                      className="flex-1 h-1 rounded-full appearance-none bg-white/10 accent-emerald-500 cursor-pointer"
+                    />
+                    <span className="w-12 text-right text-[10px] font-mono text-emerald-400">
+                      {weight > 0 ? `${effectivePct}%` : <span className="text-white/20">off</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="space-y-2">
-            {blendableSources.map((src) => (
-              <div key={src.id} className="flex items-center gap-2">
-                <span className="w-20 text-[10px] text-white/50 truncate">{src.name}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={blendWeights[src.id] ?? 0}
-                  onChange={(e) => setBlendWeights(prev => ({ ...prev, [src.id]: Number(e.target.value) }))}
-                  className="flex-1 h-1 rounded-full appearance-none bg-white/10 accent-emerald-500 cursor-pointer"
-                />
-                <span className="w-8 text-right text-[10px] font-mono text-emerald-400">
-                  {blendWeights[src.id] ?? 0}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Suggested bid settings panel */}
       {showBidSettings && (

@@ -283,43 +283,51 @@ export function OddsSourceSelector({ registry }: OddsSourceSelectorProps) {
       </div>
 
       {/* Blend panel */}
-      {showBlend && (
-        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
-          <p className="text-[10px] uppercase tracking-wider text-white/30">Weight each source</p>
-          <div className="space-y-2">
-            {blendSources.map((source) => {
-              const weight = blendWeights[source.id] ?? 0;
-              return (
-                <div key={source.id} className="flex items-center gap-3">
-                  <span className="w-24 text-[11px] text-white/50 truncate">{source.name}</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={weight}
-                    onChange={(e) =>
-                      setBlendWeights((prev) => ({
-                        ...prev,
-                        [source.id]: parseInt(e.target.value, 10),
-                      }))
-                    }
-                    className="flex-1 h-1 accent-emerald-500"
-                  />
-                  <span className="w-8 text-right text-[11px] font-mono text-white/40">
-                    {weight}
-                  </span>
-                </div>
-              );
-            })}
+      {showBlend && (() => {
+        const totalWeight = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        return (
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
+            <p className="text-[10px] uppercase tracking-wider text-white/30">Weight each source</p>
+            <div className="space-y-2">
+              {blendSources.map((source) => {
+                const weight = blendWeights[source.id] ?? 0;
+                const effectivePct = totalWeight > 0 ? Math.round((weight / totalWeight) * 100) : 0;
+                return (
+                  <div key={source.id} className="flex items-center gap-3">
+                    <span className="w-24 text-[11px] text-white/50 truncate">{source.name}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={weight}
+                      onChange={(e) =>
+                        setBlendWeights((prev) => ({
+                          ...prev,
+                          [source.id]: parseInt(e.target.value, 10),
+                        }))
+                      }
+                      className="flex-1 h-1 accent-emerald-500"
+                    />
+                    <span className="w-14 text-right text-[11px] font-mono text-white/40">
+                      {weight > 0 ? (
+                        <><span className="text-emerald-400/70">{effectivePct}%</span></>
+                      ) : (
+                        <span className="text-white/20">off</span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              onClick={handleBlendApply}
+              className="rounded-md bg-emerald-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 transition-colors"
+            >
+              Apply Blend
+            </button>
           </div>
-          <button
-            onClick={handleBlendApply}
-            className="rounded-md bg-emerald-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 transition-colors"
-          >
-            Apply Blend
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Custom odds editor panel */}
       {showCustom && (

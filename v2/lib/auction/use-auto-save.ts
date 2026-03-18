@@ -24,6 +24,7 @@ export function useAutoSave() {
         payoutRules: state.payoutRules,
         estimatedPotSize: state.estimatedPotSize,
         eventType: state.config?.id,
+        leagueName: state.leagueName,
       });
       if (result?.error) {
         setError(result.error);
@@ -35,7 +36,7 @@ export function useAutoSave() {
     } finally {
       setIsSaving(false);
     }
-  }, [state.teams, state.payoutRules, state.estimatedPotSize, state.config?.id, dispatch]);
+  }, [state.teams, state.payoutRules, state.estimatedPotSize, state.config?.id, state.leagueName, dispatch]);
 
   useEffect(() => {
     if (!state.isDirty || state.isLoading) return;
