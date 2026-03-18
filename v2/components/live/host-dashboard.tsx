@@ -4,8 +4,8 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Plus, Radio, Users, ArrowRight, Trash2, Lock, Link2, Check } from 'lucide-react';
-import { deleteSession } from '@/actions/session';
+import { Plus, Radio, Users, ArrowRight, Trash2, Lock, Link2, Check, LogOut, Loader2 } from 'lucide-react';
+import { deleteSession, leaveSession } from '@/actions/session';
 
 interface Session {
   id: string;
@@ -15,6 +15,7 @@ interface Session {
   tournament_id: string;
   created_at: string;
   password_hash?: string | null;
+  participant_count?: number;
 }
 
 interface HostDashboardProps {
@@ -76,15 +77,19 @@ function SessionCard({
   session,
   isHosted,
   onDelete,
+  onLeave,
 }: {
   session: Session;
   isHosted: boolean;
   onDelete?: (session: Session) => void;
+  onLeave?: (session: Session) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const href = isHosted ? `/host/${session.id}` : `/live/${session.id}`;
   const canDelete = isHosted && session.status !== 'active';
+  const canLeave = !isHosted && session.status !== 'active';
   const hasPassword = !!session.password_hash;
+  const participantCount = session.participant_count ?? 0;
 
   const copyJoinLink = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -106,7 +111,7 @@ function SessionCard({
             </span>
           )}
         </h3>
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-1 flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${statusColors[session.status] ?? statusColors.lobby}`}
           >
@@ -115,6 +120,12 @@ function SessionCard({
           <span className="text-xs font-mono text-white/40">
             {session.join_code}
           </span>
+          {participantCount > 0 && (
+            <span className="flex items-center gap-1 text-xs text-white/30">
+              <Users className="size-3" />
+              {participantCount}
+            </span>
+          )}
           <span className="text-xs text-white/30">
             {new Date(session.created_at).toLocaleDateString()}
           </span>
@@ -136,6 +147,19 @@ function SessionCard({
             ) : (
               <Link2 className="size-4" />
             )}
+          </button>
+        )}
+        {canLeave && onLeave && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onLeave(session);
+            }}
+            className="rounded-lg p-2 text-white/20 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+            title="Leave auction"
+          >
+            <LogOut className="size-4" />
           </button>
         )}
         {canDelete && onDelete && (
@@ -166,6 +190,7 @@ export function HostDashboard({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleDelete(session: Session) {
@@ -184,6 +209,20 @@ export function HostDashboard({
         setDeleteTarget(null);
         router.refresh();
       }
+    });
+  }
+
+  function handleLeave(session: Session) {
+    setError(null);
+    setLeavingId(session.id);
+    startTransition(async () => {
+      const result = await leaveSession(session.id);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+      setLeavingId(null);
     });
   }
 
@@ -278,7 +317,12 @@ export function HostDashboard({
           </div>
           <div className="space-y-2">
             {joinedSessions.map((s) => (
-              <SessionCard key={s.id} session={s} isHosted={false} />
+              <SessionCard
+                key={s.id}
+                session={s}
+                isHosted={false}
+                onLeave={handleLeave}
+              />
             ))}
           </div>
         </div>

@@ -402,10 +402,10 @@ export async function getMyHostedSessions() {
   } = await supabase.auth.getUser();
   if (!user) return { sessions: [], joined: [] };
 
-  // Sessions I created (include password_hash presence for lock icon)
+  // Sessions I created (include participant count)
   const { data: hosted } = await supabase
     .from('auction_sessions')
-    .select('id, name, join_code, status, tournament_id, created_at, password_hash')
+    .select('id, name, join_code, status, tournament_id, created_at, password_hash, auction_participants(count)')
     .eq('commissioner_id', user.id)
     .order('created_at', { ascending: false });
 
@@ -421,13 +421,21 @@ export async function getMyHostedSessions() {
     const sessionIds = participations.map((p) => p.session_id);
     const { data } = await supabase
       .from('auction_sessions')
-      .select('id, name, join_code, status, tournament_id, created_at, password_hash')
+      .select('id, name, join_code, status, tournament_id, created_at, password_hash, auction_participants(count)')
       .in('id', sessionIds)
       .order('created_at', { ascending: false });
     joined = data ?? [];
   }
 
-  return { sessions: hosted ?? [], joined: joined ?? [] };
+  // Flatten participant counts
+  const flatten = (sessions: typeof hosted) =>
+    (sessions ?? []).map((s) => ({
+      ...s,
+      participant_count:
+        (s.auction_participants as unknown as Array<{ count: number }>)?.[0]?.count ?? 0,
+    }));
+
+  return { sessions: flatten(hosted), joined: flatten(joined) };
 }
 
 /** Check if a session requires a password (for join form UI) */
