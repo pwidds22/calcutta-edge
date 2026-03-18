@@ -245,3 +245,37 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 7. **Region-based shuffle** — shuffle within one region at a time
 8. **Stripe `client_reference_id`** — payment attribution
 9. **Decimal payout percentages**
+
+## Session Notes (2026-03-18 Evening — UX Polish + Multi-League + Team Order)
+
+### Completed (2026-03-18 Evening)
+- **Blend effective % display** — sliders now show normalized percentage (e.g., "34%") instead of raw slider values. Applied to both strategy page (`v2/components/auction/odds-source-selector.tsx`) and live auction (`v2/components/live/strategy-overlay.tsx`). Shows "off" when weight is 0.
+- **Multi-league saves** — users can save multiple auction configs for the same tournament (e.g., "Work League" vs "Friends League"):
+  - DB migration: added `league_name text NOT NULL DEFAULT 'My Auction'` column to `auction_data`, new unique constraint on `(user_id, event_type, league_name)`
+  - Server actions: `v2/actions/auction.ts` — `loadAuctionData()`, `saveAuctionData()`, `resetAuctionData()` now accept `leagueName`, added `listUserLeagues()` and `renameLeague()`
+  - State: `v2/lib/auction/auction-state.ts` — added `leagueName` to `AuctionState`, `SET_LEAGUE_NAME` action
+  - Auto-save: `v2/lib/auction/use-auto-save.ts` — passes `leagueName` to save action
+  - Page: `v2/app/(protected)/auction/page.tsx` — loads league list, reads `?league=` URL param, passes to AuctionTool
+  - UI: `v2/components/auction/auction-tool.tsx` — `LeagueSelector` component with dropdown, create, rename, delete. `useEffect` deps include `leagueName` so switching leagues reloads data.
+- **Team order templates** — commissioner gets 4 ordering presets in lobby (`v2/components/live/commissioner-view.tsx`):
+  - By Seed (ascending), By Region (grouped, seeds ascending within), Serpentine (snake draft), Shuffle (random)
+  - Helper functions: `orderBySeed()`, `orderByRegion()`, `orderSerpentine()` — all handle bundles correctly
+- **Pick next team** — commissioner can click any unsold team in the queue to present it next during active auction when bidding isn't open (`v2/components/live/team-queue.tsx`). Shows "Click to present" hint. New props: `isCommissioner`, `biddingStatus`.
+- **Inline chat panel** — chat moved from floating bottom-right bubble to inline card in right sidebar, below participants, above portfolio (`v2/components/live/chat-panel.tsx`). Always visible without clicking. Applied to both commissioner and participant views.
+- **Collapsible blend panel** — blend weights in strategy overlay now shows compact summary line ("EM 34% · TR 33% · Pin 33%") when collapsed, click to expand sliders (`v2/components/live/strategy-overlay.tsx`).
+- **Session rules card** — participants see auction settings (payouts, timer, min bid, pot size) when joining (`v2/components/live/session-rules-card.tsx`) — shown in lobby and as collapsible during active auction.
+- **Commits**: `6756ce8` (timer sniping + bugs), `de536b1` (blend + leagues + order + pick-next), `a38e7b8` (inline chat + collapsible blend), `7c9d693` (league switch fix)
+
+### Anti-Patterns Learned
+- **Empty useEffect deps + server-rerender**: When a server component re-renders with new props (URL change), client components with `useEffect(fn, [])` ignore the new props. Must include the switching key (e.g., `leagueName`) in deps.
+- **DB unique constraint changes**: When adding a column to a unique constraint, must `DROP CONSTRAINT` first, then `ADD CONSTRAINT` with the new column. Existing data gets the `DEFAULT` value.
+- **Order template functions must handle bundles**: Bundle items in `teamOrder` are strings like `"b:playin-East-16"`. Sort helpers must extract seed/group from bundle member teams, not the string itself.
+
+### Next Steps (Priority Order)
+1. **Timer sniping fix (P0)** — DONE in `6756ce8` (server-side grace period via `timer_ends_at` check in `autoAdvance`)
+2. **Play-in bundle grouping fix (P1)** — DONE in `6756ce8`
+3. **Display name in profile** — DONE in `6756ce8`
+4. **Custom bundles** — commissioner-defined team groupings
+5. **Edit auction settings post-creation**
+6. **Stripe `client_reference_id`** — payment attribution
+7. **Decimal payout percentages**
