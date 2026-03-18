@@ -69,6 +69,7 @@ export type AuctionAction =
   | { type: 'SET_SEARCH_TERM'; term: string }
   | { type: 'SET_BUNDLE_PRESET'; preset: BundlePreset }
   | { type: 'SET_ODDS_SOURCE'; sourceId: string; probabilities: Record<number, Record<string, number>> }
+  | { type: 'CLEAR_ALL_PRICES' }
   | { type: 'MARK_SAVED' }
   | { type: 'RESET_AUCTION' };
 
@@ -186,6 +187,18 @@ export function auctionReducer(
         calculateImpliedProbabilities(newState.teams, state.config);
         recalculateValues(newState);
       }
+      return newState;
+    }
+
+    case 'CLEAR_ALL_PRICES': {
+      const teams = state.teams.map((t) => ({
+        ...t,
+        purchasePrice: 0,
+        isMyTeam: false,
+      }));
+      const newState: AuctionState = { ...state, teams, isDirty: true };
+      recalculateProjectedPot(newState);
+      recalculateValues(newState);
       return newState;
     }
 

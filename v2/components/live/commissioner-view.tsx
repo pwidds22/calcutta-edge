@@ -152,14 +152,21 @@ export function CommissionerView({
   const autoModeRef = useRef(channel.autoMode);
   autoModeRef.current = channel.autoMode;
 
-  // Timer: commissioner auto-closes (or auto-advances in auto-mode) on expiry
+  // Timer: commissioner auto-closes (or auto-advances in auto-mode) on expiry.
+  // The server-side autoAdvance checks DB timer_ends_at before closing,
+  // so if a last-second bid extended the timer, the server rejects the close
+  // and re-broadcasts TIMER_RESET — the client-side grace period + server
+  // guard together prevent sniping.
   const timer = useTimer({
     isCommissioner: true,
-    onExpire: useCallback(() => {
+    onExpire: useCallback(async () => {
       if (autoModeRef.current) {
-        autoAdvance(session.id);
+        const result = await autoAdvance(session.id);
+        // If server says timer was extended, the TIMER_RESET broadcast
+        // will resync our timer — nothing else to do here.
+        if (result && 'timerExtended' in result) return;
       } else {
-        closeBidding(session.id);
+        await closeBidding(session.id);
       }
     }, [session.id]),
   });

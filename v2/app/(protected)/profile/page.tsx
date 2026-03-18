@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { BarChart3, Mail, CreditCard, Calendar, ArrowRight } from 'lucide-react'
+import { DisplayNameForm } from '@/components/profile/display-name-form'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -38,6 +39,7 @@ export default async function ProfilePage() {
       <div className="mt-8 space-y-1">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-white/30">Account Details</h2>
         <div className="mt-3 divide-y divide-white/[0.06] rounded-xl border border-white/[0.06] bg-white/[0.02]">
+          <DisplayNameForm currentName={profile?.display_name ?? null} />
           <div className="flex items-center gap-3 px-5 py-4">
             <Mail className="size-4 text-white/30" />
             <div>

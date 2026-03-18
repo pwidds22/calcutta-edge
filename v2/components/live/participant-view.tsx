@@ -18,6 +18,7 @@ import { StrategyOverlay } from './strategy-overlay';
 import { TimerDisplay } from './timer-display';
 import { TournamentDashboard } from './tournament-dashboard';
 import { ChatPanel } from './chat-panel';
+import { SessionRulesCard } from './session-rules-card';
 import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
@@ -166,7 +167,7 @@ export function ParticipantView({
           onlineCount={channel.onlineUsers.length}
           auctionStatus={channel.auctionStatus}
         />
-        <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] py-16">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] py-12">
           <p className="text-lg font-medium text-white/60">
             Waiting for the commissioner to start...
           </p>
@@ -174,7 +175,17 @@ export function ParticipantView({
             {channel.onlineUsers.length} participant{channel.onlineUsers.length !== 1 ? 's' : ''} connected
           </p>
         </div>
-        <ParticipantList onlineUsers={channel.onlineUsers} />
+
+        {/* Show session rules so participants know the setup */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <SessionRulesCard
+            payoutRules={session.payout_rules}
+            estimatedPotSize={session.estimated_pot_size}
+            settings={session.settings}
+            teamCount={activeTeamOrder.length}
+          />
+          <ParticipantList onlineUsers={channel.onlineUsers} />
+        </div>
 
         <ChatPanel
           messages={channel.chatMessages}

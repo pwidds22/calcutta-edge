@@ -62,36 +62,36 @@ describe('generateBundles — none preset', () => {
 });
 
 describe('generateBundles — light preset', () => {
-  it('creates play-in bundles + 4 region bundles for seeds 13-16', () => {
+  it('creates 4 region bundles for seeds 13-16, with 16-seed play-ins absorbed', () => {
     const bundles = generateBundles('light', teams, config);
     const playInBundles = bundles.filter((b) => b.id.startsWith('playin-'));
     const regionBundles = bundles.filter((b) => b.id.startsWith('region-'));
 
-    expect(playInBundles).toHaveLength(4);
+    // Seed-16 play-in teams are absorbed into region bundles.
+    // Seed-11 play-in teams are OUTSIDE the 13-16 range, so remain separate.
+    expect(playInBundles).toHaveLength(2); // West-11 and Midwest-11
+    expect(playInBundles.every((b) => b.id.includes('-11'))).toBe(true);
     expect(regionBundles).toHaveLength(4);
   });
 
-  it('region bundles do not include play-in teams', () => {
+  it('region bundles include play-in teams from their seed range', () => {
     const bundles = generateBundles('light', teams, config);
-    const playInTeamIds = new Set(
-      bundles
-        .filter((b) => b.id.startsWith('playin-'))
-        .flatMap((b) => b.teamIds)
-    );
     const regionBundles = bundles.filter((b) => b.id.startsWith('region-'));
-    for (const rb of regionBundles) {
-      for (const id of rb.teamIds) {
-        expect(playInTeamIds.has(id)).toBe(false);
-      }
+    const regionTeamIds = new Set(regionBundles.flatMap((b) => b.teamIds));
+
+    // All 16-seed teams (including play-in pairs) should be in region bundles
+    const seed16Teams = teams.filter((t) => t.seed === 16);
+    for (const t of seed16Teams) {
+      expect(regionTeamIds.has(t.id)).toBe(true);
     }
   });
 
-  it('each region bundle covers seeds 13-16 in that region', () => {
+  it('each region bundle covers seeds 13-16 in that region (including play-ins)', () => {
     const bundles = generateBundles('light', teams, config);
     const eastBundle = bundles.find((b) => b.id === 'region-East-13-16')!;
     const eastTeams = eastBundle.teamIds.map((id) => teams.find((t) => t.id === id)!);
-    // East has no play-ins in 13-16 range, so should have 4 teams (seeds 13, 14, 15, 16)
-    expect(eastTeams).toHaveLength(4);
+    // East should have seeds 13, 14, 15, 16 (including any play-in 16-seeds)
+    expect(eastTeams.length).toBeGreaterThanOrEqual(4);
     for (const t of eastTeams) {
       expect(t.seed).toBeGreaterThanOrEqual(13);
       expect(t.seed).toBeLessThanOrEqual(16);
@@ -127,13 +127,21 @@ describe('generateBundles — standard preset', () => {
 });
 
 describe('generateBundles — heavy preset', () => {
-  it('creates play-in bundles + 4 region bundles for seeds 9-16', () => {
+  it('creates 4 region bundles for seeds 9-16, with play-in teams absorbed', () => {
     const bundles = generateBundles('heavy', teams, config);
     const playInBundles = bundles.filter((b) => b.id.startsWith('playin-'));
     const regionBundles = bundles.filter((b) => b.id.startsWith('region-'));
 
-    expect(playInBundles).toHaveLength(4);
+    // Play-in teams (16-seeds) are absorbed into region bundles, not listed separately
+    expect(playInBundles).toHaveLength(0);
     expect(regionBundles).toHaveLength(4);
+
+    // Verify play-in teams are inside region bundles
+    const regionTeamIds = new Set(regionBundles.flatMap((b) => b.teamIds));
+    const playInTeams = teams.filter((t) => t.seed === 16);
+    for (const t of playInTeams) {
+      expect(regionTeamIds.has(t.id)).toBe(true);
+    }
   });
 
   it('heavy region bundles contain more teams than light', () => {

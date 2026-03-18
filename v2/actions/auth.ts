@@ -105,6 +105,28 @@ export async function updatePassword(formData: FormData) {
   return { success: true }
 }
 
+export async function updateDisplayName(displayName: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const trimmed = displayName.trim()
+  if (!trimmed) return { error: 'Display name cannot be empty' }
+  if (trimmed.length > 30) return { error: 'Display name must be 30 characters or less' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ display_name: trimmed })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/profile')
+  return { success: true }
+}
+
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()

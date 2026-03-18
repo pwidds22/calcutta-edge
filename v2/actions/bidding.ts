@@ -353,7 +353,7 @@ export async function closeBidding(sessionId: string) {
 
   const { data: session } = await supabase
     .from('auction_sessions')
-    .select('commissioner_id, bidding_status')
+    .select('commissioner_id, bidding_status, timer_ends_at, timer_duration_ms')
     .eq('id', sessionId)
     .single();
 
@@ -895,6 +895,11 @@ export async function pauseAuction(sessionId: string) {
  * Auto-advance: called by commissioner timer expiry in auto-mode.
  * Closes bidding → sells to highest bidder (or skips if no bids) → opens next.
  * Everything happens server-side in one call to avoid race conditions.
+ *
+ * SERVER-AUTHORITATIVE TIMER: Before closing, we check the DB's timer_ends_at.
+ * If a last-second bid extended the timer, we reject the close and re-broadcast
+ * the updated timer so the commissioner's client resyncs. This prevents "sniping"
+ * where a valid bid's timer extension is lost due to broadcast latency.
  */
 export async function autoAdvance(sessionId: string) {
   const supabase = await createClient();
@@ -913,6 +918,29 @@ export async function autoAdvance(sessionId: string) {
     return { error: 'Not authorized' };
   session.team_order = parseTeamOrder(session.team_order);
   if (session.status !== 'active') return { error: 'Auction not active' };
+
+  // ── SERVER-AUTHORITATIVE TIMER CHECK ──
+  // The commissioner's client thinks the timer expired, but a last-second bid
+  // may have extended timer_ends_at in the DB. Check the DB truth + add a
+  // grace period to absorb broadcast latency.
+  const GRACE_PERIOD_MS = 2000; // 2-second buffer for broadcast propagation
+  if (session.timer_ends_at) {
+    const dbEndsAt = new Date(session.timer_ends_at).getTime();
+    const now = Date.now();
+    if (dbEndsAt > now - GRACE_PERIOD_MS) {
+      // Timer was extended by a bid OR hasn't truly expired yet.
+      // If still in the future, re-broadcast the active timer so the
+      // commissioner's client resyncs its countdown.
+      if (dbEndsAt > now) {
+        await broadcastToChannel(channelName(sessionId), 'TIMER_RESET', {
+          endsAt: session.timer_ends_at,
+          durationMs: session.timer_duration_ms ?? (dbEndsAt - now),
+        });
+        return { error: 'Timer was extended by a recent bid', timerExtended: true };
+      }
+      // Timer ended within the grace window — it's truly expired, proceed.
+    }
+  }
 
   const admin = createAdminClient();
   const currentOrderItem = session.team_order[session.current_team_idx];

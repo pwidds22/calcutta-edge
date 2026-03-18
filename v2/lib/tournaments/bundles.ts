@@ -74,24 +74,27 @@ function getPlayInTeamIds(playInBundles: TeamBundle[]): Set<number> {
 
 /**
  * Bundle teams by seed range per region.
- * Teams already in play-in bundles are excluded.
+ * Play-in teams whose seed falls within [seedMin, seedMax] are INCLUDED in
+ * the region bundle (not listed separately). This prevents 16-seed play-in
+ * teams from showing as standalone items when light/heavy bundling groups
+ * seeds 13-16 per region.
  */
 function bundleByRegion(
   teams: BaseTeam[],
   config: TournamentConfig,
   seedMin: number,
   seedMax: number,
-  playInTeamIds: Set<number>
+  _playInTeamIds: Set<number>
 ): TeamBundle[] {
   const bundles: TeamBundle[] = [];
 
   for (const group of config.groups) {
+    // Include ALL teams in the seed range, including play-in teams
     const regionTeams = teams.filter(
       (t) =>
         t.group === group.key &&
         t.seed >= seedMin &&
-        t.seed <= seedMax &&
-        !playInTeamIds.has(t.id)
+        t.seed <= seedMax
     );
     if (regionTeams.length === 0) continue;
 
@@ -154,23 +157,33 @@ export function generateBundles(
     case 'none':
       return playInBundles;
 
-    case 'light':
-      return [
-        ...playInBundles,
-        ...bundleByRegion(teams, config, 13, 16, playInTeamIds),
-      ];
+    case 'light': {
+      // Region bundles absorb play-in teams whose seed is in range (13-16).
+      // Only include play-in bundles for seeds OUTSIDE the region range.
+      const regionBundles = bundleByRegion(teams, config, 13, 16, playInTeamIds);
+      const regionTeamIds = new Set(regionBundles.flatMap((b) => b.teamIds));
+      const extraPlayIns = playInBundles.filter(
+        (b) => !b.teamIds.some((id) => regionTeamIds.has(id))
+      );
+      return [...extraPlayIns, ...regionBundles];
+    }
 
     case 'standard':
+      // Seed-line bundling keeps play-in bundles separate (different grouping axis)
       return [
         ...playInBundles,
         ...bundleBySeedLine(teams, 13, 16, playInTeamIds),
       ];
 
-    case 'heavy':
-      return [
-        ...playInBundles,
-        ...bundleByRegion(teams, config, 9, 16, playInTeamIds),
-      ];
+    case 'heavy': {
+      // Region bundles absorb play-in teams whose seed is in range (9-16).
+      const regionBundles = bundleByRegion(teams, config, 9, 16, playInTeamIds);
+      const regionTeamIds = new Set(regionBundles.flatMap((b) => b.teamIds));
+      const extraPlayIns = playInBundles.filter(
+        (b) => !b.teamIds.some((id) => regionTeamIds.has(id))
+      );
+      return [...extraPlayIns, ...regionBundles];
+    }
   }
 }
 

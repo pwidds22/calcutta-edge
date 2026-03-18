@@ -13,6 +13,13 @@ interface UseTimerOptions {
   isCommissioner: boolean;
 }
 
+/**
+ * Client-side grace period before firing onExpire.
+ * Absorbs broadcast latency so a TIMER_RESET from a last-second bid
+ * can arrive and cancel the expiry before autoAdvance fires.
+ */
+const CLIENT_GRACE_MS = 1500;
+
 export function useTimer({ onExpire, isCommissioner }: UseTimerOptions) {
   const [state, setState] = useState<TimerState>({
     isRunning: false,
@@ -24,6 +31,7 @@ export function useTimer({ onExpire, isCommissioner }: UseTimerOptions) {
   const totalMsRef = useRef<number>(0);
   const rafRef = useRef<number | null>(null);
   const expiredRef = useRef<boolean>(false);
+  const graceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
 
@@ -38,10 +46,16 @@ export function useTimer({ onExpire, isCommissioner }: UseTimerOptions) {
     });
 
     if (remaining <= 0) {
-      // Timer expired
+      // Timer visually expired — but wait a grace period before firing onExpire
+      // so in-flight TIMER_RESET broadcasts from last-second bids can arrive.
       if (!expiredRef.current && isCommissioner) {
         expiredRef.current = true;
-        onExpireRef.current();
+        graceTimeoutRef.current = setTimeout(() => {
+          // Double-check: if endsAtRef was updated (timer.reset/start called)
+          // during the grace window, a bid came in — don't fire.
+          if (endsAtRef.current !== null) return;
+          onExpireRef.current();
+        }, CLIENT_GRACE_MS);
       }
       endsAtRef.current = null;
       return;
@@ -55,9 +69,13 @@ export function useTimer({ onExpire, isCommissioner }: UseTimerOptions) {
       // Guard against zero/negative duration (prevents divide-by-zero in progress bar)
       if (durationMs <= 0) return;
 
-      // Cancel any existing timer
+      // Cancel any existing timer + grace timeout
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
+      }
+      if (graceTimeoutRef.current !== null) {
+        clearTimeout(graceTimeoutRef.current);
+        graceTimeoutRef.current = null;
       }
 
       endsAtRef.current = new Date(endsAt).getTime();
@@ -77,7 +95,8 @@ export function useTimer({ onExpire, isCommissioner }: UseTimerOptions) {
 
   const reset = useCallback(
     (endsAt: string, durationMs: number) => {
-      // Same as start but semantically distinct (new bid came in)
+      // Same as start but semantically distinct (new bid came in).
+      // Critically, this cancels any pending grace timeout.
       start(endsAt, durationMs);
     },
     [start]
@@ -87,6 +106,10 @@ export function useTimer({ onExpire, isCommissioner }: UseTimerOptions) {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
+    }
+    if (graceTimeoutRef.current !== null) {
+      clearTimeout(graceTimeoutRef.current);
+      graceTimeoutRef.current = null;
     }
     endsAtRef.current = null;
     expiredRef.current = false;
@@ -98,6 +121,9 @@ export function useTimer({ onExpire, isCommissioner }: UseTimerOptions) {
     return () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
+      }
+      if (graceTimeoutRef.current !== null) {
+        clearTimeout(graceTimeoutRef.current);
       }
     };
   }, []);
