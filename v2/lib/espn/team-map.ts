@@ -107,18 +107,28 @@ export function resolveEspnTeam(espnName: string): number | null {
 
 /**
  * Map ESPN round headline text to our round keys.
- * ESPN headline format: "NCAA Men's Basketball Championship - West Region - First Round"
+ * ESPN headline format: "NCAA Men's Basketball Championship - West Region - 1st Round"
+ *
+ * CRITICAL: Check specific round labels BEFORE "championship" because the tournament
+ * name itself contains "Championship" in every headline. ESPN uses both "First Round"
+ * and "1st Round" formats depending on the year.
  */
 export function resolveEspnRound(headline: string): string | null {
   const lower = headline.toLowerCase();
 
-  if (lower.includes('first four')) return null; // Play-in, not tracked as a round
-  if (lower.includes('first round')) return 'r32';
-  if (lower.includes('second round')) return 's16';
+  // Play-in games — skip
+  if (lower.includes('first four')) return null;
+
+  // Specific round labels (check these BEFORE "championship")
+  if (lower.includes('1st round') || lower.includes('first round')) return 'r32';
+  if (lower.includes('2nd round') || lower.includes('second round')) return 's16';
   if (lower.includes('sweet 16') || lower.includes('regional semifinal')) return 'e8';
   if (lower.includes('elite eight') || lower.includes('elite 8') || lower.includes('regional final')) return 'f4';
   if (lower.includes('final four') || lower.includes('national semifinal')) return 'f2';
-  if (lower.includes('championship') || lower.includes('national championship')) return 'champ';
+
+  // Championship game — ONLY match "national championship" (the final game),
+  // NOT the tournament name "NCAA Men's Basketball Championship"
+  if (lower.includes('national championship')) return 'champ';
 
   return null;
 }
