@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
   if (isPublic) {
     if (user && (path === '/login' || path === '/register')) {
       const url = request.nextUrl.clone()
-      url.pathname = '/auction'
+      url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
     return supabaseResponse

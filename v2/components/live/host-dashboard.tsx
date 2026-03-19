@@ -138,7 +138,7 @@ function SessionCard({
             className={`rounded-lg p-2 transition-all ${
               copied
                 ? 'text-emerald-400'
-                : 'text-white/20 opacity-0 hover:bg-white/[0.06] hover:text-white/50 group-hover:opacity-100'
+                : 'text-white/20 sm:opacity-0 hover:bg-white/[0.06] hover:text-white/50 sm:group-hover:opacity-100'
             }`}
             title={copied ? 'Copied!' : 'Copy join link'}
           >
@@ -156,7 +156,7 @@ function SessionCard({
               e.stopPropagation();
               onLeave(session);
             }}
-            className="rounded-lg p-2 text-white/20 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+            className="rounded-lg p-2 text-white/20 sm:opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 sm:group-hover:opacity-100"
             title="Leave auction"
           >
             <LogOut className="size-4" />
@@ -169,7 +169,7 @@ function SessionCard({
               e.stopPropagation();
               onDelete(session);
             }}
-            className="rounded-lg p-2 text-white/20 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+            className="rounded-lg p-2 text-white/20 sm:opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 sm:group-hover:opacity-100"
             title="Delete session"
           >
             <Trash2 className="size-4" />

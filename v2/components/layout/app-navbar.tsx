@@ -6,10 +6,11 @@ import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { logout } from '@/actions/auth'
 import Image from 'next/image'
-import { Menu, X, TrendingUp, User, LogOut, Radio } from 'lucide-react'
+import { Menu, X, TrendingUp, User, LogOut, Radio, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_LINKS = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Strategy', href: '/auction', icon: TrendingUp },
   { label: 'Host', href: '/host', icon: Radio },
   { label: 'Profile', href: '/profile', icon: User },
@@ -23,7 +24,7 @@ export function AppNavbar() {
     <nav className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between px-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2">
           <Image src="/brand/calcutta_edge_180x180.png" alt="Calcutta Edge" width={28} height={28} className="rounded" priority />
           <span className="text-lg font-bold tracking-tight text-white">Calcutta Edge</span>
         </Link>

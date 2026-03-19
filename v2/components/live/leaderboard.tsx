@@ -195,9 +195,23 @@ export function Leaderboard({
                             className="border-b border-white/[0.02] last:border-0"
                           >
                             <td className="px-3 py-1.5">
-                              <span className="text-white/30">({team.seed}) </span>
-                              <span className="text-white/70">{team.teamName}</span>
-                              <span className="ml-1 text-white/15">{team.group}</span>
+                              <div>
+                                <span className="text-white/30">({team.seed}) </span>
+                                <span className="text-white/70">{team.teamName}</span>
+                                <span className="ml-1 text-white/15">{team.group}</span>
+                              </div>
+                              {team.roundsWon.length > 0 && (
+                                <div className="flex gap-1 mt-0.5">
+                                  {team.roundsWon.map((rk) => (
+                                    <span
+                                      key={rk}
+                                      className="rounded bg-emerald-500/10 px-1 py-px text-[9px] font-medium text-emerald-400/70"
+                                    >
+                                      {config.rounds.find((r) => r.key === rk)?.label ?? rk} ✓
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td className="px-3 py-1.5 text-center">
                               {team.status === 'champion' && (
@@ -261,10 +275,22 @@ export function Leaderboard({
       </div>
 
       {entries.length === 0 && (
-        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] py-8 text-center">
-          <p className="text-sm text-white/30">
-            Leaderboard will update as tournament results are entered.
-          </p>
+        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] py-8 text-center space-y-2">
+          {results.length === 0 ? (
+            <>
+              <p className="text-sm text-white/40">No game results synced yet.</p>
+              <p className="text-xs text-white/25">
+                Click the <span className="text-emerald-400 font-medium">Sync ESPN</span> button above to pull the latest scores.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-white/40">Games in progress</p>
+              <p className="text-xs text-white/25">
+                Payouts will appear as each round completes. Sync ESPN to get the latest results.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>

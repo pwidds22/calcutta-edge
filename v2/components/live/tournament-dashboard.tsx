@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
@@ -88,6 +88,19 @@ export function TournamentDashboard({
       setTimeout(() => setSyncMessage(null), 4000);
     }
   }, [sessionId]);
+
+  // Auto-sync ESPN on first visit if no results exist yet
+  const hasAutoSynced = useRef(false);
+  useEffect(() => {
+    if (
+      !hasAutoSynced.current &&
+      config.id === 'march_madness_2026' &&
+      initialResults.length === 0
+    ) {
+      hasAutoSynced.current = true;
+      handleEspnSync();
+    }
+  }, [config.id, initialResults.length, handleEspnSync]);
 
   // Handle prop result updates (from broadcast or local save)
   const handlePropResultUpdate = useCallback(

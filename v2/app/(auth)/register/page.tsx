@@ -9,7 +9,7 @@ export default async function RegisterPage() {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect('/auction')
+    redirect('/dashboard')
   }
 
   return <RegisterForm />

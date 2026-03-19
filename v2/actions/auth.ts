@@ -18,7 +18,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/auction')
+  redirect('/dashboard')
 }
 
 export async function signup(formData: FormData) {
@@ -47,7 +47,7 @@ export async function signup(formData: FormData) {
   sendWelcomeEmail(email).catch(() => {});
 
   revalidatePath('/', 'layout')
-  redirect('/auction')
+  redirect('/dashboard')
 }
 
 export async function resetPassword(formData: FormData) {
