@@ -144,7 +144,6 @@ function LeagueCard({ session }: { session: DashboardSession }) {
 }
 
 function AliveTeamRow({ team }: { team: DashboardTeam }) {
-  const teamPL = team.earnings - team.purchasePrice;
   return (
     <Link
       href={`/live/${team.leagueId}`}
@@ -161,31 +160,37 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
             <span className="text-white/30">({team.seed})</span> {team.teamName}
             <span className="ml-1 text-white/15">{team.group}</span>
           </p>
-          <p className="text-[10px] text-white/20">{team.leagueName}</p>
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="text-white/20">{team.leagueName}</span>
+            {team.roundsWon.length > 0 && (
+              <div className="flex gap-0.5">
+                {team.roundsWon.map((rk) => (
+                  <span
+                    key={rk}
+                    className="rounded bg-emerald-500/10 px-1 py-px text-[8px] font-medium text-emerald-400/60"
+                  >
+                    {rk.toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        {team.roundsWon.length > 0 && (
-          <div className="flex gap-0.5">
-            {team.roundsWon.map((rk) => (
-              <span
-                key={rk}
-                className="rounded bg-emerald-500/10 px-1 py-px text-[8px] font-medium text-emerald-400/60"
-              >
-                {rk.toUpperCase()}
-              </span>
-            ))}
+      <div className="flex items-center gap-3 flex-shrink-0 ml-2 text-right">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="text-white/30">${team.purchasePrice}</span>
+            {team.earnings > 0 && (
+              <span className="text-emerald-400/70">+${Math.round(team.earnings).toLocaleString()}</span>
+            )}
           </div>
-        )}
-        <span className={`text-xs font-mono ${
-          teamPL > 0
-            ? 'text-emerald-400/70'
-            : teamPL < 0
-              ? 'text-red-400/50'
-              : 'text-white/30'
-        }`}>
-          {teamPL >= 0 ? '+' : ''}${Math.round(teamPL).toLocaleString()}
-        </span>
+          {team.breakEvenRound && team.earnings < team.purchasePrice && (
+            <p className="text-[9px] text-amber-400/40">
+              profit at {team.breakEvenRound}
+            </p>
+          )}
+        </div>
       </div>
     </Link>
   );

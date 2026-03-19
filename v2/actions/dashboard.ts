@@ -14,6 +14,7 @@ export interface DashboardTeam {
   purchasePrice: number;
   earnings: number;
   roundsWon: string[];
+  breakEvenRound: string | null; // First round where cumulative payout > purchase price
   leagueName: string;
   leagueId: string;
 }
@@ -170,6 +171,19 @@ export async function getDashboardData(): Promise<DashboardData> {
         userEliminatedCost += bid.amount;
       }
 
+      // Compute break-even round: first round where cumulative payout exceeds purchase price
+      let breakEvenRound: string | null = null;
+      if (config && payoutRules) {
+        let cumulative = 0;
+        for (const round of config.rounds) {
+          cumulative += actualPot * ((payoutRules[round.key] ?? 0) / 100);
+          if (cumulative >= bid.amount) {
+            breakEvenRound = round.label;
+            break;
+          }
+        }
+      }
+
       const team: DashboardTeam = {
         teamName: baseTeam?.name ?? `Team ${bid.team_id}`,
         seed: baseTeam?.seed ?? 0,
@@ -178,6 +192,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         purchasePrice: bid.amount,
         earnings,
         roundsWon,
+        breakEvenRound,
         leagueName: session.name,
         leagueId: session.id,
       };
