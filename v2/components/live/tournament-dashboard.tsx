@@ -251,7 +251,7 @@ export function TournamentDashboard({
             title="Sync game results from ESPN"
           >
             <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync ESPN'}</span>
+            <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync Scores'}</span>
           </button>
         )}
       </div>

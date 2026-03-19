@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   TrendingUp,
@@ -12,6 +13,7 @@ import {
   XCircle,
   Radio,
   Plus,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DashboardData, DashboardSession, DashboardTeam } from '@/actions/dashboard';
@@ -23,11 +25,39 @@ const statusColors: Record<string, string> = {
   completed: 'bg-white/[0.06] text-white/40',
 };
 
-function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatCard({
+  label,
+  value,
+  color,
+  tooltip,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+  tooltip?: string;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 text-center">
-      <p className="text-[10px] uppercase tracking-wider text-white/30">{label}</p>
+    <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+      <div className="flex items-center justify-center gap-1">
+        <p className="text-[10px] uppercase tracking-wider text-white/30">{label}</p>
+        {tooltip && (
+          <button
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+            onClick={() => setShowTooltip(!showTooltip)}
+            className="text-white/20 hover:text-white/40"
+          >
+            <Info className="size-3" />
+          </button>
+        )}
+      </div>
       <p className={`mt-1 text-xl font-bold ${color ?? 'text-white'}`}>{value}</p>
+      {showTooltip && tooltip && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-10 w-56 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-[11px] text-white/60 shadow-xl">
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
@@ -71,11 +101,20 @@ function LeagueCard({ session }: { session: DashboardSession }) {
           <span className="font-mono">Pot: ${session.potSize.toLocaleString()}</span>
           {session.userTeamsCount > 0 && (
             <span>
-              {session.userTeamsCount} team{session.userTeamsCount !== 1 ? 's' : ''}{' '}
-              {session.status === 'completed' && session.userTeamsAlive > 0 && (
-                <span className="text-emerald-400/60">
-                  · {session.userTeamsAlive} alive
-                </span>
+              {session.userTeamsCount} team{session.userTeamsCount !== 1 ? 's' : ''}
+              {session.status === 'completed' && (
+                <>
+                  {session.userTeamsAlive > 0 && (
+                    <span className="text-emerald-400/60">
+                      {' '}· {session.userTeamsAlive} alive
+                    </span>
+                  )}
+                  {session.userTeamsEliminated > 0 && (
+                    <span className="text-red-400/50">
+                      {' '}· {session.userTeamsEliminated} out
+                    </span>
+                  )}
+                </>
               )}
             </span>
           )}
@@ -94,7 +133,7 @@ function LeagueCard({ session }: { session: DashboardSession }) {
               {session.userNetPL >= 0 ? '+' : ''}${Math.round(session.userNetPL).toLocaleString()}
             </div>
             <p className="text-[10px] text-white/20">
-              spent ${session.userTotalSpent.toLocaleString()}
+              bought in ${session.userTotalSpent.toLocaleString()}
             </p>
           </div>
         )}
@@ -105,6 +144,7 @@ function LeagueCard({ session }: { session: DashboardSession }) {
 }
 
 function AliveTeamRow({ team }: { team: DashboardTeam }) {
+  const teamPL = team.earnings - team.purchasePrice;
   return (
     <Link
       href={`/live/${team.leagueId}`}
@@ -137,11 +177,15 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
             ))}
           </div>
         )}
-        {team.earnings > 0 && (
-          <span className="text-xs font-mono text-emerald-400/70">
-            +${Math.round(team.earnings).toLocaleString()}
-          </span>
-        )}
+        <span className={`text-xs font-mono ${
+          teamPL > 0
+            ? 'text-emerald-400/70'
+            : teamPL < 0
+              ? 'text-red-400/50'
+              : 'text-white/30'
+        }`}>
+          {teamPL >= 0 ? '+' : ''}${Math.round(teamPL).toLocaleString()}
+        </span>
       </div>
     </Link>
   );
@@ -152,6 +196,8 @@ export function UserDashboard({ data }: { data: DashboardData }) {
   const completedSessions = sessions.filter((s) => s.status === 'completed');
   const activeSessions = sessions.filter((s) => s.status !== 'completed');
   const hasAnyBids = sessions.some((s) => s.userTeamsCount > 0);
+  const totalAlive = sessions.reduce((s, d) => s + d.userTeamsAlive, 0);
+  const totalEliminated = sessions.reduce((s, d) => s + d.userTeamsEliminated, 0);
 
   return (
     <div className="space-y-8">
@@ -184,21 +230,30 @@ export function UserDashboard({ data }: { data: DashboardData }) {
 
       {/* Summary stats (only if user has bids) */}
       {hasAnyBids && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
-            label="Total Spent"
+            label="Buy-In"
             value={`$${totalPotExposure.toLocaleString()}`}
             color="text-white/70"
+            tooltip="Total amount you spent acquiring teams across all leagues."
           />
           <StatCard
-            label="Total Earned"
+            label="Earned"
             value={`$${Math.round(totalEarned).toLocaleString()}`}
             color="text-emerald-400"
+            tooltip="Cumulative payouts from all rounds your teams have won. Each round adds to the total."
           />
           <StatCard
             label="Net P&L"
             value={`${totalNetPL >= 0 ? '+' : ''}$${Math.round(totalNetPL).toLocaleString()}`}
             color={totalNetPL > 0 ? 'text-emerald-400' : totalNetPL < 0 ? 'text-red-400' : 'text-white/40'}
+            tooltip="Earnings minus cost of eliminated teams. Alive teams aren't counted as losses — they still have a chance to earn."
+          />
+          <StatCard
+            label="Teams"
+            value={`${totalAlive} / ${totalAlive + totalEliminated}`}
+            color="text-white"
+            tooltip={`${totalAlive} alive, ${totalEliminated} eliminated across all leagues.`}
           />
         </div>
       )}

@@ -280,14 +280,14 @@ export function Leaderboard({
             <>
               <p className="text-sm text-white/40">No game results synced yet.</p>
               <p className="text-xs text-white/25">
-                Click the <span className="text-emerald-400 font-medium">Sync ESPN</span> button above to pull the latest scores.
+                Click the <span className="text-emerald-400 font-medium">Sync Scores</span> button above to pull the latest scores.
               </p>
             </>
           ) : (
             <>
               <p className="text-sm text-white/40">Games in progress</p>
               <p className="text-xs text-white/25">
-                Payouts will appear as each round completes. Sync ESPN to get the latest results.
+                Payouts will appear as each round completes. Sync Scores to get the latest results.
               </p>
             </>
           )}

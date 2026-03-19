@@ -33,9 +33,11 @@ export interface DashboardSession {
   currentRoundLabel: string | null;
   userTeamsCount: number;
   userTeamsAlive: number;
+  userTeamsEliminated: number;
   userTotalSpent: number;
   userTotalEarned: number;
-  userNetPL: number;
+  userEliminatedCost: number;
+  userNetPL: number; // earnings - eliminated teams cost (alive teams don't count as losses)
   userTeams: DashboardTeam[];
 }
 
@@ -142,6 +144,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     let userTotalEarned = 0;
     let userTotalSpent = 0;
     let userTeamsAlive = 0;
+    let userTeamsEliminated = 0;
+    let userEliminatedCost = 0;
 
     for (const bid of userBids) {
       const baseTeam = teams?.find((t) => t.id === bid.team_id);
@@ -159,7 +163,12 @@ export async function getDashboardData(): Promise<DashboardData> {
       }
 
       userTotalEarned += earnings;
-      if (status === 'alive' || status === 'champion') userTeamsAlive++;
+      if (status === 'alive' || status === 'champion') {
+        userTeamsAlive++;
+      } else if (status === 'eliminated') {
+        userTeamsEliminated++;
+        userEliminatedCost += bid.amount;
+      }
 
       const team: DashboardTeam = {
         teamName: baseTeam?.name ?? `Team ${bid.team_id}`,
@@ -211,21 +220,24 @@ export async function getDashboardData(): Promise<DashboardData> {
       currentRoundLabel,
       userTeamsCount: userBids.length,
       userTeamsAlive,
+      userTeamsEliminated,
       userTotalSpent,
       userTotalEarned,
-      userNetPL: userTotalEarned - userTotalSpent,
+      userEliminatedCost,
+      userNetPL: userTotalEarned - userEliminatedCost, // Only count eliminated teams as losses
       userTeams,
     });
   }
 
   const totalPotExposure = dashboardSessions.reduce((s, d) => s + d.userTotalSpent, 0);
   const totalEarned = dashboardSessions.reduce((s, d) => s + d.userTotalEarned, 0);
+  const totalEliminatedCost = dashboardSessions.reduce((s, d) => s + d.userEliminatedCost, 0);
 
   return {
     sessions: dashboardSessions,
     totalPotExposure,
     totalEarned,
-    totalNetPL: totalEarned - totalPotExposure,
+    totalNetPL: totalEarned - totalEliminatedCost,
     aliveTeams: allAliveTeams,
   };
 }
