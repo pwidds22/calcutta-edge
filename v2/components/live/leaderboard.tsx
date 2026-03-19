@@ -17,6 +17,11 @@ import {
   XCircle,
 } from 'lucide-react';
 
+/** Format a dollar amount — show cents only when not a whole number */
+function fmt(n: number): string {
+  return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2);
+}
+
 interface LeaderboardProps {
   soldTeams: SoldTeam[];
   baseTeams: BaseTeam[];
@@ -85,7 +90,7 @@ export function Leaderboard({
             Distributed
           </p>
           <p className="mt-1 text-lg font-bold text-emerald-400">
-            ${entries.reduce((s, e) => s + e.totalEarned, 0).toLocaleString()}
+            ${fmt(entries.reduce((s, e) => s + e.totalEarned, 0))}
           </p>
         </div>
       </div>
@@ -158,10 +163,10 @@ export function Leaderboard({
                     <div className="text-right">
                       <div className={`flex items-center gap-1 text-sm font-mono font-medium ${plColor}`}>
                         <PlIcon className="size-3" />
-                        {entry.netPL >= 0 ? '+' : ''}${Math.round(entry.netPL).toLocaleString()}
+                        {entry.netPL >= 0 ? '+' : ''}${fmt(entry.netPL)}
                       </div>
                       <p className="text-[10px] text-white/20">
-                        earned ${Math.round(entry.totalEarned).toLocaleString()} · spent ${entry.totalSpent.toLocaleString()}
+                        earned ${fmt(entry.totalEarned)} · spent ${entry.totalSpent.toLocaleString()}
                       </p>
                     </div>
                     {isExpanded ? (
@@ -237,7 +242,7 @@ export function Leaderboard({
                               ${team.purchasePrice.toLocaleString()}
                             </td>
                             <td className="px-3 py-1.5 text-right font-mono text-emerald-400/70">
-                              ${Math.round(team.earnings).toLocaleString()}
+                              ${fmt(team.earnings)}
                             </td>
                             <td
                               className={`px-3 py-1.5 text-right font-mono font-medium ${
@@ -248,7 +253,7 @@ export function Leaderboard({
                                     : 'text-white/30'
                               }`}
                             >
-                              {teamPL >= 0 ? '+' : ''}${Math.round(teamPL).toLocaleString()}
+                              {teamPL >= 0 ? '+' : ''}${fmt(teamPL)}
                             </td>
                           </tr>
                         );
@@ -262,7 +267,7 @@ export function Leaderboard({
                       {entry.propEarnings.map((pe) => (
                         <div key={pe.propKey} className="flex items-center justify-between text-xs py-0.5">
                           <span className="text-amber-400/70">{pe.propLabel}</span>
-                          <span className="font-mono text-emerald-400/70">+${Math.round(pe.amount).toLocaleString()}</span>
+                          <span className="font-mono text-emerald-400/70">+${fmt(pe.amount)}</span>
                         </div>
                       ))}
                     </div>

@@ -64,7 +64,7 @@ export function calculateActualSettlement(
     name: entry.participantName,
     totalSpent: entry.totalSpent,
     totalEarned: entry.totalEarned,
-    netBalance: entry.totalEarned - entry.totalSpent,
+    netBalance: entry.netPL, // Uses eliminated-cost-only P&L from calculateLeaderboard
   }));
 
   // Sort by netBalance ascending (biggest debtors first)

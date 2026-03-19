@@ -204,6 +204,7 @@ export function calculateLeaderboard(
   for (const [participantId, { name, teams }] of byParticipant) {
     const totalSpent = teams.reduce((sum, t) => sum + t.amount, 0);
     let totalEarned = 0;
+    let eliminatedCost = 0;
     let teamsAlive = 0;
     let teamsEliminated = 0;
     const teamResults: TeamResult[] = [];
@@ -218,8 +219,11 @@ export function calculateLeaderboard(
       const earnings = calculateTeamEarnings(roundsWon, actualPot, payoutRules);
       totalEarned += earnings;
 
-      if (status === 'alive') teamsAlive++;
-      if (status === 'eliminated') teamsEliminated++;
+      if (status === 'alive' || status === 'champion') teamsAlive++;
+      if (status === 'eliminated') {
+        teamsEliminated++;
+        eliminatedCost += sold.amount;
+      }
 
       teamResults.push({
         teamId: sold.teamId,
@@ -255,7 +259,7 @@ export function calculateLeaderboard(
       participantName: name,
       totalSpent,
       totalEarned,
-      netPL: totalEarned - totalSpent,
+      netPL: totalEarned - eliminatedCost, // Only count eliminated teams as losses
       teamsOwned: teams.length,
       teamsAlive,
       teamsEliminated,

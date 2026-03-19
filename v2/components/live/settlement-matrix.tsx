@@ -12,6 +12,11 @@ import {
 } from '@/lib/auction/live/debt-simplification';
 import { ArrowRight, CheckCircle2, DollarSign, AlertTriangle, Check } from 'lucide-react';
 
+/** Format a dollar amount — show cents only when not a whole number */
+function fmt(n: number): string {
+  return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2);
+}
+
 interface SettlementMatrixProps {
   sessionId: string;
   soldTeams: SoldTeam[];
@@ -72,7 +77,7 @@ export function SettlementMatrix({
         <StatCard label="Pot" value={`$${settlement.actualPot.toLocaleString()}`} />
         <StatCard
           label="Distributed"
-          value={`$${Math.round(settlement.totalDistributed).toLocaleString()}`}
+          value={`$${fmt(settlement.totalDistributed)}`}
         />
         <StatCard
           label="Transactions"
@@ -111,7 +116,7 @@ export function SettlementMatrix({
               <div className="text-right">
                 <div className="flex items-center gap-4 text-xs text-white/30">
                   <span>Spent: ${b.totalSpent.toLocaleString()}</span>
-                  <span>Earned: ${Math.round(b.totalEarned).toLocaleString()}</span>
+                  <span>Earned: ${fmt(b.totalEarned)}</span>
                 </div>
                 <p
                   className={`text-sm font-mono font-medium ${
@@ -122,7 +127,7 @@ export function SettlementMatrix({
                         : 'text-white/40'
                   }`}
                 >
-                  {b.netBalance >= 0 ? '+' : ''}${Math.round(b.netBalance).toLocaleString()}
+                  {b.netBalance >= 0 ? '+' : ''}${fmt(b.netBalance)}
                 </p>
               </div>
             </div>
@@ -270,7 +275,7 @@ function PaymentRow({
           <span className={`text-sm font-mono font-medium ${
             isPaid ? 'text-emerald-400/40' : 'text-emerald-400'
           }`}>
-            {Math.round(payment.amount).toLocaleString()}
+            {fmt(payment.amount)}
           </span>
         </div>
         <ArrowRight className={`size-3.5 ${isPaid ? 'text-white/15' : 'text-white/30'}`} />
