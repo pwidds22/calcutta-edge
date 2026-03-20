@@ -181,6 +181,10 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 - **Reach-round devigging needs expectedWinners**: 16 teams reach S16, 8 reach E8, etc. — outright normalization to sum=1 is wrong for reach markets. Use `devigOutright(odds, expectedWinners)`
 - **DK R32 odds are game moneylines, not futures**: Must devig as matchup pairs, not outright across 68 teams
 - **npm install on Windows breaks native modules**: `npm install resend` displaced `lightningcss-win32-x64-msvc.node`. Fix: `cp node_modules/lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node node_modules/lightningcss/` and clear `.next` cache
+- **Always verify session ownership before DB edits**: Check `commissioner_id` → `profiles.email` before modifying any session data. Easy to change the wrong auction.
+- **`bidder_id` in `auction_bids` is `auth.users.id`**, NOT `auction_participants.id`: JOINs must match against `user_id` on participants, not the participant `id` PK.
+- **`TournamentConfig` has no `teams` field**: Teams live on `TournamentEntry` (from `getTournament()`). Use `tournament.teams`, not `config.teams`.
+- **Duplicate winning bids possible**: `sellTeam()` can create duplicate `is_winning_bid=true` rows on undo/redo. Consider unique partial index: `CREATE UNIQUE INDEX ON auction_bids (session_id, team_id) WHERE is_winning_bid = true`
 
 ## Session Notes (2026-03-17 Evening — Marketing Launch)
 
@@ -279,3 +283,32 @@ Still live on Render at the repo root. Node.js + Express + MongoDB + JWT auth + 
 5. **Edit auction settings post-creation**
 6. **Stripe `client_reference_id`** — payment attribution
 7. **Decimal payout percentages**
+
+## Session Notes (2026-03-19 — Round Labels + Bundle Price Fix)
+
+### Completed (2026-03-19)
+- **Round label clarity overhaul** — added `gameLabel` field to `RoundConfig` (`v2/lib/tournaments/types.ts`) to distinguish between milestone labels (R32 = "advanced TO R32") and game labels (R64 = "lost IN R64")
+  - Leaderboard "Current Round" now shows game round (`v2/components/live/leaderboard.tsx:84`)
+  - Results entry tabs show game round labels (`v2/components/live/results-entry.tsx:111`)
+  - Dashboard current round uses gameLabel (`v2/actions/dashboard.ts:217`)
+  - Dashboard roundsWon badges show proper labels with ✓ (`v2/components/dashboard/user-dashboard.tsx:172`)
+  - Elimination badges already used gameLabel (verified correct)
+  - Strategy page "Profit If Team Advances To" + milestone labels verified correct (`v2/components/auction/team-table.tsx:184`)
+  - All 6 tournament configs already had `gameLabel` populated
+  - Commit: `2982939`
+- **Bundle price splitting bug fix** — first team in a bundle kept full bundle price instead of split amount (`v2/actions/bidding.ts`)
+  - `sellTeam()` now updates first team's bid `amount` to `splitAmount + remainder` (line ~430)
+  - `autoAdvance()` same fix applied (line ~1005)
+  - Fixed 21 affected bid rows across all 5 completed sessions via direct SQL UPDATE
+  - Example: $4 bid on 4-team bundle showed $4+$1+$1+$1=$7, now correctly shows $1+$1+$1+$1=$4
+  - Commit: `efaa8cd`
+
+### Anti-Patterns Learned
+- **Bundle sell marks original bid as winning without updating amount**: The `is_winning_bid=true` UPDATE on the first team's bid row must ALSO update `amount` to the split value. Otherwise the first team keeps the full bundle price while other teams get correct split amounts via INSERT.
+- **`gameLabel` vs `label` on RoundConfig**: `label` = milestone (R32 = "advanced TO"), `gameLabel` = game round (R64 = "lost IN"). Use `gameLabel` for eliminations, current round, and results entry. Use `label` for advancement badges, strategy columns, and break-even display.
+
+### Next Steps (Priority Order)
+1. **Custom bundles** — commissioner-defined team groupings
+2. **Edit auction settings post-creation**
+3. **Stripe `client_reference_id`** — payment attribution
+4. **Decimal payout percentages**
