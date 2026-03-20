@@ -184,6 +184,11 @@ export async function getDashboardData(): Promise<DashboardData> {
         }
       }
 
+      // Convert round keys to display labels (milestone names)
+      const roundsWonLabels = config
+        ? roundsWon.map((rk) => config.rounds.find((r) => r.key === rk)?.label ?? rk)
+        : roundsWon;
+
       const team: DashboardTeam = {
         teamName: baseTeam?.name ?? `Team ${bid.team_id}`,
         seed: baseTeam?.seed ?? 0,
@@ -191,7 +196,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         status,
         purchasePrice: bid.amount,
         earnings,
-        roundsWon,
+        roundsWon: roundsWonLabels,
         breakEvenRound,
         leagueName: session.name,
         leagueId: session.id,
@@ -214,7 +219,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         });
         if (!hasAllResults) {
           currentRound = round.key;
-          currentRoundLabel = round.label;
+          currentRoundLabel = round.gameLabel ?? round.label;
           break;
         }
       }

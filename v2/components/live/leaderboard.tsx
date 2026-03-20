@@ -81,7 +81,10 @@ export function Leaderboard({
             {isTournamentComplete
               ? 'Complete'
               : currentRound
-                ? config.rounds.find((r) => r.key === currentRound)?.label ?? currentRound
+                ? (() => {
+                    const r = config.rounds.find((r) => r.key === currentRound);
+                    return r?.gameLabel ?? r?.label ?? currentRound;
+                  })()
                 : '—'}
           </p>
         </div>
@@ -229,14 +232,17 @@ export function Leaderboard({
                                   <CheckCircle2 className="size-3" /> Alive
                                 </span>
                               )}
-                              {team.status === 'eliminated' && (
-                                <span className="inline-flex items-center gap-0.5 text-red-400/60">
-                                  <XCircle className="size-3" />{' '}
-                                  {config.rounds.find(
-                                    (r) => r.key === team.eliminatedInRound
-                                  )?.label ?? team.eliminatedInRound}
-                                </span>
-                              )}
+                              {team.status === 'eliminated' && (() => {
+                                const round = config.rounds.find(
+                                  (r) => r.key === team.eliminatedInRound
+                                );
+                                return (
+                                  <span className="inline-flex items-center gap-0.5 text-red-400/60">
+                                    <XCircle className="size-3" />{' '}
+                                    {round?.gameLabel ?? round?.label ?? team.eliminatedInRound}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-3 py-1.5 text-right font-mono text-white/40">
                               ${team.purchasePrice.toLocaleString()}

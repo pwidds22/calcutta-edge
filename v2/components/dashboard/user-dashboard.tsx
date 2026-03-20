@@ -169,7 +169,7 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
                     key={rk}
                     className="rounded bg-emerald-500/10 px-1 py-px text-[8px] font-medium text-emerald-400/60"
                   >
-                    {rk.toUpperCase()}
+                    {rk} ✓
                   </span>
                 ))}
               </div>

@@ -108,7 +108,7 @@ export function ResultsEntry({
             >
               {completion === 'complete' && <CheckCircle2 className="size-3" />}
               {completion === 'partial' && <Clock className="size-3" />}
-              {round.label}
+              {round.gameLabel ?? round.label}
             </button>
           );
         })}

@@ -11,9 +11,15 @@ export type DevigStrategy = 'bracket' | 'global' | 'group' | 'none';
 
 export interface RoundConfig {
   key: RoundKey;
+  /** Milestone label — the round teams advance TO (e.g., "R32", "S16") */
   label: string;
   teamsAdvancing: number;
+  /** Verbose milestone name (e.g., "Round of 32", "Sweet 16") */
   payoutLabel: string;
+  /** The actual game round name — where teams play IN (e.g., "R64", "R32").
+   *  Used for elimination badges: "⊗ R64" means lost in the Round of 64.
+   *  If omitted, falls back to `label`. */
+  gameLabel?: string;
 }
 
 export interface GroupConfig {

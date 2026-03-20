@@ -5,10 +5,10 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
   name: 'NFL Season 2026-27',
   sport: 'nfl',
   rounds: [
-    { key: 'playoffBerth', label: 'Playoff', teamsAdvancing: 14, payoutLabel: 'Make Playoffs' },
-    { key: 'divisionWinner', label: 'DivWin', teamsAdvancing: 8, payoutLabel: 'Win Division' },
-    { key: 'conferenceChamp', label: 'ConfW', teamsAdvancing: 2, payoutLabel: 'Win Conference' },
-    { key: 'superBowl', label: 'SB', teamsAdvancing: 1, payoutLabel: 'Win Super Bowl' },
+    { key: 'playoffBerth', label: 'Playoff', teamsAdvancing: 14, payoutLabel: 'Make Playoffs', gameLabel: 'Season' },
+    { key: 'divisionWinner', label: 'DivWin', teamsAdvancing: 8, payoutLabel: 'Win Division', gameLabel: 'Season' },
+    { key: 'conferenceChamp', label: 'ConfW', teamsAdvancing: 2, payoutLabel: 'Win Conference', gameLabel: 'Conf Champ' },
+    { key: 'superBowl', label: 'SB', teamsAdvancing: 1, payoutLabel: 'Win Super Bowl', gameLabel: 'Super Bowl' },
   ],
   groups: [
     { key: 'AFC_East', label: 'AFC East' },

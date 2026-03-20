@@ -5,9 +5,9 @@ export const KENTUCKY_DERBY_2026_CONFIG: TournamentConfig = {
   name: 'Kentucky Derby 2026',
   sport: 'horse_racing',
   rounds: [
-    { key: 'show', label: 'Show', teamsAdvancing: 3, payoutLabel: 'Show (Top 3)' },
-    { key: 'place', label: 'Place', teamsAdvancing: 2, payoutLabel: 'Place (Top 2)' },
-    { key: 'win', label: 'Win', teamsAdvancing: 1, payoutLabel: 'Win' },
+    { key: 'show', label: 'Show', teamsAdvancing: 3, payoutLabel: 'Show (Top 3)', gameLabel: 'Race' },
+    { key: 'place', label: 'Place', teamsAdvancing: 2, payoutLabel: 'Place (Top 2)', gameLabel: 'Race' },
+    { key: 'win', label: 'Win', teamsAdvancing: 1, payoutLabel: 'Win', gameLabel: 'Race' },
   ],
   groups: [
     { key: 'favorites', label: 'Favorites' },

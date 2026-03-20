@@ -5,10 +5,10 @@ export const NFL_PLAYOFFS_2026_CONFIG: TournamentConfig = {
   name: 'NFL Playoffs 2026',
   sport: 'nfl',
   rounds: [
-    { key: 'wildcard', label: 'WC', teamsAdvancing: 8, payoutLabel: 'Win Wild Card' },
-    { key: 'divisional', label: 'Div', teamsAdvancing: 4, payoutLabel: 'Win Divisional' },
-    { key: 'conference', label: 'Conf', teamsAdvancing: 2, payoutLabel: 'Win Conference' },
-    { key: 'superBowl', label: 'SB', teamsAdvancing: 1, payoutLabel: 'Win Super Bowl' },
+    { key: 'wildcard', label: 'WC', teamsAdvancing: 8, payoutLabel: 'Win Wild Card', gameLabel: 'Wild Card' },
+    { key: 'divisional', label: 'Div', teamsAdvancing: 4, payoutLabel: 'Win Divisional', gameLabel: 'Divisional' },
+    { key: 'conference', label: 'Conf', teamsAdvancing: 2, payoutLabel: 'Win Conference', gameLabel: 'Conference' },
+    { key: 'superBowl', label: 'SB', teamsAdvancing: 1, payoutLabel: 'Win Super Bowl', gameLabel: 'Super Bowl' },
   ],
   groups: [
     { key: 'AFC', label: 'AFC' },

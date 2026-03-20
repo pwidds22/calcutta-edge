@@ -5,12 +5,12 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
   name: 'FIFA World Cup 2026',
   sport: 'soccer',
   rounds: [
-    { key: 'groupStage', label: 'Group', teamsAdvancing: 32, payoutLabel: 'Advance from Group' },
-    { key: 'r32', label: 'R32', teamsAdvancing: 16, payoutLabel: 'Win Round of 32' },
-    { key: 'r16', label: 'R16', teamsAdvancing: 8, payoutLabel: 'Win Round of 16' },
-    { key: 'qf', label: 'QF', teamsAdvancing: 4, payoutLabel: 'Win Quarterfinal' },
-    { key: 'sf', label: 'SF', teamsAdvancing: 2, payoutLabel: 'Win Semifinal' },
-    { key: 'champion', label: 'Final', teamsAdvancing: 1, payoutLabel: 'Win Final' },
+    { key: 'groupStage', label: 'Group', teamsAdvancing: 32, payoutLabel: 'Advance from Group', gameLabel: 'Groups' },
+    { key: 'r32', label: 'R32', teamsAdvancing: 16, payoutLabel: 'Win Round of 32', gameLabel: 'R32' },
+    { key: 'r16', label: 'R16', teamsAdvancing: 8, payoutLabel: 'Win Round of 16', gameLabel: 'R16' },
+    { key: 'qf', label: 'QF', teamsAdvancing: 4, payoutLabel: 'Win Quarterfinal', gameLabel: 'QF' },
+    { key: 'sf', label: 'SF', teamsAdvancing: 2, payoutLabel: 'Win Semifinal', gameLabel: 'SF' },
+    { key: 'champion', label: 'Final', teamsAdvancing: 1, payoutLabel: 'Win Final', gameLabel: 'Final' },
   ],
   groups: [
     { key: 'A', label: 'Group A' },

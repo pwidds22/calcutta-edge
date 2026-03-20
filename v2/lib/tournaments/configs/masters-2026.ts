@@ -5,11 +5,11 @@ export const MASTERS_2026_CONFIG: TournamentConfig = {
   name: 'The Masters 2026',
   sport: 'golf',
   rounds: [
-    { key: 'makeCut', label: 'Cut', teamsAdvancing: 50, payoutLabel: 'Make the Cut' },
-    { key: 'top20', label: 'T20', teamsAdvancing: 20, payoutLabel: 'Top 20' },
-    { key: 'top10', label: 'T10', teamsAdvancing: 10, payoutLabel: 'Top 10' },
-    { key: 'top5', label: 'T5', teamsAdvancing: 5, payoutLabel: 'Top 5' },
-    { key: 'winner', label: 'Win', teamsAdvancing: 1, payoutLabel: 'Winner' },
+    { key: 'makeCut', label: 'Cut', teamsAdvancing: 50, payoutLabel: 'Make the Cut', gameLabel: 'Cut' },
+    { key: 'top20', label: 'T20', teamsAdvancing: 20, payoutLabel: 'Top 20', gameLabel: 'Top 20' },
+    { key: 'top10', label: 'T10', teamsAdvancing: 10, payoutLabel: 'Top 10', gameLabel: 'Top 10' },
+    { key: 'top5', label: 'T5', teamsAdvancing: 5, payoutLabel: 'Top 5', gameLabel: 'Top 5' },
+    { key: 'winner', label: 'Win', teamsAdvancing: 1, payoutLabel: 'Winner', gameLabel: 'Final' },
   ],
   groups: [
     { key: 'favorites', label: 'Favorites' },

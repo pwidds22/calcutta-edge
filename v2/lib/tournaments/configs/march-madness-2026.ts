@@ -5,12 +5,12 @@ export const MARCH_MADNESS_2026_CONFIG: TournamentConfig = {
   name: 'March Madness 2026',
   sport: 'ncaa_basketball',
   rounds: [
-    { key: 'r32', label: 'R32', teamsAdvancing: 32, payoutLabel: 'Round of 32' },
-    { key: 's16', label: 'S16', teamsAdvancing: 16, payoutLabel: 'Sweet 16' },
-    { key: 'e8', label: 'E8', teamsAdvancing: 8, payoutLabel: 'Elite 8' },
-    { key: 'f4', label: 'F4', teamsAdvancing: 4, payoutLabel: 'Final Four' },
-    { key: 'f2', label: 'F2', teamsAdvancing: 2, payoutLabel: 'Championship' },
-    { key: 'champ', label: 'Champ', teamsAdvancing: 1, payoutLabel: 'Winner' },
+    { key: 'r32', label: 'R32', teamsAdvancing: 32, payoutLabel: 'Round of 32', gameLabel: 'R64' },
+    { key: 's16', label: 'S16', teamsAdvancing: 16, payoutLabel: 'Sweet 16', gameLabel: 'R32' },
+    { key: 'e8', label: 'E8', teamsAdvancing: 8, payoutLabel: 'Elite 8', gameLabel: 'S16' },
+    { key: 'f4', label: 'F4', teamsAdvancing: 4, payoutLabel: 'Final Four', gameLabel: 'E8' },
+    { key: 'f2', label: 'F2', teamsAdvancing: 2, payoutLabel: 'Championship', gameLabel: 'F4' },
+    { key: 'champ', label: 'Champ', teamsAdvancing: 1, payoutLabel: 'Winner', gameLabel: 'Final' },
   ],
   groups: [
     { key: 'East', label: 'East' },

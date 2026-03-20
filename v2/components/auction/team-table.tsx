@@ -181,7 +181,7 @@ export function TeamTable() {
                 {config?.teamLabel ?? 'Team'} Info
               </TableHead>
               <TableHead colSpan={rounds.length} className="text-center text-xs font-semibold">
-                Profit After Reaching Round
+                Profit If Team Advances To
               </TableHead>
               <TableHead colSpan={3} className="text-center text-xs font-semibold">
                 Value Info
