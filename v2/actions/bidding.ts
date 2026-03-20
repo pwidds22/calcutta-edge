@@ -427,10 +427,11 @@ export async function sellTeam(sessionId: string) {
     const splitAmount = Math.round(winAmount / bundle.teamIds.length);
     const remainder = winAmount - (splitAmount * bundle.teamIds.length);
 
-    // Bids were tracked against first team — mark winning bid there
+    // Bids were tracked against first team — mark winning bid + update amount to split
+    const firstTeamAmount = splitAmount + remainder;
     await admin
       .from('auction_bids')
-      .update({ is_winning_bid: true })
+      .update({ is_winning_bid: true, amount: firstTeamAmount })
       .eq('session_id', sessionId)
       .eq('team_id', bundle.teamIds[0])
       .eq('bidder_id', winnerId)
@@ -1006,9 +1007,19 @@ export async function autoAdvance(sessionId: string) {
       const splitAmount = Math.round(winAmount / bundleTeamIds.length);
       const remainder = winAmount - (splitAmount * bundleTeamIds.length);
 
+      // Update first team's bid amount from full bundle price to split amount
+      const firstTeamAmount = splitAmount + remainder;
+      await admin
+        .from('auction_bids')
+        .update({ amount: firstTeamAmount })
+        .eq('session_id', sessionId)
+        .eq('team_id', bundleTeamIds[0])
+        .eq('bidder_id', winnerId)
+        .eq('is_winning_bid', true);
+
       for (let i = 0; i < bundleTeamIds.length; i++) {
         const memberTeamId = bundleTeamIds[i];
-        const amount = i === 0 ? splitAmount + remainder : splitAmount;
+        const amount = i === 0 ? firstTeamAmount : splitAmount;
 
         if (i > 0) {
           await admin.from('auction_bids').insert({
