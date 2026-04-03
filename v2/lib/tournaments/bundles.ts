@@ -225,7 +225,8 @@ function bundleGolf(
 export function generateBundles(
   preset: BundlePreset,
   teams: BaseTeam[],
-  config: TournamentConfig
+  config: TournamentConfig,
+  customConfig?: { cutoff: number; groupSize: number }
 ): TeamBundle[] {
   // Golf-specific bundling
   if (config.sport === 'golf') {
@@ -239,6 +240,9 @@ export function generateBundles(
       case 'heavy':
         return bundleGolf(teams, 30, 5);   // Top 30 individual, rest in groups of ~5
       case 'custom':
+        if (customConfig) {
+          return bundleGolf(teams, customConfig.cutoff, customConfig.groupSize);
+        }
         return [];
     }
   }

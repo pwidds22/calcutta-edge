@@ -19,16 +19,26 @@ export const MASTERS_2026_CONFIG: TournamentConfig = {
   ],
   devigStrategy: 'global',
   defaultPayoutRules: {
-    makeCut: 0.20,   // 0.20% each × 50 cut-makers = 10% of pot
-    top20: 0.50,     // 0.50% each × 20 = 10% of pot
-    top10: 1.50,     // 1.50% each × 10 = 15% of pot
-    top5: 4.00,      // 4.00% each × 5  = 20% of pot
-    winner: 45.00,   // 45.00% × 1      = 45% of pot
-    lowRound: 0,     // Total: 100%
+    makeCut: 0.20,     // 0.20% each × 50 cut-makers = 10% of pot
+    top20: 0.50,       // 0.50% each × 20 = 10% of pot
+    top10: 1.50,       // 1.50% each × 10 = 15% of pot
+    top5: 4.00,        // 4.00% each × 5  = 20% of pot
+    winner: 45.00,     // 45.00% × 1      = 45% of pot
+    lowRoundR1: 0,     // Props default to 0% — commissioner enables during session setup
+    lowRoundR2: 0,
+    lowRoundR3: 0,
+    lowRoundR4: 0,
+    worstRound: 0,
+    worstOverall: 0,   // Total: 100% (props are additive when enabled)
   },
   defaultPotSize: 5000,
   propBets: [
-    { key: 'lowRound', label: 'Low Round' },
+    { key: 'lowRoundR1', label: 'Low Round — Thu' },
+    { key: 'lowRoundR2', label: 'Low Round — Fri' },
+    { key: 'lowRoundR3', label: 'Low Round — Sat' },
+    { key: 'lowRoundR4', label: 'Low Round — Sun' },
+    { key: 'worstRound', label: 'Worst Round' },
+    { key: 'worstOverall', label: 'Worst Overall (DFL)' },
   ],
   badge: 'The Masters 2026',
   teamLabel: 'Golfer',

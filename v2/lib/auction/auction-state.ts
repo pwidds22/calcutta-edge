@@ -17,6 +17,11 @@ import { generateBundles } from '@/lib/tournaments/bundles';
 
 // ─── State ───────────────────────────────────────────────────────────
 
+export interface CustomBundleConfig {
+  cutoff: number;    // Top N golfers stay individual
+  groupSize: number; // Remaining golfers grouped in sets of this size
+}
+
 export interface AuctionState {
   teams: Team[];
   payoutRules: PayoutRules;
@@ -25,6 +30,7 @@ export interface AuctionState {
   config: TournamentConfig | null;
   bundles: TeamBundle[];
   bundlePreset: BundlePreset;
+  customBundleConfig: CustomBundleConfig;
   groupFilter: GroupFilter;
   statusFilter: StatusFilter;
   sortOption: SortOption;
@@ -45,6 +51,7 @@ export const INITIAL_STATE: AuctionState = {
   config: null,
   bundles: [],
   bundlePreset: 'none',
+  customBundleConfig: { cutoff: 40, groupSize: 4 },
   groupFilter: 'All',
   statusFilter: 'All',
   sortOption: 'seed',
@@ -70,6 +77,7 @@ export type AuctionAction =
   | { type: 'SET_SORT'; option: SortOption; direction: SortDirection }
   | { type: 'SET_SEARCH_TERM'; term: string }
   | { type: 'SET_BUNDLE_PRESET'; preset: BundlePreset }
+  | { type: 'SET_CUSTOM_BUNDLE_CONFIG'; config: CustomBundleConfig }
   | { type: 'SET_ODDS_SOURCE'; sourceId: string; probabilities: Record<number, Record<string, number>> }
   | { type: 'CLEAR_ALL_PRICES' }
   | { type: 'SET_LEAGUE_NAME'; leagueName: string }
@@ -174,9 +182,16 @@ export function auctionReducer(
 
     case 'SET_BUNDLE_PRESET': {
       const bundles = action.preset !== 'none' && state.config
-        ? generateBundles(action.preset, state.teams, state.config)
+        ? generateBundles(action.preset, state.teams, state.config, state.customBundleConfig)
         : [];
       return { ...state, bundlePreset: action.preset, bundles };
+    }
+
+    case 'SET_CUSTOM_BUNDLE_CONFIG': {
+      const bundles = state.bundlePreset === 'custom' && state.config
+        ? generateBundles('custom', state.teams, state.config, action.config)
+        : state.bundles;
+      return { ...state, customBundleConfig: action.config, bundles };
     }
 
     case 'SET_ODDS_SOURCE': {

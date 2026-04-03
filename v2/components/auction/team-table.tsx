@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useAuction } from '@/lib/auction/auction-context';
 import {
@@ -166,6 +166,18 @@ export function TeamTable() {
         </span>
       </div>
 
+      {/* Custom bundle controls — golf only */}
+      {bundlePreset === 'custom' && config?.sport === 'golf' && (
+        <CustomBundleControls
+          cutoff={state.customBundleConfig.cutoff}
+          groupSize={state.customBundleConfig.groupSize}
+          totalPlayers={state.teams.length}
+          onUpdate={(cutoff, groupSize) =>
+            dispatch({ type: 'SET_CUSTOM_BUNDLE_CONFIG', config: { cutoff, groupSize } })
+          }
+        />
+      )}
+
       {/* Legend for sub-values */}
       <p className="text-[11px] text-muted-foreground">
         Each round column shows <span className="text-emerald-400">profit</span>/<span className="text-red-400">loss</span> if the team reaches that round. Below: <span className="text-white/70">probability of reaching that round</span>. Hover for more detail.
@@ -288,6 +300,73 @@ export function TeamTable() {
           </Link>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Custom Bundle Controls ──────────────────────────────────────
+
+function CustomBundleControls({
+  cutoff,
+  groupSize,
+  totalPlayers,
+  onUpdate,
+}: {
+  cutoff: number;
+  groupSize: number;
+  totalPlayers: number;
+  onUpdate: (cutoff: number, groupSize: number) => void;
+}) {
+  const remaining = Math.max(0, totalPlayers - cutoff);
+  const numGroups = groupSize > 0 ? Math.ceil(remaining / groupSize) : 0;
+  const totalItems = cutoff + numGroups;
+
+  return (
+    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
+      <p className="text-[10px] uppercase tracking-wider text-white/30">Custom Bundling</p>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[11px] text-white/50 mb-1">
+            Individual cutoff <span className="text-emerald-400 font-mono">Top {cutoff}</span>
+          </label>
+          <input
+            type="range"
+            min={10}
+            max={totalPlayers}
+            value={cutoff}
+            onChange={(e) => onUpdate(parseInt(e.target.value, 10), groupSize)}
+            className="w-full h-1 accent-emerald-500"
+          />
+          <div className="flex justify-between text-[10px] text-white/20 mt-0.5">
+            <span>10</span>
+            <span>{totalPlayers}</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] text-white/50 mb-1">
+            Group size <span className="text-emerald-400 font-mono">{groupSize} per group</span>
+          </label>
+          <input
+            type="range"
+            min={2}
+            max={8}
+            value={groupSize}
+            onChange={(e) => onUpdate(cutoff, parseInt(e.target.value, 10))}
+            className="w-full h-1 accent-emerald-500"
+          />
+          <div className="flex justify-between text-[10px] text-white/20 mt-0.5">
+            <span>2</span>
+            <span>8</span>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-white/40">
+        {cutoff} individual + {numGroups} group{numGroups !== 1 ? 's' : ''} of ~{groupSize} = <span className="text-emerald-400 font-medium">{totalItems} auction items</span>
+        {remaining > 0 && <span className="text-white/20"> ({remaining} golfer{remaining !== 1 ? 's' : ''} grouped)</span>}
+      </p>
     </div>
   );
 }

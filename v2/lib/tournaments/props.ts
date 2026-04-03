@@ -53,16 +53,71 @@ export const MARCH_MADNESS_PROPS: PropDefinition[] = [
 ];
 
 /**
+ * Standard props for golf Calcuttas (Masters, US Open, etc.).
+ * Low round per day is the most common side bet in golf Calcuttas.
+ */
+export const GOLF_PROPS: PropDefinition[] = [
+  {
+    key: 'lowRoundR1',
+    label: 'Low Round — Thursday',
+    description: 'Lowest score in Round 1',
+    defaultPercentage: 2.5,
+    autoCalculated: false,
+  },
+  {
+    key: 'lowRoundR2',
+    label: 'Low Round — Friday',
+    description: 'Lowest score in Round 2',
+    defaultPercentage: 2.5,
+    autoCalculated: false,
+  },
+  {
+    key: 'lowRoundR3',
+    label: 'Low Round — Saturday',
+    description: 'Lowest score in Round 3 (moving day)',
+    defaultPercentage: 2.5,
+    autoCalculated: false,
+  },
+  {
+    key: 'lowRoundR4',
+    label: 'Low Round — Sunday',
+    description: 'Lowest score in the final round',
+    defaultPercentage: 2.5,
+    autoCalculated: false,
+  },
+  {
+    key: 'worstRound',
+    label: 'Worst Single Round',
+    description: 'Highest (worst) score in any single round among players who made the cut',
+    defaultPercentage: 0,
+    autoCalculated: false,
+  },
+  {
+    key: 'worstOverall',
+    label: 'Worst Overall Score',
+    description: 'Highest (worst) total score among players who made the cut (DFL)',
+    defaultPercentage: 0,
+    autoCalculated: false,
+  },
+  {
+    key: 'customProp',
+    label: 'Custom Prop',
+    description: 'Commissioner-defined prop bet (e.g., hole-in-one, ace pool)',
+    defaultPercentage: 0,
+    autoCalculated: false,
+  },
+];
+
+/**
  * Get standard prop definitions for a tournament.
- * Only March Madness has standard props for now; other tournaments
- * use their own prop keys defined in payout-presets.ts.
  */
 export function getStandardProps(tournamentId: string): PropDefinition[] {
   if (tournamentId.startsWith('march_madness')) {
     return MARCH_MADNESS_PROPS;
   }
-  // Other tournaments don't have standard prop definitions yet.
-  // Their prop keys (goldenBoot, lowRound, etc.) are handled via payout rules directly.
+  if (tournamentId.startsWith('masters') || tournamentId.includes('golf') || tournamentId.includes('open') || tournamentId.includes('pga')) {
+    return GOLF_PROPS;
+  }
   return [];
 }
 

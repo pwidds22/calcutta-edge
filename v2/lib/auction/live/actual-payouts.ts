@@ -76,13 +76,14 @@ export function buildPlayInLoserSet(
 
   for (const [, pairTeams] of byKey) {
     if (pairTeams.length < 2) continue;
-    // If any team in the pair won round 1, all others are play-in losers
-    const winnerExists = pairTeams.some(
-      (t) => resultMap.get(`${t.id}:${firstRound}`) === 'won'
+    // If any team in the pair has ANY result for round 1 (won or lost in R64),
+    // it means they survived the play-in — all others are play-in losers.
+    const survivorExists = pairTeams.some(
+      (t) => resultMap.has(`${t.id}:${firstRound}`)
     );
-    if (winnerExists) {
+    if (survivorExists) {
       for (const t of pairTeams) {
-        if (resultMap.get(`${t.id}:${firstRound}`) !== 'won') {
+        if (!resultMap.has(`${t.id}:${firstRound}`)) {
           losers.add(t.id);
         }
       }
