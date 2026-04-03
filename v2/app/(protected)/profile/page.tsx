@@ -85,11 +85,11 @@ export default async function ProfilePage() {
           <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-5 py-5">
             <h3 className="text-sm font-semibold text-white">Unlock Full Strategy Access</h3>
             <p className="mt-1 text-sm text-white/50">
-              Get devigged odds, fair value calculations, bid recommendations, and round-by-round profit projections for every team.
+              Get devigged odds, fair value calculations, bid recommendations, and profit projections for every event.
             </p>
             <Button asChild className="mt-4 gap-2 bg-emerald-600 hover:bg-emerald-700">
               <Link href="/payment">
-                Unlock — $29.99
+                Unlock — from $19.99
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

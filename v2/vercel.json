@@ -3,6 +3,10 @@
     {
       "path": "/api/espn/sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/golf/sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }

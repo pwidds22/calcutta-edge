@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { TeamTableRow, BundleRow } from './team-table-row';
-import { BUNDLE_PRESETS } from '@/lib/tournaments/bundles';
+import { getBundlePresets } from '@/lib/tournaments/bundles';
 import { ArrowUpDown, Lock } from 'lucide-react';
 import type { GroupFilter, StatusFilter, SortOption, BundlePreset } from '@/lib/calculations/types';
 
@@ -152,9 +152,9 @@ export function TeamTable() {
             <SelectValue placeholder="Bundling" />
           </SelectTrigger>
           <SelectContent>
-            {(Object.keys(BUNDLE_PRESETS) as BundlePreset[]).map((key) => (
+            {(Object.keys(getBundlePresets(config?.sport)) as BundlePreset[]).map((key) => (
               <SelectItem key={key} value={key}>
-                {BUNDLE_PRESETS[key].label}
+                {getBundlePresets(config?.sport)[key].label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -275,16 +275,16 @@ export function TeamTable() {
         <div className="flex flex-col items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-6 text-center">
           <Lock className="h-5 w-5 text-white/40" />
           <p className="text-sm font-medium text-white">
-            See the full picture. Unlock all {filteredTeams.length} teams.
+            See the full picture. Unlock all {filteredTeams.length} {(config?.teamLabel ?? 'team').toLowerCase()}s.
           </p>
           <p className="text-xs text-white/50">
-            Fair values, bid recommendations, and profit projections for every team.
+            Fair values, bid recommendations, and profit projections for every {(config?.teamLabel ?? 'team').toLowerCase()}.
           </p>
           <Link
-            href="/payment"
+            href={`/payment?tournament=${config?.id ?? ''}`}
             className="rounded-md bg-emerald-600 px-6 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
           >
-            Unlock Full Access — $29.99
+            Unlock Full Access — ${((config?.strategyPrice ?? 2999) / 100).toFixed(2)}
           </Link>
         </div>
       )}

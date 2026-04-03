@@ -150,7 +150,7 @@ export function HeroSection() {
             </div>
 
             <p className="mt-4 text-xs text-white/30">
-              Free to host &middot; Strategy analytics $29.99/event
+              Free to host &middot; Strategy analytics from $19.99/event
             </p>
           </div>
 

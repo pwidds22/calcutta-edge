@@ -22,7 +22,7 @@ const TIERS = [
   },
   {
     name: 'Strategy Analytics',
-    price: '$29.99',
+    price: 'From $19.99',
     priceDetail: 'One-time per event',
     description: 'The data edge nobody else at the table has.',
     badge: 'Most Popular',

@@ -74,6 +74,8 @@ export const MARCH_MADNESS_2026_CONFIG: TournamentConfig = {
   startDate: '2026-03-19',
   hostingOpensAt: '2026-03-01',
   isActive: true,
+  strategyPrice: 2999, // $29.99
+  stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL',
 };
 
 // Helper: dummy American odds (not used when probabilities are provided)

@@ -31,11 +31,18 @@ export function impliedProbabilityToAmericanOdds(probability: number): number {
  * Devig a group of teams for a specific round.
  * Normalizes raw implied probabilities by dividing by the overround (sum of all probs).
  * Optionally caps at a previous round's devigged probability.
+ *
+ * @param targetSum - What the devigged probabilities should sum to.
+ *   For winner (1 winner): targetSum = 1.
+ *   For golf makeCut (50 advance): targetSum = 50.
+ *   For NCAA R32 matchups (1 of 2 advances): targetSum = 1.
+ *   Defaults to 1 for backward compatibility with bracket devigging.
  */
 function devigGroup(
   teams: Team[],
   round: RoundKey,
-  capRound?: RoundKey
+  capRound?: RoundKey,
+  targetSum: number = 1
 ): void {
   const overround = teams.reduce(
     (sum, t) => sum + t.rawImpliedProbabilities[round],
@@ -44,7 +51,7 @@ function devigGroup(
   if (overround === 0) return;
 
   for (const team of teams) {
-    team.odds[round] = team.rawImpliedProbabilities[round] / overround;
+    team.odds[round] = (team.rawImpliedProbabilities[round] / overround) * targetSum;
     if (capRound) {
       team.odds[round] = Math.min(team.odds[round], team.odds[capRound]);
     }
@@ -116,12 +123,16 @@ function devigBracket(teams: Team[], config: TournamentConfig): void {
 /**
  * Global devigging: normalize all teams for each round.
  * Simple strategy for tournaments without bracket structure (golf, NFL).
+ *
+ * Uses teamsAdvancing as the target probability sum for each round.
+ * For golf: makeCut probabilities should sum to ~50 (50 players make the cut),
+ * top20 should sum to ~20, etc. Winner sums to 1.
  */
 function devigGlobal(teams: Team[], config: TournamentConfig): void {
   for (let i = 0; i < config.rounds.length; i++) {
     const round = config.rounds[i];
     const capRound = i > 0 ? config.rounds[i - 1].key : undefined;
-    devigGroup(teams, round.key, capRound);
+    devigGroup(teams, round.key, capRound, round.teamsAdvancing);
   }
 }
 

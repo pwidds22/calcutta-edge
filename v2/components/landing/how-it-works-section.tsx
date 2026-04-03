@@ -12,7 +12,7 @@ const STEPS = [
   {
     number: '03',
     title: 'Unlock Strategy',
-    description: 'See fair values, suggested bids, and profit projections for $29.99.',
+    description: 'See fair values, suggested bids, and profit projections from $19.99.',
   },
   {
     number: '04',

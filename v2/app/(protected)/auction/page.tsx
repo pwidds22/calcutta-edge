@@ -2,8 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { loadAuctionData, listUserLeagues } from '@/actions/auction'
 import { AuctionTool } from '@/components/auction/auction-tool'
-import { getActiveTournament, listTournaments } from '@/lib/tournaments/registry'
+import { getActiveTournament, getTournament, listTournaments } from '@/lib/tournaments/registry'
 import { normalizePayoutRules } from '@/lib/calculations/normalize'
+import { hasTournamentAccess } from '@/lib/auth/tournament-access'
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
 
@@ -20,16 +21,16 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
 
   if (!user) redirect('/login')
 
-  // Check payment status
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('has_paid')
-    .eq('id', user.id)
-    .single()
+  // Resolve tournament: use ?tournament= param if it's an active tournament, else default
+  const activeTournament = getActiveTournament()
+  const requestedTournament = params.tournament ? getTournament(params.tournament) : null
+  const selectedTournament = (requestedTournament && requestedTournament.config.isActive)
+    ? requestedTournament
+    : activeTournament
+  const { config, teams: baseTeams } = selectedTournament
 
-  // Always use the active tournament for the strategy tool
-  // Other tournaments are shown as "Coming Soon" — not interactive
-  const { config, teams: baseTeams } = getActiveTournament()
+  // Check per-tournament payment status
+  const hasPaid = await hasTournamentAccess(supabase, user.id, config.id)
 
   // Get all tournaments for the selector
   const allTournaments = listTournaments()
@@ -50,13 +51,17 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
       {allTournaments.length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {allTournaments.map((t) => {
-            const isActive = t.isActive
-            if (isActive) {
+            if (t.isActive) {
+              const isSelected = t.id === config.id
               return (
                 <Link
                   key={t.id}
-                  href="/auction"
-                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30"
+                  href={`/auction?tournament=${t.id}`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isSelected
+                      ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30'
+                      : 'bg-white/[0.04] text-white/50 hover:bg-white/[0.06] hover:text-white/70 ring-1 ring-white/10'
+                  }`}
                 >
                   {t.name}
                 </Link>
@@ -85,7 +90,7 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
         initialPotSize={auctionData?.estimatedPotSize ?? config.defaultPotSize}
         config={config}
         baseTeams={baseTeams}
-        hasPaid={profile?.has_paid ?? false}
+        hasPaid={hasPaid}
         leagueName={selectedLeague}
         leagueList={leagueList}
       />

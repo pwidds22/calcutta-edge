@@ -70,12 +70,12 @@ export function TeamSpotlight({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-white/40 mb-1">
-            Team {teamIndex + 1} of {totalTeams}
+            {config.teamLabel ?? 'Team'} {teamIndex + 1} of {totalTeams}
           </p>
           <h2 className="text-2xl font-bold text-white">{team.name}</h2>
           <div className="mt-1.5 flex items-center gap-2">
             <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
-              #{team.seed} Seed
+              #{team.seed}{config.sport !== 'golf' ? ' Seed' : ''}
             </span>
             <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-white/60">
               {team.group}

@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getTournament } from '@/lib/tournaments/registry';
-import { getTeamStatus, calculateTeamEarnings } from '@/lib/auction/live/actual-payouts';
+import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
 
@@ -141,6 +141,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     const participantCount = (session.auction_participants as unknown as Array<{ count: number }>)?.[0]?.count ?? 0;
 
     // Compute per-team status and earnings
+    const playInLosers = (config && teams) ? buildPlayInLoserSet(teams, results, config) : new Set<number>();
     const userTeams: DashboardTeam[] = [];
     let userTotalEarned = 0;
     let userTotalSpent = 0;
@@ -157,7 +158,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       let earnings = 0;
 
       if (config && results.length > 0) {
-        const teamStatus = getTeamStatus(bid.team_id, results, config);
+        const teamStatus = getTeamStatus(bid.team_id, results, config, playInLosers);
         status = teamStatus.status;
         roundsWon = teamStatus.roundsWon;
         earnings = calculateTeamEarnings(roundsWon, actualPot, payoutRules);

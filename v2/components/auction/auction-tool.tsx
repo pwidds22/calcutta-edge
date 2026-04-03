@@ -11,7 +11,7 @@ import { SummaryStatsCards } from './summary-stats-cards';
 import { TeamTable } from './team-table';
 import { OddsSourceSelector } from './odds-source-selector';
 import { initializeTeams } from '@/lib/calculations/initialize';
-import { buildMarchMadness2026Registry } from '@/lib/tournaments/odds-sources';
+import { getOddsRegistry } from '@/lib/tournaments/registry';
 import { renameLeague, resetAuctionData } from '@/actions/auction';
 import { Lock, Trash2, ChevronDown, Plus, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,7 @@ function AuctionToolInner({
 }: AuctionToolInnerProps) {
   const { state, dispatch } = useAuction();
   const { isSaving, lastSaved, error } = useAutoSave();
-  const oddsRegistry = useMemo(() => buildMarchMadness2026Registry(), []);
+  const oddsRegistry = useMemo(() => config ? getOddsRegistry(config.id) : undefined, [config]);
 
   // Initialize on mount AND when league changes (URL nav triggers new server props)
   useEffect(() => {
@@ -92,15 +92,15 @@ function AuctionToolInner({
                   You&apos;re viewing a preview
                 </p>
                 <p className="text-xs text-white/50">
-                  Unlock all {state.teams.length || 64} teams with fair values, bid recommendations, and profit projections.
+                  Unlock all {state.teams.length || baseTeams.length} {(config.teamLabel ?? 'team').toLowerCase()}s with fair values, bid recommendations, and profit projections.
                 </p>
               </div>
             </div>
             <Link
-              href="/payment"
+              href={`/payment?tournament=${config.id}`}
               className="w-full shrink-0 rounded-md bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500 transition-colors sm:w-auto"
             >
-              Unlock — $29.99
+              Unlock — ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
             </Link>
           </div>
         </div>
@@ -115,8 +115,8 @@ function AuctionToolInner({
         saveError={error}
       />
 
-      {/* Odds source selector */}
-      <OddsSourceSelector registry={oddsRegistry} />
+      {/* Odds source selector — only show when tournament has multiple odds sources */}
+      {oddsRegistry && <OddsSourceSelector registry={oddsRegistry} />}
 
       {/* Pot size */}
       <PotSizeSection />

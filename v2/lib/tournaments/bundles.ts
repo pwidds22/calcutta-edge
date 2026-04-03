@@ -2,7 +2,8 @@ import type { BaseTeam, TeamBundle, BundlePreset, TournamentConfig } from './typ
 
 // ─── Preset Metadata ────────────────────────────────────────────────
 
-export const BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: string }> = {
+/** Default bundle preset metadata — used for bracket sports (March Madness, etc.) */
+const BRACKET_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: string }> = {
   none: {
     label: 'No Bundling',
     description: 'Every team auctioned individually (play-in pairs still bundled)',
@@ -24,6 +25,39 @@ export const BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: 
     description: 'Define your own team groupings',
   },
 };
+
+/** Golf-specific bundle presets — groups lower-ranked players */
+const GOLF_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: string }> = {
+  none: {
+    label: 'No Bundling',
+    description: 'Every golfer auctioned individually (~89 items, 3+ hours)',
+  },
+  light: {
+    label: 'Top 50 Individual',
+    description: 'Top 50 golfers individual, rest in balanced groups of 3-4',
+  },
+  standard: {
+    label: 'Top 40 Individual',
+    description: 'Top 40 golfers individual, rest in balanced groups of 3-4 (~52 items)',
+  },
+  heavy: {
+    label: 'Top 30 Individual',
+    description: 'Top 30 golfers individual, rest in balanced groups of 4-5 (~42 items)',
+  },
+  custom: {
+    label: 'Custom',
+    description: 'Define your own player groupings',
+  },
+};
+
+/** Get bundle preset metadata based on sport type */
+export function getBundlePresets(sport?: string): Record<BundlePreset, { label: string; description: string }> {
+  if (sport === 'golf') return GOLF_BUNDLE_PRESETS;
+  return BRACKET_BUNDLE_PRESETS;
+}
+
+/** @deprecated Use getBundlePresets(sport) instead */
+export const BUNDLE_PRESETS = BRACKET_BUNDLE_PRESETS;
 
 // ─── Play-In Detection ──────────────────────────────────────────────
 
@@ -142,18 +176,74 @@ function bundleBySeedLine(
   return bundles;
 }
 
+// ─── Golf Bundling ─────────────────────────────────────────────────
+
+/**
+ * Bundle lower-ranked golfers into balanced groups.
+ * Golfers ranked above `individualCutoff` stay individual.
+ * Remaining golfers are split into balanced groups using a "pot draft" method:
+ * sort remaining by seed, distribute round-robin across N groups.
+ * This ensures each group has a mix of better and worse longshots.
+ */
+function bundleGolf(
+  teams: BaseTeam[],
+  individualCutoff: number,
+  groupSize: number
+): TeamBundle[] {
+  const sorted = [...teams].sort((a, b) => a.seed - b.seed);
+  const toBundles = sorted.filter((t) => t.seed > individualCutoff);
+
+  if (toBundles.length === 0) return [];
+
+  const numGroups = Math.ceil(toBundles.length / groupSize);
+  const groups: BaseTeam[][] = Array.from({ length: numGroups }, () => []);
+
+  // Round-robin distribution (serpentine) for balance
+  for (let i = 0; i < toBundles.length; i++) {
+    const round = Math.floor(i / numGroups);
+    const idx = round % 2 === 0 ? i % numGroups : numGroups - 1 - (i % numGroups);
+    groups[idx].push(toBundles[i]);
+  }
+
+  return groups
+    .filter((g) => g.length > 0)
+    .map((g, i) => ({
+      id: `golf-group-${i + 1}`,
+      name: `Group ${i + 1} (${g.map((t) => t.name.split(' ').pop()).join(' / ')})`,
+      teamIds: g.map((t) => t.id),
+    }));
+}
+
 // ─── Main Generator ─────────────────────────────────────────────────
 
 /**
  * Generate all bundles for a given preset.
  * Play-in bundles are always included. Teams in play-in bundles are excluded
  * from seed-based bundles to avoid double-counting.
+ * For golf, uses rank-based grouping instead of seed/region bundling.
  */
 export function generateBundles(
   preset: BundlePreset,
   teams: BaseTeam[],
   config: TournamentConfig
 ): TeamBundle[] {
+  // Golf-specific bundling
+  if (config.sport === 'golf') {
+    switch (preset) {
+      case 'none':
+        return [];
+      case 'light':
+        return bundleGolf(teams, 50, 4);   // Top 50 individual, rest in groups of ~4
+      case 'standard':
+        return bundleGolf(teams, 40, 4);   // Top 40 individual, rest in groups of ~4
+      case 'heavy':
+        return bundleGolf(teams, 30, 5);   // Top 30 individual, rest in groups of ~5
+      case 'custom':
+        return [];
+    }
+  }
+
+  // Bracket-sport bundling (March Madness, etc.)
   const playInBundles = detectPlayInBundles(teams, config);
   const playInTeamIds = getPlayInTeamIds(playInBundles);
 
@@ -162,8 +252,6 @@ export function generateBundles(
       return playInBundles;
 
     case 'light': {
-      // Region bundles absorb play-in teams whose seed is in range (13-16).
-      // Only include play-in bundles for seeds OUTSIDE the region range.
       const regionBundles = bundleByRegion(teams, config, 13, 16, playInTeamIds);
       const regionTeamIds = new Set(regionBundles.flatMap((b) => b.teamIds));
       const extraPlayIns = playInBundles.filter(
@@ -173,14 +261,12 @@ export function generateBundles(
     }
 
     case 'standard':
-      // Seed-line bundling keeps play-in bundles separate (different grouping axis)
       return [
         ...playInBundles,
         ...bundleBySeedLine(teams, 13, 16, playInTeamIds),
       ];
 
     case 'heavy': {
-      // Region bundles absorb play-in teams whose seed is in range (9-16).
       const regionBundles = bundleByRegion(teams, config, 9, 16, playInTeamIds);
       const regionTeamIds = new Set(regionBundles.flatMap((b) => b.teamIds));
       const extraPlayIns = playInBundles.filter(
@@ -190,8 +276,6 @@ export function generateBundles(
     }
 
     case 'custom':
-      // Custom bundles are managed in the UI — just return play-in bundles here.
-      // The actual custom bundles are passed directly via settings.bundles.
       return playInBundles;
   }
 }

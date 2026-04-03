@@ -15,7 +15,7 @@ const STATS = [
     detail: 'Instant updates across all devices',
   },
   {
-    value: '$29.99',
+    value: 'From $19.99',
     label: 'Strategy Analytics',
     detail: 'One-time per event',
   },

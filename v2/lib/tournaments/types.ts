@@ -59,6 +59,10 @@ export interface TournamentConfig {
   /** ISO date when hosting opens (typically 2-3 weeks before startDate). If omitted, hosting is always open. */
   hostingOpensAt?: string;
   isActive: boolean;
+  /** Strategy tool price in cents (e.g., 2999 = $29.99). Used for payment gating. */
+  strategyPrice?: number;
+  /** Env var key for this tournament's Stripe Payment Link URL */
+  stripePaymentLinkEnvKey?: string;
 }
 
 // ─── Team Types ─────────────────────────────────────────────────────

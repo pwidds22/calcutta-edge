@@ -11,7 +11,7 @@ import {
   type SessionSettings,
 } from '@/lib/auction/live/types';
 import { getPayoutPresets, type PayoutPreset } from '@/lib/tournaments/payout-presets';
-import { BUNDLE_PRESETS, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
+import { getBundlePresets, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
 import { getTournament } from '@/lib/tournaments/registry';
 import { getStandardProps, type EnabledProp } from '@/lib/tournaments/props';
 import { ArrowLeft, Gavel, Timer, DollarSign, Trophy, ChevronDown, ChevronUp, Zap, Lock, Layers, Dice5, Plus, X } from 'lucide-react';
@@ -251,7 +251,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder='e.g. "Office March Madness 2026"'
+            placeholder={`e.g. "Office ${selectedTournament?.name ?? 'Auction'} Pool"`}
             className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-white/20 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
           />
         </div>
@@ -339,10 +339,10 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
             Team Bundling
           </label>
           <p className="text-xs text-white/30 mb-2">
-            Bundle low-seed teams together to speed up the auction.
+            {selectedTournament?.sport === 'golf' ? 'Group lower-ranked golfers together to speed up the auction.' : 'Bundle low-seed teams together to speed up the auction.'}
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {(Object.entries(BUNDLE_PRESETS) as [BundlePreset, typeof BUNDLE_PRESETS[BundlePreset]][]).map(
+            {(Object.entries(getBundlePresets(selectedTournament?.sport)) as [BundlePreset, { label: string; description: string }][]).map(
               ([key, preset]) => (
                 <button
                   key={key}

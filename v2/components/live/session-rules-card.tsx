@@ -3,7 +3,7 @@
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { SessionSettings } from '@/lib/auction/live/types';
 import { BID_INCREMENT_PRESETS } from '@/lib/auction/live/types';
-import { BUNDLE_PRESETS } from '@/lib/tournaments/bundles';
+import { getBundlePresets } from '@/lib/tournaments/bundles';
 import {
   DollarSign,
   Timer,
@@ -143,7 +143,7 @@ export function SessionRulesCard({
             </div>
             <p className="mt-1 text-sm text-white/80">
               {bundlePreset && bundlePreset !== 'none'
-                ? BUNDLE_PRESETS[bundlePreset]?.label ?? bundlePreset
+                ? getBundlePresets()[bundlePreset]?.label ?? bundlePreset
                 : `${bundles.length} custom bundles`}
             </p>
             <p className="mt-0.5 text-xs text-white/30">

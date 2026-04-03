@@ -44,7 +44,7 @@ export function FeaturesSection() {
             Know what every team is worth before you bid
           </h2>
           <p className="mt-4 text-base text-white/50">
-            Pair with free hosting or use standalone. $29.99/event.
+            Pair with free hosting or use standalone. From $19.99/event.
           </p>
         </div>
 

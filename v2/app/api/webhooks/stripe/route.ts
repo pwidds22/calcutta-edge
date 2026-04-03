@@ -31,9 +31,22 @@ export async function POST(request: NextRequest) {
 
     const email =
       session.customer_email || session.customer_details?.email
-    const clientRefId = session.client_reference_id
+    const rawClientRefId = session.client_reference_id
 
-    console.log('Processing payment — client_reference_id:', clientRefId, 'email:', email)
+    // Parse client_reference_id — new format: "userId:tournamentId", legacy: "userId"
+    let clientRefId: string | null = null
+    let tournamentId = 'march_madness_2026' // default for legacy payments
+    if (rawClientRefId) {
+      if (rawClientRefId.includes(':')) {
+        const parts = rawClientRefId.split(':')
+        clientRefId = parts[0]
+        tournamentId = parts[1] ?? tournamentId
+      } else {
+        clientRefId = rawClientRefId
+      }
+    }
+
+    console.log('Processing payment — client_reference_id:', clientRefId, 'tournament:', tournamentId, 'email:', email)
 
     // Strategy: client_reference_id → email → recent unpaid
     let profileId: string | null = null
@@ -47,10 +60,6 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (profile) {
-        if (profile.has_paid) {
-          console.log('User already paid (via client_reference_id):', clientRefId)
-          return NextResponse.json({ received: true })
-        }
         profileId = profile.id
         console.log('Matched user via client_reference_id:', clientRefId)
       } else {
@@ -62,15 +71,11 @@ export async function POST(request: NextRequest) {
     if (!profileId && email) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, has_paid')
+        .select('id')
         .eq('email', email.toLowerCase())
         .single()
 
       if (profile) {
-        if (profile.has_paid) {
-          console.log('User already paid (via email):', email)
-          return NextResponse.json({ received: true })
-        }
         profileId = profile.id
         console.log('Matched user via email:', email)
       }
@@ -100,6 +105,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
+    // Insert per-tournament purchase record
+    const { error: purchaseError } = await supabase
+      .from('paid_tournaments')
+      .upsert({
+        user_id: profileId,
+        tournament_id: tournamentId,
+        amount_cents: session.amount_total ?? 0,
+        paid_at: new Date().toISOString(),
+        stripe_session_id: session.id,
+      }, { onConflict: 'user_id,tournament_id' })
+
+    if (purchaseError) {
+      console.error('Failed to insert paid_tournaments:', purchaseError)
+    }
+
+    // Also update legacy has_paid for backward compatibility
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
@@ -116,7 +137,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('Successfully marked user as paid:', profileId)
+    console.log('Successfully marked user as paid:', profileId, 'tournament:', tournamentId)
   }
 
   return NextResponse.json({ received: true })

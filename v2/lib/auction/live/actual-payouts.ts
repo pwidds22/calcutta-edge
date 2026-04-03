@@ -46,6 +46,52 @@ export interface LeaderboardData {
   isTournamentComplete: boolean;
 }
 
+// ─── Play-In Loser Detection ────────────────────────────────────
+
+/**
+ * Build a set of team IDs that lost their play-in game.
+ * Play-in pairs share the same seed+group. If one team in a pair has a 'won'
+ * result for the first round, the other team lost the play-in and is eliminated.
+ * This handles the case where ESPN sync skips First Four games.
+ */
+export function buildPlayInLoserSet(
+  allTeams: BaseTeam[],
+  results: TournamentResult[],
+  config: TournamentConfig
+): Set<number> {
+  const losers = new Set<number>();
+  const firstRound = config.rounds[0]?.key;
+  if (!firstRound) return losers;
+
+  const resultMap = buildResultMap(results);
+
+  // Group teams by seed+group to find play-in pairs
+  const byKey = new Map<string, BaseTeam[]>();
+  for (const team of allTeams) {
+    const key = `${team.group}-${team.seed}`;
+    const arr = byKey.get(key);
+    if (arr) arr.push(team);
+    else byKey.set(key, [team]);
+  }
+
+  for (const [, pairTeams] of byKey) {
+    if (pairTeams.length < 2) continue;
+    // If any team in the pair won round 1, all others are play-in losers
+    const winnerExists = pairTeams.some(
+      (t) => resultMap.get(`${t.id}:${firstRound}`) === 'won'
+    );
+    if (winnerExists) {
+      for (const t of pairTeams) {
+        if (resultMap.get(`${t.id}:${firstRound}`) !== 'won') {
+          losers.add(t.id);
+        }
+      }
+    }
+  }
+
+  return losers;
+}
+
 // ─── Pure Calculation Functions ───────────────────────────────────
 
 /**
@@ -78,12 +124,24 @@ export function getAliveTeamsForRound(
 
 /**
  * Determine the status of a single team based on results.
+ * Pass playInLosers to correctly mark teams that lost their play-in game
+ * (whose results aren't tracked directly — inferred from partner's success).
  */
 export function getTeamStatus(
   teamId: number,
   results: TournamentResult[],
-  config: TournamentConfig
+  config: TournamentConfig,
+  playInLosers?: Set<number>
 ): { status: 'alive' | 'eliminated' | 'champion'; roundsWon: string[]; eliminatedInRound: string | null } {
+  // Play-in losers are eliminated in the first round even without explicit results
+  if (playInLosers?.has(teamId)) {
+    return {
+      status: 'eliminated',
+      roundsWon: [],
+      eliminatedInRound: config.rounds[0]?.key ?? null,
+    };
+  }
+
   const resultMap = buildResultMap(results);
   const roundsWon: string[] = [];
   let eliminatedInRound: string | null = null;
@@ -190,6 +248,9 @@ export function calculateLeaderboard(
   const currentRound = getCurrentRound(soldTeamIds, results, config);
   const isTournamentComplete = completedRounds.length === config.rounds.length;
 
+  // Pre-compute play-in losers so they show as eliminated, not alive
+  const playInLosers = buildPlayInLoserSet(baseTeams, results, config);
+
   // Build per-participant data
   const byParticipant = new Map<string, { name: string; teams: SoldTeam[] }>();
   for (const sold of soldTeams) {
@@ -214,7 +275,8 @@ export function calculateLeaderboard(
       const { status, roundsWon, eliminatedInRound } = getTeamStatus(
         sold.teamId,
         results,
-        config
+        config,
+        playInLosers
       );
       const earnings = calculateTeamEarnings(roundsWon, actualPot, payoutRules);
       totalEarned += earnings;

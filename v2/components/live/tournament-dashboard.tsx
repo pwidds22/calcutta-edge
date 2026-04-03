@@ -62,11 +62,14 @@ export function TournamentDashboard({
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  // Determine which sync endpoint to use based on tournament sport
+  const syncEndpoint = config.sport === 'golf' ? '/api/golf/sync' : '/api/espn/sync';
+
   const handleEspnSync = useCallback(async () => {
     setSyncing(true);
     setSyncMessage(null);
     try {
-      const res = await fetch('/api/espn/sync', {
+      const res = await fetch(syncEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
@@ -77,7 +80,8 @@ export function TournamentDashboard({
       } else if (data.inserted === 0 && data.updated === 0) {
         setSyncMessage('No new results found');
       } else {
-        setSyncMessage(`Synced ${data.games?.length ?? 0} games`);
+        const count = data.games?.length ?? data.matched ?? 0;
+        setSyncMessage(`Synced ${count} ${config.sport === 'golf' ? 'players' : 'games'}`);
         // Results will update via broadcast — no manual refetch needed
       }
     } catch {
@@ -87,7 +91,7 @@ export function TournamentDashboard({
       // Clear message after 4 seconds
       setTimeout(() => setSyncMessage(null), 4000);
     }
-  }, [sessionId]);
+  }, [sessionId, syncEndpoint, config.sport]);
 
   // Auto-sync ESPN on first visit if no results exist yet
   const hasAutoSynced = useRef(false);
@@ -242,13 +246,13 @@ export function TournamentDashboard({
           })}
         </div>
 
-        {/* ESPN Sync button — available to everyone */}
-        {config.id === 'march_madness_2026' && (
+        {/* Auto-sync button — available for supported tournaments */}
+        {(config.id === 'march_madness_2026' || config.id === 'masters_2026') && (
           <button
             onClick={handleEspnSync}
             disabled={syncing}
             className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
-            title="Sync game results from ESPN"
+            title={`Sync ${config.sport === 'golf' ? 'leaderboard' : 'game results'} from ESPN`}
           >
             <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync Scores'}</span>

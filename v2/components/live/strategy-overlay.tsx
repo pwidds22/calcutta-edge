@@ -202,15 +202,15 @@ export function StrategyOverlay({
               rel="noopener noreferrer"
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
             >
-              Unlock for $29.99
+              Unlock for ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
               <ExternalLink className="size-3.5" />
             </a>
           ) : (
             <a
-              href="/payment"
+              href={`/payment?tournament=${config.id}`}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
             >
-              Unlock for $29.99
+              Unlock for ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
             </a>
           )}
           <span className="text-[10px] text-white/30">

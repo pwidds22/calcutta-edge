@@ -254,7 +254,13 @@ export const BundleRow = memo(function BundleRow({
 
   const lowestSeed = Math.min(...memberTeams.map((t) => t.seed));
   const highestSeed = Math.max(...memberTeams.map((t) => t.seed));
-  const seedDisplay = lowestSeed === highestSeed ? `${lowestSeed}` : `${lowestSeed}-${highestSeed}`;
+  // For golf bundles with wide seed ranges, show "Grp" instead of confusing "31-79"
+  const seedRange = highestSeed - lowestSeed;
+  const seedDisplay = lowestSeed === highestSeed
+    ? `${lowestSeed}`
+    : seedRange > 10
+      ? `Grp`
+      : `${lowestSeed}-${highestSeed}`;
 
   if (locked) {
     return (

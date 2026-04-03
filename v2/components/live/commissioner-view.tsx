@@ -413,7 +413,7 @@ export function CommissionerView({
                     className="gap-1.5 border-white/10 text-white/50 hover:border-white/20 hover:text-white/80 text-[11px]"
                   >
                     <MapPin className="size-3" />
-                    By Region
+                    By {config.groupLabel ?? 'Region'}
                   </Button>
                   <Button
                     onClick={() => updateTeamOrder(session.id, orderSerpentine(activeTeamOrder, teamMap, bundles))}
