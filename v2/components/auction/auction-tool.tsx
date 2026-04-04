@@ -117,6 +117,12 @@ function AuctionToolInner({
 
       {/* Odds source selector — only show when tournament has multiple odds sources */}
       {oddsRegistry && <OddsSourceSelector registry={oddsRegistry} />}
+      {!oddsRegistry && config?.sport === 'golf' && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 text-xs text-white/50">
+          <span className="font-medium text-white/70">Odds source:</span>{' '}
+          Estimated from DataGolf rankings. Real sportsbook lines will be available closer to tournament week.
+        </div>
+      )}
 
       {/* Pot size */}
       <PotSizeSection />

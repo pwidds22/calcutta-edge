@@ -121,7 +121,7 @@ export function HeroSection() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-amber-400" />
               </span>
-              March Madness 2026 &middot; Masters &middot; World Cup &amp; More
+              The Masters 2026 &middot; March Madness &middot; NFL &amp; More
             </span>
 
             <h1 className="mt-6 text-4xl font-bold leading-[1.1] tracking-tight text-white sm:text-5xl">

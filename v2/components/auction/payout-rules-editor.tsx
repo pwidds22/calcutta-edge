@@ -8,6 +8,19 @@ import { Button } from '@/components/ui/button';
 import type { PayoutRules } from '@/lib/calculations/types';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
+const propDescriptions: Record<string, string> = {
+  lowRoundR1: 'Lowest score in Round 1 (Thursday)',
+  lowRoundR2: 'Lowest score in Round 2 (Friday)',
+  lowRoundR3: 'Lowest score in Round 3 (Saturday)',
+  lowRoundR4: 'Lowest score in Round 4 (Sunday)',
+  worstRound: 'Highest (worst) score in any single round among cut-makers',
+  worstOverall: 'Highest (worst) total 4-round score among cut-makers — Dead F***ing Last',
+  biggestUpset: 'Largest seed differential win in the tournament',
+  highestSeed: 'Highest-seeded team to reach the Final Four',
+  largestMargin: 'Team with the biggest winning margin in any single game',
+  customProp: 'Commissioner-defined prop bet',
+};
+
 export function PayoutRulesEditor() {
   const { state, dispatch, config } = useAuction();
   const [isOpen, setIsOpen] = useState(false);
@@ -81,7 +94,7 @@ export function PayoutRulesEditor() {
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
               {propBets.map((prop) => (
                 <div key={prop.key}>
-                  <Label className="text-xs">{prop.label}</Label>
+                  <Label className="text-xs cursor-help" title={propDescriptions[prop.key]}>{prop.label}</Label>
                   <div className="relative mt-1">
                     <Input
                       type="number"

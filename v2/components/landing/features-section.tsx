@@ -7,7 +7,7 @@ const FEATURES = [
     title: 'Devigged Sportsbook Odds',
     description:
       'We strip the vig from real sportsbook lines to calculate true implied probabilities for every team, every round of the tournament.',
-    detail: 'Structure-aware devigging across all 6 rounds',
+    detail: 'Structure-aware devigging across all tournament rounds',
   },
   {
     icon: Calculator,
@@ -20,7 +20,7 @@ const FEATURES = [
     icon: TrendingUp,
     title: 'Profit Projections',
     description:
-      'See your projected profit at every stage of the tournament. Track how your portfolio performs round by round as the bracket unfolds.',
+      'See your projected profit at every stage of the tournament. Track how your portfolio performs round by round as the event unfolds.',
     detail: 'Round-by-round cumulative P&L tracking',
   },
   {

@@ -7,7 +7,7 @@ const STATS = [
   {
     value: '4+',
     label: 'Sports & Events',
-    detail: 'NCAA, Golf, NFL, Horse Racing',
+    detail: 'Golf, NCAA, NFL, Horse Racing',
   },
   {
     value: 'Real-Time',

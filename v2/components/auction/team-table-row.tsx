@@ -217,12 +217,11 @@ export const BundleRow = memo(function BundleRow({
     );
   }
 
-  // Combined odds per round = average of member odds (for display)
+  // Combined odds per round = sum of member odds (probability any member reaches this round)
   const combinedOdds: Record<string, number> = {};
   for (const round of rounds) {
     combinedOdds[round.key] =
-      memberTeams.reduce((sum, t) => sum + (t.odds[round.key] ?? 0), 0) /
-      (memberTeams.length || 1);
+      memberTeams.reduce((sum, t) => sum + (t.odds[round.key] ?? 0), 0);
   }
 
   // Local price state for the bundle input
