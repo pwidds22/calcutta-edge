@@ -103,6 +103,45 @@ export async function fetchAllOdds(
   return Object.fromEntries(markets.map((m, i) => [m, results[i]])) as Record<OddsMarket, DataGolfOddsResponse>;
 }
 
+// ─── In-Play / Leaderboard ───────────────────────────────────────
+
+export interface DataGolfInPlayPlayer {
+  player_name: string; // "Last, First" format
+  dg_id: number;
+  current_pos: string | null; // "T8", "1", "CUT", "WD", "DQ", "MDF"
+  current_round: number; // 1-4
+  thru: number | null; // holes completed in current round (null = not started)
+  today: number | null; // score today relative to par
+  total: number | null; // total score relative to par
+  /** DataGolf model probabilities */
+  win_prob?: number;
+  top_5_prob?: number;
+  top_10_prob?: number;
+  top_20_prob?: number;
+  make_cut_prob?: number;
+}
+
+export interface DataGolfInPlayResponse {
+  event_name: string;
+  event_id: number;
+  current_round: number;
+  /** Array of player leaderboard entries */
+  data: DataGolfInPlayPlayer[];
+  last_updated: string;
+}
+
+/**
+ * Fetch live in-play leaderboard + probabilities.
+ * During Masters week, `tour=pga` auto-returns Masters data.
+ * @param tour - 'pga' for PGA Tour (default)
+ */
+export async function fetchInPlay(tour = 'pga'): Promise<DataGolfInPlayResponse> {
+  const url = `${DATAGOLF_BASE}/preds/in-play?tour=${tour}&key=${getApiKey()}`;
+  const res = await fetch(url, { cache: 'no-store' }); // Always fresh for live data
+  if (!res.ok) throw new Error(`DataGolf in-play API error: ${res.status}`);
+  return res.json();
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────
 
 /** Convert "Last, First" → "First Last" */
@@ -110,4 +149,19 @@ export function formatPlayerName(dgName: string): string {
   const parts = dgName.split(', ');
   if (parts.length === 2) return `${parts[1]} ${parts[0]}`;
   return dgName;
+}
+
+/**
+ * Parse a position string like "T8", "1", "CUT", "WD", "DQ", "MDF"
+ * into a numeric position (or null if non-numeric).
+ * Ties: "T8" → 8, "T22" → 22
+ */
+export function parsePosition(pos: string | null): { position: number | null; isTied: boolean } {
+  if (!pos) return { position: null, isTied: false };
+  const upper = pos.toUpperCase().trim();
+  if (['CUT', 'WD', 'DQ', 'MDF'].includes(upper)) return { position: null, isTied: false };
+  const isTied = upper.startsWith('T');
+  const numStr = isTied ? upper.slice(1) : upper;
+  const position = parseInt(numStr, 10);
+  return { position: isNaN(position) ? null : position, isTied };
 }

@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import {
-  fetchGolfLeaderboard,
-  matchPlayerToTeamId,
-  positionToResults,
-} from '@/lib/espn/golf-leaderboard';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
-import { MASTERS_2026_TEAMS } from '@/lib/tournaments/configs/masters-2026';
-import { MASTERS_2026_CONFIG } from '@/lib/tournaments/configs/masters-2026';
+import { MASTERS_2026_TEAMS, MASTERS_2026_CONFIG } from '@/lib/tournaments/configs/masters-2026';
+import { fetchDataGolfLeaderboard, positionToTierResults } from '@/lib/datagolf/leaderboard';
+import type { GolfLeaderboard } from '@/lib/datagolf/leaderboard';
+import { fetchGolfLeaderboard, matchPlayerToTeamId, positionToResults } from '@/lib/espn/golf-leaderboard';
 
 /**
  * POST /api/golf/sync
  *
  * Syncs live golf leaderboard positions into tournament_results.
+ * Primary source: DataGolf (richer data, live probabilities).
+ * Fallback: ESPN free leaderboard API.
+ *
  * Two modes:
  * 1. Vercel Cron — syncs ALL active golf sessions. Protected by CRON_SECRET.
  * 2. Manual — syncs a specific session. Body: { sessionId: string }
@@ -89,33 +89,85 @@ async function syncAllGolfSessions(supabase: ReturnType<typeof createAdminClient
   return NextResponse.json({ message: `Synced ${sessions.length} sessions`, results });
 }
 
+// ─── Fetch Leaderboard (DataGolf primary, ESPN fallback) ─────────
+
+async function fetchLeaderboard(): Promise<{
+  leaderboard: GolfLeaderboard | null;
+  error: string | null;
+}> {
+  // Try DataGolf first (richer data, live probabilities)
+  if (process.env.DATAGOLF_API_KEY) {
+    try {
+      const lb = await fetchDataGolfLeaderboard();
+      // Verify it's returning Masters data (event name check)
+      const isMasters = lb.tournamentName.toLowerCase().includes('masters')
+        || lb.tournamentName.toLowerCase().includes('augusta');
+      if (isMasters || lb.status !== 'pre') {
+        return { leaderboard: lb, error: null };
+      }
+      console.log(`[Golf Sync] DataGolf returned "${lb.tournamentName}", not Masters. Falling back to ESPN.`);
+    } catch (err) {
+      console.error('[Golf Sync] DataGolf fetch failed, falling back to ESPN:', err);
+    }
+  }
+
+  // Fallback to ESPN
+  try {
+    const espn = await fetchGolfLeaderboard();
+    return {
+      leaderboard: {
+        tournamentName: espn.tournamentName,
+        status: espn.status,
+        currentRound: espn.currentRound,
+        players: espn.players.map(p => ({
+          name: p.name,
+          dgId: 0, // No DG ID from ESPN
+          position: p.position,
+          positionDisplay: p.positionDisplay,
+          madeCut: p.madeCut,
+          currentRound: p.currentRound,
+          totalScore: p.totalScore,
+          todayScore: p.roundScore,
+          thru: null,
+          isCut: p.isCut,
+          isWithdrawn: p.isWithdrawn,
+        })),
+        source: 'espn',
+        lastUpdated: new Date().toISOString(),
+      },
+      error: null,
+    };
+  } catch (err) {
+    return { leaderboard: null, error: `Both DataGolf and ESPN fetch failed: ${err}` };
+  }
+}
+
+// ─── Sync a Single Session ──────────────────────────────────────
+
 async function syncGolfSession(
   supabase: ReturnType<typeof createAdminClient>,
   sessionId: string
 ) {
-  let leaderboard;
-  try {
-    leaderboard = await fetchGolfLeaderboard();
-  } catch (err) {
-    return { error: `ESPN Golf fetch failed: ${err}`, inserted: 0, updated: 0 };
+  const { leaderboard, error: fetchError } = await fetchLeaderboard();
+  if (fetchError || !leaderboard) {
+    return { error: fetchError ?? 'No leaderboard data', inserted: 0, updated: 0 };
   }
 
-  // Verify it's a Masters tournament (or at least a PGA event)
+  // Verify it's a Masters event
   const isMasters = leaderboard.tournamentName.toLowerCase().includes('masters')
     || leaderboard.tournamentName.toLowerCase().includes('augusta');
 
   if (!isMasters && leaderboard.status === 'pre') {
-    return { error: 'Current ESPN event is not The Masters and has not started', inserted: 0, updated: 0 };
+    return { error: 'Current event is not The Masters and has not started', inserted: 0, updated: 0 };
   }
 
-  // Only sync if tournament is in progress or completed
   if (leaderboard.status === 'pre') {
     return { message: 'Tournament has not started yet', inserted: 0, updated: 0 };
   }
 
-  // Get round configs for position mapping
-  const roundConfigs = MASTERS_2026_CONFIG.rounds
-    .filter(r => r.key !== 'lowRound') // Skip prop bets
+  // Get tier configs for position mapping
+  const tiers = MASTERS_2026_CONFIG.rounds
+    .filter(r => !r.key.startsWith('lowRound') && r.key !== 'worstRound' && r.key !== 'worstOverall')
     .map(r => ({ key: r.key, teamsAdvancing: r.teamsAdvancing }));
 
   let inserted = 0;
@@ -124,8 +176,8 @@ async function syncGolfSession(
   const unmatched: string[] = [];
   const allUpdates: Array<{ teamId: number; roundKey: string; result: 'won' | 'lost' }> = [];
 
-  // Determine if we should assign results based on tournament state:
-  // - After R2 (cut is made): can assign makeCut results
+  // Determine what results we can assign based on tournament state:
+  // - After R2 (cut made): can assign makeCut results
   // - After R4 (tournament over): can assign all position-based results
   const cutMade = leaderboard.currentRound > 2 || leaderboard.status === 'post';
   const tournamentOver = leaderboard.status === 'post';
@@ -140,21 +192,19 @@ async function syncGolfSession(
 
     matched.push(`${player.name} → ID ${teamId} (pos: ${player.positionDisplay})`);
 
-    // Determine which results to record based on tournament state
     let results: Array<{ roundKey: string; result: 'won' | 'lost' }> = [];
 
     if (tournamentOver) {
-      // Tournament complete — record all results
-      results = positionToResults(player.position, player.isCut, player.isWithdrawn, roundConfigs);
+      // Tournament complete — record all tier results
+      results = positionToTierResults(player.position, player.isCut, player.isWithdrawn, tiers);
     } else if (cutMade) {
-      // Only record makeCut result after R2
+      // Only record makeCut after R2
       if (player.isCut || player.isWithdrawn) {
         results = [{ roundKey: 'makeCut', result: 'lost' }];
       } else if (player.madeCut) {
         results = [{ roundKey: 'makeCut', result: 'won' }];
       }
     }
-    // Before cut: don't record anything yet
 
     for (const { roundKey, result } of results) {
       const { error: upsertErr, status: upsertStatus } = await supabase
@@ -165,7 +215,7 @@ async function syncGolfSession(
             team_id: teamId,
             round_key: roundKey,
             result,
-            entered_by: null,
+            entered_by: null, // System-entered
             entered_at: new Date().toISOString(),
           },
           { onConflict: 'session_id,team_id,round_key' }
@@ -196,6 +246,7 @@ async function syncGolfSession(
 
   return {
     message: `Synced ${matched.length} players from ${leaderboard.tournamentName}`,
+    source: leaderboard.source,
     tournament: leaderboard.tournamentName,
     status: leaderboard.status,
     currentRound: leaderboard.currentRound,
