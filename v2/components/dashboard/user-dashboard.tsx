@@ -14,6 +14,7 @@ import {
   Radio,
   Plus,
   Info,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DashboardData, DashboardSession, DashboardTeam } from '@/actions/dashboard';
@@ -232,6 +233,53 @@ export function UserDashboard({ data }: { data: DashboardData }) {
           </Link>
         </div>
       </div>
+
+      {/* Masters 2026 Promotion — auto-hides after April 13, 2026 */}
+      {new Date() < new Date('2026-04-14') && (
+        <div className="relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-950/40 via-emerald-900/20 to-zinc-900/40 p-5">
+          <div className="absolute -right-8 -top-8 size-32 rounded-full bg-emerald-500/5 blur-2xl" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400 border border-emerald-500/20">
+                  Masters 2026
+                </span>
+                <span className="text-[10px] text-white/30">
+                  Tournament starts April 9
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-white">
+                Run a Masters Calcutta with your group
+              </h3>
+              <p className="text-xs text-white/40 max-w-md">
+                89-player field, balanced bundles, live bidding — free to host.
+                Strategy analytics show you what every golfer is worth before the auction.
+              </p>
+            </div>
+            <div className="flex flex-shrink-0 gap-2">
+              <Link href="/auction?tournament=masters_2026">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
+                >
+                  <Sparkles className="size-3.5" />
+                  Preview Analytics
+                </Button>
+              </Link>
+              <Link href="/host/create?tournament=masters_2026">
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  <Plus className="size-3.5" />
+                  Host Free
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary stats (only if user has bids) */}
       {hasAnyBids && (

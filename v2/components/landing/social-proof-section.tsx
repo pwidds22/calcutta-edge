@@ -1,23 +1,23 @@
 const STATS = [
   {
+    value: '48+',
+    label: 'Auction Participants',
+    detail: 'Across 5 completed auctions',
+  },
+  {
+    value: '$19.99',
+    label: 'Strategy Analytics',
+    detail: 'vs $39–98 at PoolGenius',
+  },
+  {
     value: 'Free',
     label: 'Auction Hosting',
     detail: 'No credit card required',
   },
   {
-    value: '4+',
-    label: 'Sports & Events',
-    detail: 'Golf, NCAA, NFL, Horse Racing',
-  },
-  {
-    value: 'Real-Time',
-    label: 'Live Bidding',
-    detail: 'Instant updates across all devices',
-  },
-  {
-    value: 'From $19.99',
-    label: 'Strategy Analytics',
-    detail: 'One-time per event',
+    value: '13+',
+    label: 'Odds Sources',
+    detail: 'Powered by DataGolf rankings',
   },
 ]
 

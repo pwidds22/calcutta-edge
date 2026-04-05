@@ -121,7 +121,7 @@ export function HeroSection() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-amber-400" />
               </span>
-              The Masters 2026 &middot; March Madness &middot; NFL &amp; More
+              Masters 2026 — Auctions Live Now &middot; Tournament Starts April 9
             </span>
 
             <h1 className="mt-6 text-4xl font-bold leading-[1.1] tracking-tight text-white sm:text-5xl">
@@ -132,20 +132,19 @@ export function HeroSection() {
             </h1>
 
             <p className="mt-5 text-base leading-relaxed text-white/50 sm:text-lg">
-              The only platform that runs your live auction AND gives you the
-              strategy edge to dominate it. Free to host. Analytics for those
-              who play to win.
+              The only platform with free live auction hosting AND strategy
+              analytics that show you exactly what every golfer is worth.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button size="lg" asChild className="gap-2">
                 <Link href="/register">
-                  Host Free Auction
+                  Host Your Masters Calcutta Free
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
               <Button variant="outline" size="lg" asChild className="border-white/10 bg-transparent text-white hover:bg-white/[0.06] hover:text-white">
-                <Link href="/auction">See Strategy Tool</Link>
+                <Link href="/auction">Preview Strategy Analytics</Link>
               </Button>
             </div>
 

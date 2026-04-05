@@ -40,10 +40,10 @@ export function HostingFeaturesSection() {
             Free live hosting
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Run your auction like a pro
+            Everything your commissioner needs. Nothing they don&apos;t.
           </h2>
           <p className="mt-4 text-base text-white/50">
-            Everything your commissioner needs to run a live Calcutta auction. No spreadsheets, no shouting over each other.
+            Set up in 5 minutes, run from any device, track results automatically. No spreadsheets, no shouting over each other.
           </p>
         </div>
 

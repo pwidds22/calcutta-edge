@@ -129,7 +129,7 @@ export function PricingSection() {
         </div>
 
         <p className="mt-8 text-center text-xs text-white/30">
-          Pool Genius charges $39&ndash;98 for less.
+          PoolGenius charges $39&ndash;98 for analytics alone. We include free hosting.
         </p>
       </div>
     </section>

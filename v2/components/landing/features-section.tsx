@@ -41,10 +41,10 @@ export function FeaturesSection() {
             Strategy analytics
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Know what every team is worth before you bid
+            The data edge nobody else at your table has
           </h2>
           <p className="mt-4 text-base text-white/50">
-            Pair with free hosting or use standalone. From $19.99/event.
+            Works with our free hosting or any auction. $19.99 for the Masters. Pays for itself on one smart bid.
           </p>
         </div>
 

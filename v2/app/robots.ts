@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/auction', '/host/', '/live/', '/profile', '/payment'],
+        disallow: ['/api/', '/auction', '/host/', '/live/', '/profile', '/payment', '/login', '/register'],
       },
     ],
     sitemap: 'https://calcuttaedge.com/sitemap.xml',

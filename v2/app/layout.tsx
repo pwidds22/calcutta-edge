@@ -19,30 +19,30 @@ export const metadata: Metadata = {
     icon: '/favicon.ico',
     apple: '/brand/calcutta_edge_180x180.png',
   },
-  title: "Calcutta Edge — The Calcutta Auction Platform | Free Hosting + Strategy Analytics",
+  title: "Calcutta Edge | Free Online Calcutta Auction Hosting + Strategy Analytics",
   description:
-    "Host your Calcutta auction for free with real-time bidding, countdown timers, and commissioner controls. Upgrade to strategy analytics with devigged odds, fair values, and profit projections. $29.99/event.",
+    "Host your Masters, March Madness, or NFL Calcutta auction free. Get devigged odds, fair values, and bid strategy from $19.99/event. The only all-in-one Calcutta platform.",
   keywords: [
-    "calcutta auction",
-    "calcutta auction hosting",
-    "calcutta auction platform",
-    "live calcutta auction",
-    "free calcutta hosting",
-    "calcutta auction calculator",
-    "march madness calcutta",
-    "masters calcutta",
-    "golf calcutta",
-    "masters auction",
+    "masters calcutta auction 2026",
     "masters calcutta auction",
     "golf calcutta auction",
-    "calcutta bidding strategy",
-    "calcutta auction tool",
-    "calcutta auction odds",
+    "calcutta auction online",
+    "calcutta auction platform",
+    "host calcutta auction free",
+    "what is a calcutta auction",
+    "how to run a calcutta auction",
+    "calcutta auction rules golf",
+    "golf calcutta strategy",
+    "calcutta auction fair value calculator",
+    "calcutta vs bracket pool golf",
+    "masters pool 2026",
+    "calcutta auction payout structure",
+    "march madness calcutta",
   ],
   openGraph: {
-    title: "Calcutta Edge — Host Your Calcutta Auction Free",
+    title: "Calcutta Edge | Free Calcutta Auction Hosting + Strategy Analytics",
     description:
-      "The only platform that hosts your live Calcutta auction AND gives you the strategy edge to win it. Free hosting + $29.99 analytics.",
+      "Host your Masters or March Madness Calcutta auction free. Devigged odds, fair values, and bid strategy from $19.99/event.",
     url: "https://calcuttaedge.com",
     siteName: "Calcutta Edge",
     type: "website",
@@ -51,16 +51,23 @@ export const metadata: Metadata = {
         url: "/brand/calcutta_edge_banner.png",
         width: 1500,
         height: 500,
-        alt: "Calcutta Edge — Host Free. Bid Smart.",
+        alt: "Calcutta Edge — Free Calcutta Auction Hosting + Strategy Analytics",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Calcutta Edge — Free Calcutta Auction Hosting + Strategy Analytics",
+    title: "Calcutta Edge | Free Calcutta Auction Hosting + Strategy Analytics",
     description:
-      "Host your Calcutta auction for free. Upgrade to devigged odds, fair values, and profit projections for $29.99/event.",
+      "Host your Masters Calcutta auction free. Devigged odds, fair values, and profit projections from $19.99/event.",
     images: ["/brand/calcutta_edge_banner.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: "https://calcuttaedge.com",
   },
 };
 
@@ -70,7 +77,7 @@ const jsonLd = {
   name: 'Calcutta Edge',
   url: 'https://calcuttaedge.com',
   description:
-    'Host your Calcutta auction for free with real-time bidding. Upgrade to strategy analytics with devigged odds and fair values.',
+    'Host your Calcutta auction free with real-time bidding. Strategy analytics with devigged odds and fair values from $19.99/event.',
   applicationCategory: 'SportsApplication',
   operatingSystem: 'Any',
   offers: [
@@ -83,12 +90,28 @@ const jsonLd = {
     },
     {
       '@type': 'Offer',
-      name: 'Strategy Analytics',
+      name: 'Masters Strategy Analytics',
+      price: '19.99',
+      priceCurrency: 'USD',
+      description: 'Devigged odds from 13+ sources, fair value calculations, suggested bids, and profit projections for the Masters.',
+    },
+    {
+      '@type': 'Offer',
+      name: 'March Madness Strategy Analytics',
       price: '29.99',
       priceCurrency: 'USD',
       description: 'Devigged odds, fair value calculations, suggested bids, and round-by-round profit projections.',
     },
   ],
+  publisher: {
+    '@type': 'Organization',
+    name: 'Calcutta Edge',
+    url: 'https://calcuttaedge.com',
+    logo: {
+      '@type': 'ImageObject',
+      url: 'https://calcuttaedge.com/brand/calcutta_edge_180x180.png',
+    },
+  },
 }
 
 export default function RootLayout({
