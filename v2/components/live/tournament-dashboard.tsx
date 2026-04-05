@@ -9,9 +9,10 @@ import { AuctionComplete } from './auction-complete';
 import { ResultsEntry } from './results-entry';
 import { BracketEntry } from './bracket-entry';
 import { Leaderboard } from './leaderboard';
+import { GolfLeaderboard } from './golf-leaderboard';
 import { SettlementMatrix } from './settlement-matrix';
 import { PropsEntry } from './props-entry';
-import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5, RefreshCw } from 'lucide-react';
+import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5, RefreshCw, Activity } from 'lucide-react';
 
 interface TournamentDashboardProps {
   sessionId: string;
@@ -27,7 +28,7 @@ interface TournamentDashboardProps {
   initialPaymentTracking?: Record<string, boolean>;
 }
 
-type TabKey = 'summary' | 'bracket' | 'results' | 'props' | 'leaderboard' | 'settlement';
+type TabKey = 'summary' | 'bracket' | 'results' | 'props' | 'golf-leaderboard' | 'leaderboard' | 'settlement';
 
 export function TournamentDashboard({
   sessionId,
@@ -46,11 +47,13 @@ export function TournamentDashboard({
   const hasProps = enabledProps.length > 0;
 
   const [activeTab, setActiveTab] = useState<TabKey>(
-    initialResults.length > 0
-      ? 'leaderboard'
-      : hasBracket
-        ? 'bracket'
-        : 'summary'
+    config.sport === 'golf'
+      ? 'golf-leaderboard'
+      : initialResults.length > 0
+        ? 'leaderboard'
+        : hasBracket
+          ? 'bracket'
+          : 'summary'
   );
   const [results, setResults] = useState<TournamentResult[]>(initialResults);
   const [propResults, setPropResults] = useState<PropResult[]>(initialPropResults);
@@ -98,7 +101,7 @@ export function TournamentDashboard({
   useEffect(() => {
     if (
       !hasAutoSynced.current &&
-      config.id === 'march_madness_2026' &&
+      (config.id === 'march_madness_2026' || config.id === 'masters_2026') &&
       initialResults.length === 0
     ) {
       hasAutoSynced.current = true;
@@ -217,6 +220,9 @@ export function TournamentDashboard({
     ...(hasProps
       ? [{ key: 'props' as TabKey, label: 'Props', icon: Dice5 }]
       : []),
+    ...(config.sport === 'golf'
+      ? [{ key: 'golf-leaderboard' as TabKey, label: 'Live Board', icon: Activity }]
+      : []),
     { key: 'leaderboard', label: 'Leaderboard', icon: BarChart3 },
     { key: 'settlement', label: 'Settlement', icon: DollarSign },
   ];
@@ -319,6 +325,15 @@ export function TournamentDashboard({
           isCommissioner={isCommissioner}
           actualPot={actualPot}
           onPropResultUpdate={handlePropResultUpdate}
+        />
+      )}
+
+      {activeTab === 'golf-leaderboard' && config.sport === 'golf' && (
+        <GolfLeaderboard
+          soldTeams={soldTeams}
+          baseTeams={baseTeams}
+          config={config}
+          payoutRules={payoutRules}
         />
       )}
 

@@ -199,8 +199,14 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
 
 export function UserDashboard({ data }: { data: DashboardData }) {
   const { sessions, totalPotExposure, totalEarned, totalNetPL, aliveTeams } = data;
-  const completedSessions = sessions.filter((s) => s.status === 'completed');
-  const activeSessions = sessions.filter((s) => s.status !== 'completed');
+  // A session is truly "completed" only when the auction is done AND all tournament
+  // rounds have results (currentRound === null). Otherwise it's still active.
+  const completedSessions = sessions.filter(
+    (s) => s.status === 'completed' && s.currentRound === null
+  );
+  const activeSessions = sessions.filter(
+    (s) => s.status !== 'completed' || s.currentRound !== null
+  );
   const hasAnyBids = sessions.some((s) => s.userTeamsCount > 0);
   const totalAlive = sessions.reduce((s, d) => s + d.userTeamsAlive, 0);
   const totalEliminated = sessions.reduce((s, d) => s + d.userTeamsEliminated, 0);
