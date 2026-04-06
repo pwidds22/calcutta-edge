@@ -183,6 +183,7 @@ export function ParticipantView({
             estimatedPotSize={session.estimated_pot_size}
             settings={session.settings}
             teamCount={activeTeamOrder.length}
+            rounds={config.rounds}
           />
           <ParticipantList
               registeredParticipants={participants.map((p) => ({

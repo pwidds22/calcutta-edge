@@ -1,6 +1,6 @@
 'use client';
 
-import type { PayoutRules } from '@/lib/tournaments/types';
+import type { PayoutRules, RoundConfig } from '@/lib/tournaments/types';
 import type { SessionSettings } from '@/lib/auction/live/types';
 import { BID_INCREMENT_PRESETS } from '@/lib/auction/live/types';
 import { getBundlePresets } from '@/lib/tournaments/bundles';
@@ -19,6 +19,7 @@ interface SessionRulesCardProps {
   estimatedPotSize: number;
   settings: SessionSettings;
   teamCount: number;
+  rounds: RoundConfig[];
 }
 
 export function SessionRulesCard({
@@ -26,6 +27,7 @@ export function SessionRulesCard({
   estimatedPotSize,
   settings,
   teamCount,
+  rounds,
 }: SessionRulesCardProps) {
   const timer = settings.timer;
   const increments = settings.bidIncrements;
@@ -54,7 +56,18 @@ export function SessionRulesCard({
   const sortedRules = Object.entries(payoutRules)
     .filter(([, pct]) => pct > 0)
     .sort(([, a], [, b]) => b - a);
-  const totalPayout = sortedRules.reduce((sum, [, pct]) => sum + pct, 0);
+
+  // Build a map of round key → position count from tournament config
+  const positionCounts: Record<string, number> = {};
+  for (const r of rounds) {
+    positionCounts[r.key] = r.teamsAdvancing;
+  }
+
+  // Multiply per-position % by position count (props not in rounds default to 1 winner)
+  const totalPayout = sortedRules.reduce(
+    (sum, [key, pct]) => sum + pct * (positionCounts[key] ?? 1),
+    0
+  );
 
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
@@ -71,20 +84,25 @@ export function SessionRulesCard({
             Payout Structure
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            {sortedRules.map(([round, pct]) => (
-              <div key={round} className="flex items-center justify-between">
-                <span className="text-xs text-white/40 capitalize">
-                  {formatRoundName(round)}
-                </span>
-                <span className="text-xs font-medium text-white/80">
-                  {pct}%
-                </span>
-              </div>
-            ))}
+            {sortedRules.map(([round, pct]) => {
+              const positions = positionCounts[round] ?? 1;
+              return (
+                <div key={round} className="flex items-center justify-between">
+                  <span className="text-xs text-white/40 capitalize">
+                    {formatRoundName(round)}
+                  </span>
+                  <span className="text-xs font-medium text-white/80">
+                    {pct}%{positions > 1 && (
+                      <span className="text-white/30 ml-1">×{positions}</span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-          {totalPayout !== 100 && (
+          {Math.round(totalPayout * 10) / 10 !== 100 && (
             <p className="text-[11px] text-amber-400/80">
-              Total: {totalPayout}% of pot
+              Total: {Math.round(totalPayout * 10) / 10}% of pot
             </p>
           )}
         </div>
