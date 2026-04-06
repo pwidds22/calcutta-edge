@@ -325,7 +325,7 @@ export function StrategyOverlay({
 
       {/* Blend weights — collapsible compact summary */}
       {selectedSource === 'blend' && oddsRegistry && (() => {
-        const totalPct = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        const totalPct = blendableSources.reduce((s, src) => s + (blendWeights[src.id] ?? 0), 0);
         const remaining = Math.max(0, 100 - totalPct);
         // Build compact summary: "DG 50% · DK 50%"
         const summaryParts = blendableSources
@@ -335,10 +335,12 @@ export function StrategyOverlay({
             return `${abbrev} ${blendWeights[s.id]}%`;
           });
 
+        // Only count weights for sources in the current registry (ignore stale localStorage keys)
+        const activeSourceIds = new Set(blendableSources.map(s => s.id));
         const handleBlendSlider = (sourceId: string, newValue: number) => {
           setBlendWeights(prev => {
             const otherTotal = Object.entries(prev)
-              .filter(([k]) => k !== sourceId)
+              .filter(([k]) => k !== sourceId && activeSourceIds.has(k))
               .reduce((s, [, v]) => s + v, 0);
             const capped = Math.min(newValue, 100 - otherTotal);
             return { ...prev, [sourceId]: Math.max(0, capped) };

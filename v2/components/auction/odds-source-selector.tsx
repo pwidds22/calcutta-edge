@@ -289,16 +289,17 @@ export function OddsSourceSelector({ registry }: OddsSourceSelectorProps) {
 
       {/* Blend panel */}
       {showBlend && (() => {
-        const totalPct = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        // Only count weights for sources in the current registry (ignore stale keys)
+        const activeSourceIds = new Set(blendSources.map(s => s.id));
+        const totalPct = blendSources.reduce((s, src) => s + (blendWeights[src.id] ?? 0), 0);
         const isOver = totalPct > 100;
         const remaining = Math.max(0, 100 - totalPct);
 
         const handleSliderChange = (sourceId: string, newValue: number) => {
           setBlendWeights((prev) => {
             const otherTotal = Object.entries(prev)
-              .filter(([k]) => k !== sourceId)
+              .filter(([k]) => k !== sourceId && activeSourceIds.has(k))
               .reduce((s, [, v]) => s + v, 0);
-            // Cap so total never exceeds 100
             const capped = Math.min(newValue, 100 - otherTotal);
             return { ...prev, [sourceId]: Math.max(0, capped) };
           });
