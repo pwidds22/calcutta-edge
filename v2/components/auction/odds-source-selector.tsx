@@ -67,19 +67,26 @@ const CustomOddsRow = memo(function CustomOddsRow({
 export function OddsSourceSelector({ registry }: OddsSourceSelectorProps) {
   const { state, dispatch } = useAuction();
 
-  // Blend state
+  // Blend state — values are actual percentages (0-100), total capped at 100%
   const [showBlend, setShowBlend] = useState(false);
-  const [blendWeights, setBlendWeights] = useState<Record<string, number>>({
-    evan_miya: 34,
-    team_rankings: 33,
-    fanduel: 0,
-    draftkings: 0,
-    pinnacle: 33,
+  const blendSources = registry.sources.filter((s) => s.type === 'model' || s.type === 'sportsbook');
+  const [blendWeights, setBlendWeights] = useState<Record<string, number>>(() => {
+    // Initialize: split evenly across first 2 data sources (model + top book)
+    const init: Record<string, number> = {};
+    for (const s of blendSources) init[s.id] = 0;
+    if (blendSources.length >= 2) {
+      init[blendSources[0].id] = 50;
+      init[blendSources[1].id] = 50;
+    } else if (blendSources.length === 1) {
+      init[blendSources[0].id] = 100;
+    }
+    return init;
   });
 
   // Custom editor state
   const [showCustom, setShowCustom] = useState(false);
-  const [customBase, setCustomBase] = useState('evan_miya');
+  const customBaseDefault = blendSources[0]?.id ?? 'evan_miya';
+  const [customBase, setCustomBase] = useState(customBaseDefault);
   const [customDraft, setCustomDraft] = useState<Record<number, Record<string, string>>>({});
 
   const roundKeys = state.config?.rounds.map((r) => r.key) ?? [];
@@ -215,8 +222,6 @@ export function OddsSourceSelector({ registry }: OddsSourceSelectorProps) {
 
   // Exclude blend and custom from main row — they get special treatment
   const mainSources = registry.sources.filter((s) => s.type !== 'blend' && s.type !== 'custom');
-  // All data sources for blend sliders (models + sportsbooks)
-  const blendSources = registry.sources.filter((s) => s.type === 'model' || s.type === 'sportsbook');
 
   // Sorted teams for custom editor
   const sortedTeams = [...state.teams].sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99));
@@ -284,14 +289,33 @@ export function OddsSourceSelector({ registry }: OddsSourceSelectorProps) {
 
       {/* Blend panel */}
       {showBlend && (() => {
-        const totalWeight = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        const totalPct = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        const isOver = totalPct > 100;
+        const remaining = Math.max(0, 100 - totalPct);
+
+        const handleSliderChange = (sourceId: string, newValue: number) => {
+          setBlendWeights((prev) => {
+            const otherTotal = Object.entries(prev)
+              .filter(([k]) => k !== sourceId)
+              .reduce((s, [, v]) => s + v, 0);
+            // Cap so total never exceeds 100
+            const capped = Math.min(newValue, 100 - otherTotal);
+            return { ...prev, [sourceId]: Math.max(0, capped) };
+          });
+        };
+
         return (
           <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
-            <p className="text-[10px] uppercase tracking-wider text-white/30">Weight each source</p>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-wider text-white/30">Blend Sources</p>
+              <span className={`text-[11px] font-mono ${isOver ? 'text-red-400' : totalPct === 100 ? 'text-emerald-400/70' : 'text-white/30'}`}>
+                {totalPct}% / 100%
+                {remaining > 0 && <span className="text-white/20 ml-1">({remaining}% left)</span>}
+              </span>
+            </div>
             <div className="space-y-2">
               {blendSources.map((source) => {
                 const weight = blendWeights[source.id] ?? 0;
-                const effectivePct = totalWeight > 0 ? Math.round((weight / totalWeight) * 100) : 0;
                 return (
                   <div key={source.id} className="flex items-center gap-3">
                     <span className="w-24 text-[11px] text-white/50 truncate">{source.name}</span>
@@ -300,17 +324,12 @@ export function OddsSourceSelector({ registry }: OddsSourceSelectorProps) {
                       min={0}
                       max={100}
                       value={weight}
-                      onChange={(e) =>
-                        setBlendWeights((prev) => ({
-                          ...prev,
-                          [source.id]: parseInt(e.target.value, 10),
-                        }))
-                      }
+                      onChange={(e) => handleSliderChange(source.id, parseInt(e.target.value, 10))}
                       className="flex-1 h-1 accent-emerald-500"
                     />
-                    <span className="w-14 text-right text-[11px] font-mono text-white/40">
+                    <span className="w-12 text-right text-[11px] font-mono text-white/40">
                       {weight > 0 ? (
-                        <><span className="text-emerald-400/70">{effectivePct}%</span></>
+                        <span className="text-emerald-400/70">{weight}%</span>
                       ) : (
                         <span className="text-white/20">off</span>
                       )}
@@ -321,7 +340,8 @@ export function OddsSourceSelector({ registry }: OddsSourceSelectorProps) {
             </div>
             <button
               onClick={handleBlendApply}
-              className="rounded-md bg-emerald-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 transition-colors"
+              disabled={totalPct === 0}
+              className="rounded-md bg-emerald-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Apply Blend
             </button>

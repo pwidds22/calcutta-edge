@@ -125,7 +125,7 @@ function buildBookProbabilities(
     let dgSubsetSum = 0;
     let dgSubsetCount = 0;
     for (const dgId of implied.keys()) {
-      const dgProb = dgModelProbs.get(dgId)?.[roundKey];
+      const dgProb = dgModelProbs?.get(dgId)?.[roundKey];
       if (dgProb && dgProb > 0) {
         dgSubsetSum += dgProb;
         dgSubsetCount++;
