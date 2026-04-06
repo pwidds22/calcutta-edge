@@ -7,11 +7,9 @@ import { usePathname, useSearchParams } from 'next/navigation'
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    if (
-      process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN &&
-      !window.location.hostname.includes('localhost')
-    ) {
-      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN, {
+    const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN?.trim()
+    if (token && !window.location.hostname.includes('localhost')) {
+      posthog.init(token, {
         api_host: '/ingest',
         ui_host: 'https://us.i.posthog.com',
         capture_pageview: false,
