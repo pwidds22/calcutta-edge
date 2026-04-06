@@ -70,6 +70,11 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
     paymentUrl.searchParams.set('prefilled_email', user.email)
   }
 
+  // If user came from within the app (has returnTo), skip features page → go straight to Stripe
+  if (params.returnTo) {
+    redirect(paymentUrl.toString())
+  }
+
   const price = ((config.strategyPrice ?? 2999) / 100).toFixed(2)
   const features = FEATURES_BY_SPORT[config.sport] ?? DEFAULT_FEATURES
 
