@@ -33,14 +33,16 @@ export async function POST(request: NextRequest) {
       session.customer_email || session.customer_details?.email
     const rawClientRefId = session.client_reference_id
 
-    // Parse client_reference_id — new format: "userId:tournamentId", legacy: "userId"
+    // Parse client_reference_id — format: "userId--tournamentId", legacy: "userId"
+    // NOTE: Stripe only allows alphanumeric, dashes, underscores in client_reference_id.
+    // Colons are silently dropped, so we use "--" (double dash) as separator.
     let clientRefId: string | null = null
     let tournamentId = 'march_madness_2026' // default for legacy payments
     if (rawClientRefId) {
-      if (rawClientRefId.includes(':')) {
-        const parts = rawClientRefId.split(':')
-        clientRefId = parts[0]
-        tournamentId = parts[1] ?? tournamentId
+      if (rawClientRefId.includes('--')) {
+        const separatorIdx = rawClientRefId.indexOf('--')
+        clientRefId = rawClientRefId.substring(0, separatorIdx)
+        tournamentId = rawClientRefId.substring(separatorIdx + 2) || tournamentId
       } else {
         clientRefId = rawClientRefId
       }

@@ -64,8 +64,9 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
   const linkEnvKey = config.stripePaymentLinkEnvKey ?? 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL'
   const linkUrl = process.env[linkEnvKey] ?? PAYMENT_LINK_URL
   const paymentUrl = new URL(linkUrl)
-  // Encode tournament ID in client_reference_id: userId:tournamentId
-  paymentUrl.searchParams.set('client_reference_id', `${user.id}:${config.id}`)
+  // Encode tournament ID in client_reference_id: userId--tournamentId
+  // NOTE: Stripe only allows alphanumeric, dashes, underscores. Colons are silently dropped.
+  paymentUrl.searchParams.set('client_reference_id', `${user.id}--${config.id}`)
   if (user.email) {
     paymentUrl.searchParams.set('prefilled_email', user.email)
   }
