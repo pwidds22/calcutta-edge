@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'INPUT=$(cat); if echo \"$INPUT\" | grep -qP \"file_path.*?[/\\\\]\\.[e]nv\"; then echo \"BLOCKED: Do not write env files\" >&2; exit 2; fi'"
+            "command": "bash -c 'INPUT=$(cat); if echo \"$INPUT\" | grep -qP \"file_path.*?[/\\]\.[e]nv\"; then echo \"BLOCKED: Do not write env files\" >&2; exit 2; fi'"
           }
         ]
       },
@@ -15,7 +15,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'INPUT=$(cat); if echo \"$INPUT\" | grep -qE \"package-lock\\.json\"; then echo \"BLOCKED: Do not edit package-lock.json directly - use npm install instead\" >&2; exit 2; fi'"
+            "command": "bash -c 'INPUT=$(cat); if echo \"$INPUT\" | grep -qE \"package-lock\.json\"; then echo \"BLOCKED: Do not edit package-lock.json directly - use npm install instead\" >&2; exit 2; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "intercept",
+            "command": "node .claude/hooks/pre-push-check.js \"$TOOL_INPUT\""
           }
         ]
       }
@@ -26,19 +35,65 @@
       "Read",
       "Edit",
       "Write",
+      "Bash(npm run:*)",
       "Bash(npm run dev)",
       "Bash(npm test)",
       "Bash(npm install *)",
+      "Bash(npm ls:*)",
+      "Bash(npm show:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx next:*)",
+      "Bash(npx shadcn@latest:*)",
+      "Bash(npx vitest:*)",
+      "Bash(git status:*)",
       "Bash(git status*)",
-      "Bash(git diff*)",
+      "Bash(git log:*)",
       "Bash(git log*)",
+      "Bash(git diff:*)",
+      "Bash(git diff*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
       "Bash(git add *)",
+      "Bash(git commit:*)",
       "Bash(git commit *)",
+      "Bash(git push:*)",
       "Bash(git push *)",
+      "Bash(git branch:*)",
       "Bash(git branch*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)",
+      "Bash(git merge:*)",
+      "Bash(git restore:*)",
+      "Bash(node:*)",
       "Bash(node *)",
+      "Bash(ls:*)",
       "Bash(ls *)",
-      "Bash(mkdir *)"
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(echo:*)",
+      "Bash(dir:*)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(mkdir *)",
+      "Bash(curl:*)",
+      "Bash(cd v2 *)",
+      "Bash(cd v2 && *)",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__execute_sql",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__list_tables",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__apply_migration",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__search_docs",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__get_advisors",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__generate_typescript_types",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__list_migrations",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__get_logs",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__get_project_url",
+      "mcp__ea3ad3eb-3024-448b-8856-1382f4e6888d__get_publishable_keys"
     ]
   }
 }
