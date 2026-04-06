@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import { PAYMENT_LINK_URL } from '@/lib/stripe/config'
 import { Button } from '@/components/ui/button'
 import { Check, ArrowRight } from 'lucide-react'
@@ -50,31 +49,14 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
     ? requestedTournament
     : getActiveTournament()
 
-  // Store returnTo in cookie so we can redirect back after payment
-  // Only allow relative paths to prevent open redirect
-  const returnTo = params.returnTo
-  if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
-    const cookieStore = await cookies()
-    cookieStore.set('payment_return_to', returnTo, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 60 * 30, // 30 minutes
-      path: '/',
-    })
-  }
-
   // Check if already paid for this tournament — redirect back to origin
   const alreadyPaid = await hasTournamentAccess(supabase, user.id, config.id)
   if (alreadyPaid) {
-    const cookieStore = await cookies()
-    const returnCookie = cookieStore.get('payment_return_to')
-    const dest = returnCookie?.value
-    // Validate: must be relative path (prevent open redirect from tampered cookie)
-    const destination = (dest && dest.startsWith('/') && !dest.startsWith('//'))
-      ? dest
+    const returnTo = params.returnTo
+    // Validate: must be relative path (prevent open redirect)
+    const destination = (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//'))
+      ? returnTo
       : `/auction?tournament=${config.id}`
-    cookieStore.delete('payment_return_to')
     redirect(destination)
   }
 
