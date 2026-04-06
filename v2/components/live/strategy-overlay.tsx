@@ -14,11 +14,6 @@ const ODDS_SOURCE_KEY = 'calcutta_odds_source';
 const BLEND_WEIGHTS_KEY = 'calcutta_blend_weights';
 const DEFAULT_BID_PCT = 95;
 const DEFAULT_BLEND_WEIGHTS: Record<string, number> = {
-  evan_miya: 34,
-  team_rankings: 33,
-  fanduel: 0,
-  draftkings: 0,
-  pinnacle: 33,
 };
 
 /** Renders round-by-round odds + cumulative profit for a single team */
@@ -330,15 +325,26 @@ export function StrategyOverlay({
 
       {/* Blend weights — collapsible compact summary */}
       {selectedSource === 'blend' && oddsRegistry && (() => {
-        const totalWeight = Object.values(blendWeights).reduce((s, w) => s + w, 0);
-        // Build compact summary: "EM 34% · TR 33% · Pin 33%"
+        const totalPct = Object.values(blendWeights).reduce((s, w) => s + w, 0);
+        const remaining = Math.max(0, 100 - totalPct);
+        // Build compact summary: "DG 50% · DK 50%"
         const summaryParts = blendableSources
           .filter(s => (blendWeights[s.id] ?? 0) > 0)
           .map(s => {
-            const pct = totalWeight > 0 ? Math.round(((blendWeights[s.id] ?? 0) / totalWeight) * 100) : 0;
             const abbrev = s.name.length > 6 ? s.name.slice(0, 3) : s.name;
-            return `${abbrev} ${pct}%`;
+            return `${abbrev} ${blendWeights[s.id]}%`;
           });
+
+        const handleBlendSlider = (sourceId: string, newValue: number) => {
+          setBlendWeights(prev => {
+            const otherTotal = Object.entries(prev)
+              .filter(([k]) => k !== sourceId)
+              .reduce((s, [, v]) => s + v, 0);
+            const capped = Math.min(newValue, 100 - otherTotal);
+            return { ...prev, [sourceId]: Math.max(0, capped) };
+          });
+        };
+
         return (
           <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
             {/* Header — always visible, click to expand */}
@@ -350,7 +356,7 @@ export function StrategyOverlay({
               <span className="text-[10px] font-medium text-emerald-300">Blend Weights</span>
               <div className="flex items-center gap-2">
                 <span className="text-[9px] font-mono text-emerald-400/60">
-                  {summaryParts.join(' · ')}
+                  {summaryParts.join(' · ')}{remaining > 0 ? ` · ${remaining}% left` : ''}
                 </span>
                 {showBlendPanel ? <ChevronUp className="size-3 text-white/30" /> : <ChevronDown className="size-3 text-white/30" />}
               </div>
@@ -358,9 +364,13 @@ export function StrategyOverlay({
             {/* Expanded sliders */}
             {showBlendPanel && (
               <div className="border-t border-emerald-500/10 px-3 pb-2 pt-1.5 space-y-1.5">
+                <div className="flex justify-end">
+                  <span className={`text-[9px] font-mono ${totalPct === 100 ? 'text-emerald-400/70' : 'text-white/30'}`}>
+                    {totalPct}% / 100%
+                  </span>
+                </div>
                 {blendableSources.map((src) => {
                   const weight = blendWeights[src.id] ?? 0;
-                  const effectivePct = totalWeight > 0 ? Math.round((weight / totalWeight) * 100) : 0;
                   return (
                     <div key={src.id} className="flex items-center gap-1.5">
                       <span className="w-16 text-[9px] text-white/50 truncate">{src.name}</span>
@@ -370,11 +380,11 @@ export function StrategyOverlay({
                         max={100}
                         step={1}
                         value={weight}
-                        onChange={(e) => setBlendWeights(prev => ({ ...prev, [src.id]: Number(e.target.value) }))}
+                        onChange={(e) => handleBlendSlider(src.id, Number(e.target.value))}
                         className="flex-1 h-1 rounded-full appearance-none bg-white/10 accent-emerald-500 cursor-pointer"
                       />
                       <span className="w-10 text-right text-[9px] font-mono text-emerald-400">
-                        {weight > 0 ? `${effectivePct}%` : <span className="text-white/20">off</span>}
+                        {weight > 0 ? `${weight}%` : <span className="text-white/20">off</span>}
                       </span>
                     </div>
                   );
