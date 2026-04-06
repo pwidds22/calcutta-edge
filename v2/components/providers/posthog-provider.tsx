@@ -5,9 +5,14 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
 import { Suspense, useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
+if (
+  typeof window !== 'undefined' &&
+  process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN &&
+  !window.location.hostname.includes('localhost')
+) {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
+    api_host: '/ingest',
+    ui_host: 'https://us.i.posthog.com',
     capture_pageview: false, // We capture manually below for SPA navigation
     capture_pageleave: true,
   })
