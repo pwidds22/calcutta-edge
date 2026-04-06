@@ -36,3 +36,12 @@ build/
 v2/.next/
 v2/node_modules/
 .vercel
+
+# Claude Code / MCP tools
+.claude/
+v2/.claude/
+.playwright-mcp/
+
+# Working docs (not deployed)
+blog/
+docs/
