@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
 
   // Allow specific API routes — they handle their own auth.
   // SECURITY: Allowlist only known prefixes, not blanket /api/
-  if (path.startsWith('/api/webhooks') || path.startsWith('/api/test-') || path.startsWith('/api/espn') || path.startsWith('/api/golf')) {
+  if (path.startsWith('/api/webhooks') || path.startsWith('/api/test-') || path.startsWith('/api/espn') || path.startsWith('/api/golf') || path.startsWith('/ingest')) {
     return supabaseResponse
   }
 
