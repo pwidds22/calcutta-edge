@@ -1,5 +1,10 @@
 import type { Team, RoundKey, TournamentConfig } from './types';
 
+/** Check if americanOdds has any non-zero values */
+function hasAnyAmericanOdds(ao: Record<string, number>): boolean {
+  return Object.values(ao).some((v) => v !== 0);
+}
+
 /**
  * Convert American odds to implied probability.
  * Positive odds (underdog): 100 / (odds + 100)
@@ -50,8 +55,13 @@ function devigGroup(
   );
   if (overround === 0) return;
 
+  // Only normalize when overround > targetSum (i.e., there's actual vig to remove).
+  // When overround ≤ targetSum (synthetic/estimated odds with no vig), use raw
+  // probabilities as-is — scaling UP would create artificially inflated probabilities.
+  const scale = overround > targetSum ? targetSum / overround : 1;
+
   for (const team of teams) {
-    team.odds[round] = (team.rawImpliedProbabilities[round] / overround) * targetSum;
+    team.odds[round] = Math.min(1, team.rawImpliedProbabilities[round] * scale);
     if (capRound) {
       team.odds[round] = Math.min(team.odds[round], team.odds[capRound]);
     }
@@ -177,9 +187,58 @@ export function devigRoundOdds(teams: Team[], config: TournamentConfig): void {
 }
 
 /**
+ * Fill gaps in raw implied probabilities using fallback probabilities.
+ *
+ * When sportsbook odds are incomplete (some players missing odds for certain
+ * markets), we use DataGolf/model probabilities as fallback. But since those
+ * are already devigged (no vig), we need to "re-vig" them to match the
+ * sportsbook data before devigging the full set together.
+ *
+ * For each round:
+ * 1. Compute vig factor from players WITH sportsbook odds
+ * 2. For players WITHOUT odds, use fallback probability × vig factor
+ * 3. Now the full set can be devigged uniformly
+ */
+function fillOddsGaps(
+  teams: Team[],
+  roundKeys: string[],
+  config: TournamentConfig
+): void {
+  for (let i = 0; i < roundKeys.length; i++) {
+    const key = roundKeys[i];
+    const round = config.rounds[i];
+    if (!round) continue;
+
+    const withOdds = teams.filter((t) => t.rawImpliedProbabilities[key] > 0);
+    const missing = teams.filter((t) => t.rawImpliedProbabilities[key] === 0);
+
+    if (missing.length === 0 || withOdds.length === 0) continue;
+
+    // No team has a fallback probability for this round — nothing to fill
+    if (!missing.some((t) => t.probabilities?.[key])) continue;
+
+    // Vig factor: how much the sportsbook inflates probabilities above fair value.
+    // Expected fair sum for the subset = targetSum × (subset size / field size)
+    // Vig factor = actual raw sum / expected fair sum
+    const rawSum = withOdds.reduce((s, t) => s + t.rawImpliedProbabilities[key], 0);
+    const expectedFairSubset = round.teamsAdvancing * (withOdds.length / teams.length);
+    const vigFactor = expectedFairSubset > 0 ? rawSum / expectedFairSubset : 1;
+
+    for (const team of missing) {
+      const fallback = team.probabilities?.[key] ?? 0;
+      if (fallback > 0) {
+        // Re-vig the fallback probability so it blends with sportsbook data
+        team.rawImpliedProbabilities[key] = fallback * vigFactor;
+      }
+    }
+  }
+}
+
+/**
  * Calculate implied probabilities for all teams.
  * 1. Converts American odds -> raw implied probabilities (includes vig)
- * 2. Devigs by tournament structure -> fair probabilities
+ * 2. Fills gaps using fallback probabilities (re-vigged to match)
+ * 3. Devigs by tournament structure -> fair probabilities
  *
  * Mutates teams in place and returns them.
  */
@@ -193,8 +252,8 @@ export function calculateImpliedProbabilities(
     const raw: Record<string, number> = {};
     const odds: Record<string, number> = {};
 
-    if (team.probabilities) {
-      // Direct probabilities provided (model-based data, no vig to remove)
+    if (team.probabilities && !hasAnyAmericanOdds(team.americanOdds)) {
+      // Direct probabilities only (model-based data, no vig to remove)
       for (const key of roundKeys) {
         raw[key] = team.probabilities[key] ?? 0;
         odds[key] = 0;
@@ -211,6 +270,10 @@ export function calculateImpliedProbabilities(
     team.rawImpliedProbabilities = raw;
     team.odds = odds;
   }
+
+  // Fill gaps: players missing sportsbook odds for a round get their
+  // fallback (model/DG) probability re-vigged to match the book data
+  fillOddsGaps(teams, roundKeys, config);
 
   devigRoundOdds(teams, config);
 

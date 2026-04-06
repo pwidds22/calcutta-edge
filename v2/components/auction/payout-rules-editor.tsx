@@ -74,7 +74,7 @@ export function PayoutRulesEditor() {
                     type="number"
                     min={0}
                     max={100}
-                    step={0.5}
+                    step={0.01}
                     value={draft[round.key] ?? 0}
                     onChange={(e) => handleChange(round.key, e.target.value)}
                     className="pr-7 text-right text-sm"
@@ -100,7 +100,7 @@ export function PayoutRulesEditor() {
                       type="number"
                       min={0}
                       max={100}
-                      step={0.5}
+                      step={0.01}
                       value={draft[prop.key] ?? 0}
                       onChange={(e) => handleChange(prop.key, e.target.value)}
                       className="pr-7 text-right text-sm"

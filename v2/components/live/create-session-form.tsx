@@ -97,7 +97,23 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const handlePresetSelect = (mode: PayoutMode) => {
     setPayoutMode(mode);
     if (mode !== 'custom' && presets[mode]) {
-      setCustomRules({ ...presets[mode].rules });
+      const rules = { ...presets[mode].rules };
+      setCustomRules(rules);
+
+      // Auto-enable props from preset: if a preset includes non-zero prop values,
+      // sync them into the Prop Bets section so there's a single source of truth.
+      const propKeys = new Set(standardProps.map((p) => p.key));
+      const presetPropKeys = new Set<string>();
+      const presetPropPcts: Record<string, number> = {};
+      for (const [key, val] of Object.entries(rules)) {
+        if (propKeys.has(key) && val > 0) {
+          presetPropKeys.add(key);
+          presetPropPcts[key] = val;
+        }
+      }
+      setEnabledPropKeys(presetPropKeys);
+      setPropPercentages(presetPropPcts);
+      if (presetPropKeys.size > 0) setShowPropsSection(true);
     }
   };
 
@@ -134,11 +150,12 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
     .reduce((sum, p) => sum + (propPercentages[p.key] ?? p.defaultPercentage), 0)
     + customProps.reduce((sum, cp) => sum + cp.percentage, 0);
 
+  // Props are tracked solely via enabledPropTotal (from the Prop Bets section).
+  // Don't also count prop keys from activeRules to avoid double-counting.
   const totalPercent = rounds.reduce(
     (sum, r) => sum + (activeRules[r.key] ?? 0) * r.teamsAdvancing,
     0
-  ) + propBets.reduce((sum, p) => sum + (activeRules[p.key] ?? 0), 0)
-    + enabledPropTotal;
+  ) + enabledPropTotal;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,7 +175,24 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
     setLoading(true);
     setError(null);
 
-    const payoutRules = getActiveRules();
+    // Start with the placement rules, then merge in enabled prop percentages
+    const baseRules = getActiveRules();
+    const payoutRules: Record<string, number> = {};
+    // Copy only placement round keys (exclude any stale prop keys from presets)
+    const propKeySet = new Set(standardProps.map((p) => p.key));
+    for (const [key, val] of Object.entries(baseRules)) {
+      if (!propKeySet.has(key)) {
+        payoutRules[key] = val;
+      }
+    }
+    // Add enabled props with their current percentages
+    for (const prop of standardProps) {
+      if (enabledPropKeys.has(prop.key)) {
+        payoutRules[prop.key] = propPercentages[prop.key] ?? prop.defaultPercentage;
+      } else {
+        payoutRules[prop.key] = 0;
+      }
+    }
 
     const submitEntry = getTournament(selectedTournament.id);
     const submitTeams = submitEntry?.teams ?? [];
@@ -577,7 +611,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                         type="number"
                         min={0}
                         max={100}
-                        step={0.5}
+                        step={0.01}
                         value={customRules[round.key] ?? 0}
                         onChange={(e) => handleCustomRuleChange(round.key, e.target.value)}
                         className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 pr-6 text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none"
@@ -593,31 +627,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                 ))}
               </div>
 
-              {propBets.length > 0 && (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-                  {propBets.map((prop) => (
-                    <div key={prop.key}>
-                      <label className="block text-[10px] text-white/40 mb-0.5">
-                        {prop.label}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={0.5}
-                          value={customRules[prop.key] ?? 0}
-                          onChange={(e) => handleCustomRuleChange(prop.key, e.target.value)}
-                          className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 pr-6 text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none"
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
-                          %
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Props are configured in the Prop Bets section below */}
             </div>
           )}
         </div>
@@ -680,9 +690,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                             <div className="relative">
                               <input
                                 type="number"
-                                min={0.5}
+                                min={0.05}
                                 max={50}
-                                step={0.5}
+                                step={0.01}
                                 value={pct}
                                 onChange={(e) =>
                                   setPropPercentages((prev) => ({
@@ -728,9 +738,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                     <div className="relative">
                       <input
                         type="number"
-                        min={0.5}
+                        min={0.05}
                         max={50}
-                        step={0.5}
+                        step={0.01}
                         value={cp.percentage}
                         onChange={(e) =>
                           setCustomProps((prev) =>

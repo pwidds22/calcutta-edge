@@ -257,7 +257,7 @@ export function EditSettingsModal({
                           type="number"
                           min={0}
                           max={100}
-                          step={0.5}
+                          step={0.01}
                           value={customRules[round.key] ?? 0}
                           onChange={(e) => handleCustomRuleChange(round.key, e.target.value)}
                           className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 pr-6 text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none"

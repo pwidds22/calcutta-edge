@@ -155,12 +155,25 @@ export async function joinSession(joinCode: string, displayName: string, passwor
     }
   }
 
+  // Prevent duplicate display names within a session (case-insensitive)
+  const trimmedName = displayName.trim();
+  const { data: nameTaken } = await supabase
+    .from('auction_participants')
+    .select('id')
+    .eq('session_id', session.id)
+    .ilike('display_name', trimmedName)
+    .single();
+
+  if (nameTaken) {
+    return { error: `"${trimmedName}" is already taken in this auction. Try adding a last initial (e.g. "John S")` };
+  }
+
   const { error: joinError } = await supabase
     .from('auction_participants')
     .insert({
       session_id: session.id,
       user_id: user.id,
-      display_name: displayName.trim(),
+      display_name: trimmedName,
       is_commissioner: false,
     });
 
