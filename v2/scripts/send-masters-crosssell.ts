@@ -54,9 +54,8 @@ function buildCrossSellEmail(name?: string): string {
           </p>
           <p style="${styles.text}">
             The Masters tees off <strong style="color: #fff;">Thursday, April 9</strong>.
-            If your March Madness Calcutta was a hit, imagine the same format for the
-            biggest week in golf &mdash; 89 players, four days at Augusta, and the kind of
-            leaderboard drama that keeps everyone glued through Sunday.
+            Calcutta auctions work perfectly for golf &mdash; 89 players, four days at Augusta,
+            and the kind of leaderboard drama that keeps everyone glued through Sunday.
           </p>
 
           <div style="${styles.featureRow}">
@@ -75,7 +74,7 @@ function buildCrossSellEmail(name?: string): string {
             </p>
             <p style="color: #a3a3a3; font-size: 13px; line-height: 1.5; margin: 0;">
               Fair values for every golfer across 5 finish tiers (Cut, T20, T10, T5, Win).
-              Devigged odds from 13+ sportsbooks via DataGolf. Know exactly what each golfer is
+              Devigged odds from 5+ sportsbooks via DataGolf. Know exactly what each golfer is
               worth before the bidding starts.
             </p>
           </div>
@@ -86,7 +85,7 @@ function buildCrossSellEmail(name?: string): string {
             <strong style="color: #fff;">Why golf Calcuttas hit different:</strong>
             No single-round elimination. Every golfer plays at least 36 holes.
             Spread payouts mean 10-20 finishing positions can earn money.
-            Your whole portfolio stays alive through the weekend &mdash; every birdie matters.
+            More of your portfolio stays alive deeper into the weekend &mdash; every birdie matters.
           </p>
 
           <p style="${styles.text}">
@@ -124,7 +123,8 @@ function buildCrossSellEmail(name?: string): string {
 }
 
 // ── Config ────────────────────────────────────────────────────
-const DRY_RUN = true; // Set to false to actually send
+const DRY_RUN = true; // SENT 2026-04-05: 80 recipients, 0 failures
+const DRAFT_TO: string | null = null; // Set to email for draft, null for all users
 const SUBJECT = 'The Masters starts Thursday. Your Calcutta should too.';
 
 async function main() {
@@ -142,8 +142,9 @@ async function main() {
   }
 
   const EXCLUDE = new Set(['spivack711@gmail.com']);
-  const recipients = (profiles?.map((p) => p.email).filter(Boolean) ?? [])
+  const allRecipients = (profiles?.map((p) => p.email).filter(Boolean) ?? [])
     .filter((e) => !EXCLUDE.has(e));
+  const recipients = DRAFT_TO ? [DRAFT_TO] : allRecipients;
 
   if (recipients.length === 0) {
     console.log('⚠️  No recipients found in profiles table.');
