@@ -177,13 +177,23 @@ export function ParticipantView({
         </div>
 
         {/* Show session rules so participants know the setup */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <SessionRulesCard
             payoutRules={session.payout_rules}
             estimatedPotSize={session.estimated_pot_size}
             settings={session.settings}
             teamCount={activeTeamOrder.length}
             rounds={config.rounds}
+          />
+          <TeamQueue
+            sessionId={session.id}
+            teamOrder={activeTeamOrder}
+            baseTeams={baseTeams}
+            soldTeams={channel.soldTeams}
+            currentTeamIdx={channel.currentTeamIdx}
+            auctionStatus={channel.auctionStatus}
+            bundles={bundles}
+            isCommissioner={false}
           />
           <ParticipantList
               registeredParticipants={participants.map((p) => ({
