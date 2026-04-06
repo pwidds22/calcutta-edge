@@ -81,10 +81,16 @@ export function TournamentDashboard({
       if (data.error) {
         setSyncMessage(`Error: ${data.error}`);
       } else if (data.inserted === 0 && data.updated === 0) {
-        setSyncMessage('No new results found');
+        const lowRoundMsg = data.lowRound
+          ? ` | Low R${data.lowRound.round}: ${data.lowRound.players.join(', ')} (${data.lowRound.score > 0 ? '+' : ''}${data.lowRound.score})`
+          : '';
+        setSyncMessage(`No new results found${lowRoundMsg}`);
       } else {
         const count = data.games?.length ?? data.matched ?? 0;
-        setSyncMessage(`Synced ${count} ${config.sport === 'golf' ? 'players' : 'games'}`);
+        const lowRoundMsg = data.lowRound
+          ? ` | Low R${data.lowRound.round}: ${data.lowRound.players.join(', ')} (${data.lowRound.score > 0 ? '+' : ''}${data.lowRound.score})`
+          : '';
+        setSyncMessage(`Synced ${count} ${config.sport === 'golf' ? 'players' : 'games'}${lowRoundMsg}`);
         // Results will update via broadcast — no manual refetch needed
       }
     } catch {

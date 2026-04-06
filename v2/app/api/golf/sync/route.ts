@@ -230,6 +230,25 @@ async function syncGolfSession(
     }
   }
 
+  // ─── Low Round Tracking ──────────────────────────────────────────
+  // Find the player(s) with the lowest today score for the current round.
+  // Included in the response so the commissioner can assign props.
+  const playersWithToday = leaderboard.players.filter(
+    (p) => p.todayScore !== null && !p.isCut && !p.isWithdrawn
+  );
+  let lowRoundInfo: { round: number; score: number; players: string[] } | undefined;
+  if (playersWithToday.length > 0) {
+    const minScore = Math.min(...playersWithToday.map((p) => p.todayScore!));
+    const leaders = playersWithToday
+      .filter((p) => p.todayScore === minScore)
+      .map((p) => p.name);
+    lowRoundInfo = {
+      round: leaderboard.currentRound,
+      score: minScore,
+      players: leaders,
+    };
+  }
+
   // Update session status
   if (allUpdates.length > 0) {
     const newStatus = tournamentOver ? 'settled' : 'in_progress';
@@ -254,5 +273,6 @@ async function syncGolfSession(
     unmatched: unmatched.length > 0 ? unmatched : undefined,
     inserted,
     updated,
+    lowRound: lowRoundInfo,
   };
 }

@@ -139,12 +139,13 @@ export function matchPlayerToTeamId(
     n.toLowerCase()
       .replace(/['']/g, '')
       .replace(/\s+(jr|sr|ii|iii|iv)\.?$/i, '')
-      .replace(/[áàäâ]/g, 'a')
+      .replace(/[áàäâå]/g, 'a')
       .replace(/[éèëê]/g, 'e')
       .replace(/[íìïî]/g, 'i')
-      .replace(/[óòöô]/g, 'o')
+      .replace(/[óòöôø]/g, 'o')
       .replace(/[úùüû]/g, 'u')
       .replace(/[ñ]/g, 'n')
+      .replace(/[ß]/g, 'ss')
       .trim();
 
   const normalizedEspn = normalize(espnName);

@@ -115,18 +115,25 @@ export function PayoutRulesEditor() {
           )}
 
           <div className="mt-4 flex items-center justify-between border-t pt-4">
-            <span className="text-sm">
-              Total:{' '}
-              <span
-                className={`font-semibold ${
-                  Math.abs(totalPercent - 100) < 0.01
-                    ? 'text-emerald-400'
-                    : 'text-amber-400'
-                }`}
-              >
-                {totalPercent.toFixed(1)}%
+            <div>
+              <span className="text-sm">
+                Total:{' '}
+                <span
+                  className={`font-semibold ${
+                    Math.abs(totalPercent - 100) < 0.01
+                      ? 'text-emerald-400'
+                      : 'text-amber-400'
+                  }`}
+                >
+                  {totalPercent.toFixed(1)}%
+                </span>
               </span>
-            </span>
+              {config?.sport === 'golf' && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Ties at tier boundaries split that tier&apos;s payout proportionally.
+                </p>
+              )}
+            </div>
             <Button size="sm" onClick={handleApply}>
               Apply Rules
             </Button>

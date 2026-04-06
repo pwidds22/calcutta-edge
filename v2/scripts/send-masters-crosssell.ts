@@ -141,7 +141,9 @@ async function main() {
     return;
   }
 
-  const recipients = profiles?.map((p) => p.email).filter(Boolean) ?? [];
+  const EXCLUDE = new Set(['spivack711@gmail.com']);
+  const recipients = (profiles?.map((p) => p.email).filter(Boolean) ?? [])
+    .filter((e) => !EXCLUDE.has(e));
 
   if (recipients.length === 0) {
     console.log('⚠️  No recipients found in profiles table.');

@@ -528,18 +528,25 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
 
           {/* Total and customize toggle */}
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-white/30">
-              Total payout:{' '}
-              <span
-                className={`font-medium ${
-                  Math.abs(totalPercent - 100) < 0.5
-                    ? 'text-emerald-400'
-                    : 'text-amber-400'
-                }`}
-              >
-                {totalPercent.toFixed(1)}%
+            <div>
+              <span className="text-xs text-white/30">
+                Total payout:{' '}
+                <span
+                  className={`font-medium ${
+                    Math.abs(totalPercent - 100) < 0.5
+                      ? 'text-emerald-400'
+                      : 'text-amber-400'
+                  }`}
+                >
+                  {totalPercent.toFixed(1)}%
+                </span>
               </span>
-            </span>
+              {selectedTournament?.sport === 'golf' && (
+                <p className="text-[10px] text-white/25 mt-0.5">
+                  Ties at tier boundaries (e.g. 22 players T20) split that tier&apos;s payout proportionally.
+                </p>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => {

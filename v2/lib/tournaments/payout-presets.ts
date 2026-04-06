@@ -64,43 +64,60 @@ export const MARCH_MADNESS_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
 };
 
 /**
- * Masters: makeCut×50 + top20×20 + top10×10 + top5×5 + winner×1 = 100%
+ * Masters: makeCut×50 + top20×20 + top10×10 + top5×5 + winner×1 + props = 100%
+ * Prop keys must match the tournament config's propBets[].key exactly
+ * (lowRoundR1–R4, worstRound, worstOverall) or they won't be counted in totals.
  */
 export const MASTERS_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
   balanced: {
     label: 'Balanced',
     description: 'Spread payouts across finishes — rewards consistency',
     rules: {
-      makeCut: 0.10,   // ×50 = 5%
-      top20: 0.50,     // ×20 = 10%
-      top10: 1.50,     // ×10 = 15%
-      top5: 4.00,      // ×5  = 20%
-      winner: 50.00,   // ×1  = 50%
-      lowRound: 0,
+      makeCut: 0.10,       // ×50 = 5%
+      top20: 0.50,         // ×20 = 10%
+      top10: 1.50,         // ×10 = 15%
+      top5: 4.00,          // ×5  = 20%
+      winner: 50.00,       // ×1  = 50%
+      lowRoundR1: 0,
+      lowRoundR2: 0,
+      lowRoundR3: 0,
+      lowRoundR4: 0,
+      worstRound: 0,
+      worstOverall: 0,
     },
   },
   topHeavy: {
     label: 'Winner Takes Most',
     description: 'Majority of the pot goes to the champion',
     rules: {
-      makeCut: 0.04,   // ×50 = 2%
-      top20: 0.15,     // ×20 = 3%
-      top10: 0.50,     // ×10 = 5%
-      top5: 2.00,      // ×5  = 10%
-      winner: 80.00,   // ×1  = 80%
-      lowRound: 0,
+      makeCut: 0.04,       // ×50 = 2%
+      top20: 0.15,         // ×20 = 3%
+      top10: 0.50,         // ×10 = 5%
+      top5: 2.00,          // ×5  = 10%
+      winner: 80.00,       // ×1  = 80%
+      lowRoundR1: 0,
+      lowRoundR2: 0,
+      lowRoundR3: 0,
+      lowRoundR4: 0,
+      worstRound: 0,
+      worstOverall: 0,
     },
   },
   withProps: {
     label: 'With Low Round',
-    description: '85% placement payouts, 15% for low round bonus',
+    description: '85% placement payouts, 15% for daily low round bonuses',
     rules: {
-      makeCut: 0.08,   // ×50 = 4%
-      top20: 0.40,     // ×20 = 8%
-      top10: 1.20,     // ×10 = 12%
-      top5: 3.20,      // ×5  = 16%
-      winner: 45.00,   // ×1  = 45%
-      lowRound: 15.00,
+      makeCut: 0.08,       // ×50 = 4%
+      top20: 0.40,         // ×20 = 8%
+      top10: 1.20,         // ×10 = 12%
+      top5: 3.20,          // ×5  = 16%
+      winner: 45.00,       // ×1  = 45%
+      lowRoundR1: 3.75,    // Thu low round = 3.75%
+      lowRoundR2: 3.75,    // Fri low round = 3.75%
+      lowRoundR3: 3.75,    // Sat low round = 3.75%
+      lowRoundR4: 3.75,    // Sun low round = 3.75%  (total: 15%)
+      worstRound: 0,
+      worstOverall: 0,
     },
   },
 };

@@ -6,7 +6,7 @@ import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/
 import type { DataGolfInPlayPlayer, DataGolfInPlayResponse } from '@/lib/datagolf/client';
 import { formatPlayerName } from '@/lib/datagolf/client';
 import { calculateDeadHeatFractions } from '@/lib/datagolf/leaderboard';
-import { RefreshCw, Activity, Wifi } from 'lucide-react';
+import { RefreshCw, Activity, Wifi, Trophy } from 'lucide-react';
 
 interface GolfLeaderboardProps {
   soldTeams: SoldTeam[];
@@ -78,14 +78,29 @@ function calculateLiveEV(
   return hasAnyProb ? ev : null;
 }
 
+/** Normalize a name for matching: lowercase, strip accents (incl. Scandinavian å/ø) */
+function normalizeName(n: string): string {
+  return n.toLowerCase()
+    .replace(/[áàäâå]/g, 'a')
+    .replace(/[éèëê]/g, 'e')
+    .replace(/[íìïî]/g, 'i')
+    .replace(/[óòöôø]/g, 'o')
+    .replace(/[úùüû]/g, 'u')
+    .replace(/[ñ]/g, 'n')
+    .replace(/[ß]/g, 'ss')
+    .replace(/['']/g, '')
+    .trim();
+}
+
 /**
  * Build a name-matching map from baseTeams to quickly find teamId by player name.
  * Handles "First Last" format from DataGolf → baseTeam.name matching.
+ * Uses accent normalization for Scandinavian names (Åberg, Højgaard).
  */
 function buildNameMap(baseTeams: BaseTeam[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const t of baseTeams) {
-    map.set(t.name.toLowerCase(), t.id);
+    map.set(normalizeName(t.name), t.id);
   }
   return map;
 }
@@ -156,7 +171,7 @@ export function GolfLeaderboard({
   // Build rows by matching DataGolf players to auction teams
   const rows: LeaderboardRow[] = (data?.data ?? []).map((player) => {
     const displayName = formatPlayerName(player.player_name);
-    const teamId = nameMap.get(displayName.toLowerCase()) ?? null;
+    const teamId = nameMap.get(normalizeName(displayName)) ?? null;
     const owner = teamId !== null ? ownerMap.get(teamId) : null;
     const liveEV = calculateLiveEV(player, actualPot, payoutRules);
     const fractions = deadHeatMap.get(player.dg_id) ?? null;
@@ -216,6 +231,21 @@ export function GolfLeaderboard({
     );
   }
 
+  // ─── Low Round Leaders ──────────────────────────────────────────
+  // Find the player(s) with the lowest "today" score for the current round.
+  // Only show when at least one player has started (today !== null).
+  const roundDayLabels: Record<number, string> = { 1: 'Thu', 2: 'Fri', 3: 'Sat', 4: 'Sun' };
+  const playersWithScores = rows.filter(
+    (r) => r.player.today !== null && r.player.current_pos !== 'CUT'
+      && r.player.current_pos !== 'WD' && r.player.current_pos !== 'DQ'
+  );
+  const lowScore = playersWithScores.length > 0
+    ? Math.min(...playersWithScores.map((r) => r.player.today!))
+    : null;
+  const lowRoundLeaders = lowScore !== null
+    ? playersWithScores.filter((r) => r.player.today === lowScore)
+    : [];
+
   return (
     <div className="space-y-3">
       {/* Header bar */}
@@ -242,6 +272,41 @@ export function GolfLeaderboard({
           </button>
         </div>
       </div>
+
+      {/* Low Round Leader banner */}
+      {lowRoundLeaders.length > 0 && lowScore !== null && (
+        <div className="rounded-lg border border-amber-500/15 bg-amber-500/5 px-4 py-2.5 flex items-center gap-3">
+          <Trophy className="size-4 text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-[10px] uppercase tracking-wider text-amber-400/60">
+              Low Round — {roundDayLabels[data.current_round] ?? `R${data.current_round}`}
+            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-sm font-medium text-white truncate">
+                {lowRoundLeaders.map((r) => r.displayName).join(', ')}
+              </span>
+              <span className="font-mono text-sm font-bold text-red-400">
+                {fmtScore(lowScore)}
+              </span>
+              {lowRoundLeaders.length > 1 && (
+                <span className="rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-400/70">
+                  {lowRoundLeaders.length}-way tie
+                </span>
+              )}
+              {lowRoundLeaders.some((r) => r.player.thru !== null && r.player.thru < 18) && (
+                <span className="text-[10px] text-white/25">
+                  (in progress)
+                </span>
+              )}
+            </div>
+          </div>
+          {lowRoundLeaders.length === 1 && lowRoundLeaders[0].owner && (
+            <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-white/70 shrink-0">
+              {lowRoundLeaders[0].owner}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Leaderboard table */}
       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden">
