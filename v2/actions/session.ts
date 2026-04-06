@@ -253,12 +253,13 @@ export async function getSessionState(sessionId: string) {
     .select('team_id, round_key, result')
     .eq('session_id', sessionId);
 
-  // Check payment status for strategy overlay
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('has_paid')
-    .eq('id', user.id)
-    .single();
+  // Check payment status for strategy overlay (per-tournament)
+  const { hasTournamentAccess } = await import('@/lib/auth/tournament-access');
+  const hasPaidForTournament = await hasTournamentAccess(
+    supabase,
+    user.id,
+    session.tournament_id
+  );
 
   // Build display name lookup for bid history
   const participantMap: Record<string, string> = {};
@@ -278,7 +279,7 @@ export async function getSessionState(sessionId: string) {
       result: 'won' | 'lost' | 'pending';
     }>,
     isCommissioner,
-    hasPaid: profile?.has_paid ?? false,
+    hasPaid: hasPaidForTournament,
     userId: user.id,
   };
 }

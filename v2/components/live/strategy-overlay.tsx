@@ -70,6 +70,7 @@ function RoundOddsRow({
 
 interface StrategyOverlayProps {
   hasPaid: boolean;
+  sessionId: string;
   currentTeamId: number | string | null;
   currentHighestBid: number;
   config: TournamentConfig;
@@ -83,6 +84,7 @@ interface StrategyOverlayProps {
 
 export function StrategyOverlay({
   hasPaid,
+  sessionId,
   currentTeamId,
   currentHighestBid,
   config,
@@ -176,8 +178,6 @@ export function StrategyOverlay({
     : (oddsRegistry?.sources.find(s => s.id === selectedSource)?.name ?? 'Default');
 
   if (!hasPaid) {
-    const paymentUrl = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL;
-
     return (
       <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
         <div className="flex items-start gap-3">
@@ -195,24 +195,15 @@ export function StrategyOverlay({
           </div>
         </div>
         <div className="mt-3 flex items-center gap-2">
-          {paymentUrl ? (
-            <a
-              href={paymentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
-            >
-              Unlock for ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
-              <ExternalLink className="size-3.5" />
-            </a>
-          ) : (
-            <a
-              href={`/payment?tournament=${config.id}`}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
-            >
-              Unlock for ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
-            </a>
-          )}
+          <a
+            href={`/payment?tournament=${config.id}&returnTo=${encodeURIComponent(`/live/${sessionId}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
+          >
+            Unlock for ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
+            <ExternalLink className="size-3.5" />
+          </a>
           <span className="text-[10px] text-white/30">
             Opens in new tab — come back to keep bidding
           </span>

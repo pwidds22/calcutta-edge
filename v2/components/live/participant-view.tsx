@@ -277,6 +277,7 @@ export function ParticipantView({
 
             <StrategyOverlay
               hasPaid={hasPaid}
+              sessionId={session.id}
               currentTeamId={currentTeamId}
               currentHighestBid={channel.currentHighestBid}
               config={config}
