@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { loadAuctionData, listUserLeagues } from '@/actions/auction'
 import { AuctionTool } from '@/components/auction/auction-tool'
-import { getActiveTournament, getTournament, listTournaments } from '@/lib/tournaments/registry'
+import { getActiveTournament, getTournament, listTournaments, getOddsRegistry } from '@/lib/tournaments/registry'
 import { normalizePayoutRules } from '@/lib/calculations/normalize'
 import { hasTournamentAccess } from '@/lib/auth/tournament-access'
 import Link from 'next/link'
@@ -44,6 +44,9 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
 
   // Normalize payout rules: map legacy DB keys to current config keys
   const payoutRules = normalizePayoutRules(auctionData?.payoutRules, config)
+
+  // Fetch odds registry (async for golf — DataGolf API; sync for March Madness)
+  const oddsRegistry = await getOddsRegistry(config.id) ?? null
 
   return (
     <div className="container mx-auto max-w-[1400px] px-4 py-6">
@@ -93,6 +96,7 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
         hasPaid={hasPaid}
         leagueName={selectedLeague}
         leagueList={leagueList}
+        oddsRegistry={oddsRegistry}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AuctionProvider, useAuction } from '@/lib/auction/auction-context';
@@ -11,11 +11,11 @@ import { SummaryStatsCards } from './summary-stats-cards';
 import { TeamTable } from './team-table';
 import { OddsSourceSelector } from './odds-source-selector';
 import { initializeTeams } from '@/lib/calculations/initialize';
-import { getOddsRegistry } from '@/lib/tournaments/registry';
 import { renameLeague, resetAuctionData } from '@/actions/auction';
 import { Lock, Trash2, ChevronDown, Plus, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { SavedTeamData, PayoutRules, TournamentConfig, BaseTeam } from '@/lib/calculations/types';
+import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 
 interface AuctionToolInnerProps {
   initialTeams: SavedTeamData[];
@@ -26,6 +26,7 @@ interface AuctionToolInnerProps {
   hasPaid: boolean;
   leagueName: string;
   leagueList: string[];
+  oddsRegistry: OddsSourceRegistry | null;
 }
 
 function AuctionToolInner({
@@ -37,10 +38,10 @@ function AuctionToolInner({
   hasPaid,
   leagueName,
   leagueList,
+  oddsRegistry,
 }: AuctionToolInnerProps) {
   const { state, dispatch } = useAuction();
   const { isSaving, lastSaved, error } = useAutoSave();
-  const oddsRegistry = useMemo(() => config ? getOddsRegistry(config.id) : undefined, [config]);
 
   // Initialize on mount AND when league changes (URL nav triggers new server props)
   useEffect(() => {
@@ -120,7 +121,7 @@ function AuctionToolInner({
       {!oddsRegistry && config?.sport === 'golf' && (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 text-xs text-white/50">
           <span className="font-medium text-white/70">Odds source:</span>{' '}
-          Estimated from DataGolf rankings. Real sportsbook lines will be available closer to tournament week.
+          Using default odds from tournament config. Live sportsbook sources unavailable.
         </div>
       )}
 

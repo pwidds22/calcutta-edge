@@ -114,6 +114,76 @@ export async function fetchDataGolfLeaderboard(): Promise<GolfLeaderboard> {
   };
 }
 
+// ─── Low Round Identification ───────────────────────────────────
+
+export interface LowRoundResult {
+  round: number; // 1-4
+  roundKey: string; // 'lowRoundR1' etc.
+  /** Lowest score (strokes) for this round */
+  lowScore: number;
+  /** Players who shot the low score */
+  players: Array<{ name: string; dgId: number }>;
+  /** Dead heat fraction (1/N if N-way tie) */
+  deadHeatFraction: number;
+  /** Whether this round is complete (all players finished) */
+  isComplete: boolean;
+}
+
+/**
+ * Identify low round scorer(s) for each completed round from in-play data.
+ * Uses R1-R4 stroke counts (not relative to par) to find the minimum.
+ * Handles ties with dead heat fractions.
+ */
+export function identifyLowRounds(
+  data: DataGolfInPlayResponse
+): LowRoundResult[] {
+  const results: LowRoundResult[] = [];
+  const roundKeys = ['R1', 'R2', 'R3', 'R4'] as const;
+  const propKeys = ['lowRoundR1', 'lowRoundR2', 'lowRoundR3', 'lowRoundR4'];
+
+  for (let i = 0; i < 4; i++) {
+    const roundNum = i + 1;
+    const roundField = roundKeys[i];
+
+    // Collect all valid scores for this round (exclude WD/DQ/null)
+    const scores: Array<{ name: string; dgId: number; score: number }> = [];
+    for (const p of data.data) {
+      const score = p[roundField];
+      if (typeof score === 'number' && score > 0) {
+        scores.push({
+          name: formatPlayerName(p.player_name),
+          dgId: p.dg_id,
+          score,
+        });
+      }
+    }
+
+    if (scores.length === 0) continue;
+
+    const lowScore = Math.min(...scores.map(s => s.score));
+    const leaders = scores.filter(s => s.score === lowScore);
+
+    // A round is "complete" if we're past it (current_round > roundNum)
+    // or if it's the current round and all active players are through 18
+    const isComplete = data.current_round > roundNum ||
+      (data.current_round === roundNum && data.data.every(
+        p => p.current_pos === 'CUT' || p.current_pos === 'WD' || p.current_pos === 'DQ' ||
+             p.thru === null || p.thru === 18
+      ));
+
+    results.push({
+      round: roundNum,
+      roundKey: propKeys[i],
+      lowScore,
+      players: leaders.map(l => ({ name: l.name, dgId: l.dgId })),
+      deadHeatFraction: 1 / leaders.length,
+      isComplete,
+    });
+  }
+
+  return results;
+}
+
 // ─── Position-Based Results ──────────────────────────────────────
 
 /**

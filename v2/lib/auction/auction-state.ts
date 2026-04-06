@@ -195,15 +195,21 @@ export function auctionReducer(
     }
 
     case 'SET_ODDS_SOURCE': {
-      // Swap probabilities on each team from the selected source, then recalculate
+      // Source probabilities are already devigged fair values.
+      // Set them directly as final odds, bypassing the devig pipeline.
+      // For teams NOT in the source, keep their existing odds unchanged.
+      const roundKeys = state.config?.rounds.map(r => r.key) ?? [];
       const teams = state.teams.map((t) => {
         const sourceProbs = action.probabilities[t.id];
         if (!sourceProbs) return t;
-        return { ...t, probabilities: sourceProbs };
+        const odds: Record<string, number> = {};
+        for (const key of roundKeys) {
+          odds[key] = sourceProbs[key] ?? 0;
+        }
+        return { ...t, probabilities: sourceProbs, odds };
       });
       const newState: AuctionState = { ...state, teams, oddsSource: action.sourceId };
       if (state.config) {
-        calculateImpliedProbabilities(newState.teams, state.config);
         recalculateValues(newState);
       }
       return newState;

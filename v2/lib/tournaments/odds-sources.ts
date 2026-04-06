@@ -1,4 +1,4 @@
-import type { RoundKey } from './types';
+import type { RoundKey, BaseTeam } from './types';
 import { MARCH_MADNESS_2026_TEAMS } from './configs/march-madness-2026';
 import { TEAM_RANKINGS_2026 } from './data/team-rankings-2026';
 import {
@@ -6,6 +6,12 @@ import {
   buildDraftKingsProbabilities,
   buildPinnacleProbabilities,
 } from './devig-pipeline';
+import { fetchAllOdds, fetchPreTournament } from '@/lib/datagolf/client';
+import {
+  buildAllOddsSources,
+  buildDgIdToTeamIdMap,
+  mapSourceToTeamIds,
+} from '@/lib/datagolf/odds-builder';
 
 /** Per-team probability data from a single source */
 export interface OddsSourceProbabilities {
@@ -64,6 +70,78 @@ export function buildMarchMadness2026Registry(): OddsSourceRegistry {
       pinnacle: buildPinnacleProbabilities(),
     },
   };
+}
+
+// ─── Golf Odds Registry (Dynamic from DataGolf API) ──────────────
+
+/**
+ * Build an odds source registry for a golf tournament using live DataGolf API data.
+ * Fetches all 5 outright markets, devigs each sportsbook, and maps to team IDs.
+ *
+ * @param teams - The tournament's BaseTeam array (for dg_id → teamId mapping)
+ * @param defaultSourceId - Which source to pre-select (default: 'draftkings')
+ */
+/** Curated list of sources to show in the golf odds selector */
+const GOLF_ALLOWED_SOURCES = new Set([
+  'datagolf_history', // DataGolf model with course fit — the only model source
+  'draftkings',
+  'caesars',
+  'fanduel',
+  'betcris',
+  'bet365',
+]);
+
+export async function buildGolfOddsRegistry(
+  teams: BaseTeam[],
+  defaultSourceId = 'datagolf_history'
+): Promise<OddsSourceRegistry> {
+  // Fetch pre-tournament model predictions (all 5 markets, already fair)
+  // and outrights sportsbook odds (vigged, need devigging) in parallel
+  const [allOdds, preTournament] = await Promise.all([
+    fetchAllOdds('pga'),
+    fetchPreTournament('pga'),
+  ]);
+
+  const dgSources = buildAllOddsSources(allOdds, preTournament.baseline_history_fit);
+  const dgIdMap = buildDgIdToTeamIdMap(allOdds, teams);
+
+  const minCoverage = Math.floor(teams.length * 0.3); // Need 30%+ coverage to include
+  const sources: OddsSource[] = [];
+  const staticData: Record<string, OddsSourceProbabilities> = {};
+
+  for (const src of dgSources) {
+    // Only include curated sources
+    if (!GOLF_ALLOWED_SOURCES.has(src.name)) continue;
+
+    const teamProbs = mapSourceToTeamIds(src, dgIdMap);
+    const coverage = Object.keys(teamProbs).length;
+
+    if (coverage < minCoverage) continue;
+
+    const sourceType: OddsSource['type'] = src.name.startsWith('datagolf') ? 'model' : 'sportsbook';
+    sources.push({
+      id: src.name,
+      name: src.label,
+      description: `${coverage}/${teams.length} golfers`,
+      type: sourceType,
+      isRemote: false, // Already fetched
+    });
+
+    staticData[src.name] = {
+      teams: teamProbs,
+      updatedAt: allOdds.win?.last_updated ?? new Date().toISOString(),
+    };
+  }
+
+  // Add blend + custom meta-sources
+  sources.push({ id: 'blend', name: 'Blend', description: 'Custom weighted blend', type: 'blend', isRemote: false });
+  sources.push({ id: 'custom', name: 'Custom', description: 'Your own probabilities', type: 'custom', isRemote: false });
+
+  // If the requested default isn't available, fall back to first source
+  const hasDefault = sources.some(s => s.id === defaultSourceId);
+  const resolvedDefault = hasDefault ? defaultSourceId : (sources[0]?.id ?? 'draftkings');
+
+  return { sources, defaultSourceId: resolvedDefault, staticData };
 }
 
 /**

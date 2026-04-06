@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
 import { MASTERS_2026_TEAMS, MASTERS_2026_CONFIG } from '@/lib/tournaments/configs/masters-2026';
-import { fetchDataGolfLeaderboard, positionToTierResults } from '@/lib/datagolf/leaderboard';
+import { fetchDataGolfLeaderboard, positionToTierResults, identifyLowRounds } from '@/lib/datagolf/leaderboard';
 import type { GolfLeaderboard } from '@/lib/datagolf/leaderboard';
+import { fetchInPlay } from '@/lib/datagolf/client';
 import { fetchGolfLeaderboard, matchPlayerToTeamId, positionToResults } from '@/lib/espn/golf-leaderboard';
 
 /**
@@ -230,23 +231,57 @@ async function syncGolfSession(
     }
   }
 
-  // ─── Low Round Tracking ──────────────────────────────────────────
-  // Find the player(s) with the lowest today score for the current round.
-  // Included in the response so the commissioner can assign props.
-  const playersWithToday = leaderboard.players.filter(
-    (p) => p.todayScore !== null && !p.isCut && !p.isWithdrawn
-  );
-  let lowRoundInfo: { round: number; score: number; players: string[] } | undefined;
-  if (playersWithToday.length > 0) {
-    const minScore = Math.min(...playersWithToday.map((p) => p.todayScore!));
-    const leaders = playersWithToday
-      .filter((p) => p.todayScore === minScore)
-      .map((p) => p.name);
-    lowRoundInfo = {
-      round: leaderboard.currentRound,
-      score: minScore,
-      players: leaders,
-    };
+  // ─── Low Round Auto-Grading ─────────────────────────────────────
+  // Fetch raw in-play data to get R1-R4 stroke scores for low round identification.
+  // Only attempt if we have a DataGolf API key.
+  const lowRoundResults: Array<{ round: number; score: number; players: string[]; isComplete: boolean }> = [];
+  let lowRoundGraded = 0;
+
+  if (process.env.DATAGOLF_API_KEY) {
+    try {
+      const rawInPlay = await fetchInPlay('pga');
+      const lowRounds = identifyLowRounds(rawInPlay);
+
+      for (const lr of lowRounds) {
+        lowRoundResults.push({
+          round: lr.round,
+          score: lr.lowScore,
+          players: lr.players.map(p => p.name),
+          isComplete: lr.isComplete,
+        });
+
+        // Only auto-grade completed rounds
+        if (!lr.isComplete) continue;
+
+        // Grade each low round winner
+        for (const winner of lr.players) {
+          const teamId = matchPlayerToTeamId(winner.name, MASTERS_2026_TEAMS);
+          if (teamId === null) continue;
+
+          const { error: upsertErr, status: upsertStatus } = await supabase
+            .from('tournament_results')
+            .upsert(
+              {
+                session_id: sessionId,
+                team_id: teamId,
+                round_key: lr.roundKey,
+                result: 'won',
+                entered_by: null,
+                entered_at: new Date().toISOString(),
+              },
+              { onConflict: 'session_id,team_id,round_key' }
+            );
+
+          if (!upsertErr) {
+            upsertStatus === 201 ? inserted++ : updated++;
+            lowRoundGraded++;
+            allUpdates.push({ teamId, roundKey: lr.roundKey, result: 'won' });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Golf Sync] Low round identification failed:', err);
+    }
   }
 
   // Update session status
@@ -273,6 +308,7 @@ async function syncGolfSession(
     unmatched: unmatched.length > 0 ? unmatched : undefined,
     inserted,
     updated,
-    lowRound: lowRoundInfo,
+    lowRounds: lowRoundResults.length > 0 ? lowRoundResults : undefined,
+    lowRoundGraded,
   };
 }

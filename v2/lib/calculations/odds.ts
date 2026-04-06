@@ -253,7 +253,7 @@ export function calculateImpliedProbabilities(
     const odds: Record<string, number> = {};
 
     if (team.probabilities && !hasAnyAmericanOdds(team.americanOdds)) {
-      // Direct probabilities only (model-based data, no vig to remove)
+      // Direct probabilities only (model-based data like Evan Miya, no vig to remove)
       for (const key of roundKeys) {
         raw[key] = team.probabilities[key] ?? 0;
         odds[key] = 0;

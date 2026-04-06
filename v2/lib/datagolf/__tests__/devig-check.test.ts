@@ -35,20 +35,20 @@ function devigGlobal(
 }
 
 describe('Masters 2026 devig sanity check', () => {
-  it('Scheffler win probability should be ~10-18% (estimated odds)', () => {
+  it('Scheffler win probability should be ~10-18% (real DraftKings odds)', () => {
     const winProbs = devigGlobal(MASTERS_2026_TEAMS, 'winner', 1);
     const schefflerWin = winProbs.get(1)!; // ID 1 = Scheffler
-    // +450 with 89-player field → ~11-12% after devig
-    // Will be closer to 13-15% with real sportsbook odds (available ~April 6)
+    // +485 with 91-player field → ~13-17% after devig
     expect(schefflerWin).toBeGreaterThan(0.08);
     expect(schefflerWin).toBeLessThan(0.20);
     console.log(`Scheffler win prob: ${(schefflerWin * 100).toFixed(2)}%`);
   });
 
-  it('Scheffler makeCut probability should be very high (>85%)', () => {
+  it('Scheffler makeCut probability should be very high (>75%)', () => {
     const cutProbs = devigGlobal(MASTERS_2026_TEAMS, 'makeCut', 50);
     const schefflerCut = cutProbs.get(1)!;
-    expect(schefflerCut).toBeGreaterThan(0.85);
+    // With real sportsbook odds, devigged makeCut is ~80% (heavy vig on cut markets)
+    expect(schefflerCut).toBeGreaterThan(0.75);
     console.log(`Scheffler makeCut prob: ${(schefflerCut * 100).toFixed(2)}%`);
   });
 
@@ -76,17 +76,17 @@ describe('Masters 2026 devig sanity check', () => {
     console.log(`Top5 prob sum: ${sum.toFixed(2)}`);
   });
 
-  it('Rahm (+700) should devig to ~8-12% win probability', () => {
+  it('Rahm (+910) should devig to ~6-12% win probability', () => {
     const winProbs = devigGlobal(MASTERS_2026_TEAMS, 'winner', 1);
     const rahmWin = winProbs.get(2)!; // ID 2 = Rahm
-    expect(rahmWin).toBeGreaterThan(0.06);
+    expect(rahmWin).toBeGreaterThan(0.05);
     expect(rahmWin).toBeLessThan(0.15);
     console.log(`Rahm win prob: ${(rahmWin * 100).toFixed(2)}%`);
   });
 
-  it('Fred Couples (+150000) should have tiny win probability', () => {
+  it('Fred Couples (+500000) should have tiny win probability', () => {
     const winProbs = devigGlobal(MASTERS_2026_TEAMS, 'winner', 1);
-    const couplesWin = winProbs.get(81)!; // ID 81 = Couples
+    const couplesWin = winProbs.get(91)!; // ID 91 = Couples (real odds)
     expect(couplesWin).toBeLessThan(0.001);
     console.log(`Couples win prob: ${(couplesWin * 100).toFixed(4)}%`);
   });
@@ -100,7 +100,7 @@ describe('Masters 2026 devig sanity check', () => {
     console.log('\nTop 10 Win Probabilities:');
     for (const [id, prob] of sorted) {
       const team = MASTERS_2026_TEAMS.find(t => t.id === id);
-      console.log(`  ${team?.name.padEnd(25)} ${(prob * 100).toFixed(2)}% (${team?.americanOdds.winner > 0 ? '+' : ''}${team?.americanOdds.winner})`);
+      console.log(`  ${team?.name.padEnd(25)} ${(prob * 100).toFixed(2)}% (${(team?.americanOdds.winner ?? 0) > 0 ? '+' : ''}${team?.americanOdds.winner})`);
     }
   });
 });

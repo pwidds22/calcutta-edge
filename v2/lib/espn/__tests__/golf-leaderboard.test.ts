@@ -8,23 +8,23 @@ describe('matchPlayerToTeamId', () => {
   it('matches exact names', () => {
     expect(matchPlayerToTeamId('Scottie Scheffler', MASTERS_2026_TEAMS)).toBe(1);
     expect(matchPlayerToTeamId('Jon Rahm', MASTERS_2026_TEAMS)).toBe(2);
-    expect(matchPlayerToTeamId('Rory McIlroy', MASTERS_2026_TEAMS)).toBe(3);
+    expect(matchPlayerToTeamId('Rory McIlroy', MASTERS_2026_TEAMS)).toBe(4);
   });
 
   it('matches case-insensitively', () => {
     expect(matchPlayerToTeamId('scottie scheffler', MASTERS_2026_TEAMS)).toBe(1);
-    expect(matchPlayerToTeamId('RORY MCILROY', MASTERS_2026_TEAMS)).toBe(3);
+    expect(matchPlayerToTeamId('RORY MCILROY', MASTERS_2026_TEAMS)).toBe(4);
   });
 
   it('matches with accent normalization', () => {
     // Nicolai Højgaard might appear with ø or o
-    expect(matchPlayerToTeamId('Nicolai Hojgaard', MASTERS_2026_TEAMS)).toBe(24);
+    expect(matchPlayerToTeamId('Nicolai Hojgaard', MASTERS_2026_TEAMS)).toBe(34);
   });
 
   it('matches by last name when first name differs', () => {
     // ESPN might use abbreviated first names
     expect(matchPlayerToTeamId('S. Scheffler', MASTERS_2026_TEAMS)).toBe(1);
-    expect(matchPlayerToTeamId('R. McIlroy', MASTERS_2026_TEAMS)).toBe(3);
+    expect(matchPlayerToTeamId('R. McIlroy', MASTERS_2026_TEAMS)).toBe(4);
   });
 
   it('returns null for unknown players', () => {
@@ -33,18 +33,18 @@ describe('matchPlayerToTeamId', () => {
   });
 
   it('matches field players correctly', () => {
-    expect(matchPlayerToTeamId('Fred Couples', MASTERS_2026_TEAMS)).toBe(81);
-    expect(matchPlayerToTeamId('Vijay Singh', MASTERS_2026_TEAMS)).toBe(83);
-    expect(matchPlayerToTeamId('Bubba Watson', MASTERS_2026_TEAMS)).toBe(75);
+    expect(matchPlayerToTeamId('Fred Couples', MASTERS_2026_TEAMS)).toBe(91);
+    expect(matchPlayerToTeamId('Vijay Singh', MASTERS_2026_TEAMS)).toBe(86);
+    expect(matchPlayerToTeamId('Bubba Watson', MASTERS_2026_TEAMS)).toBe(74);
   });
 
-  it('matches all 89 Masters field players by exact name', () => {
+  it('matches all Masters field players by exact name', () => {
     let matchedCount = 0;
     for (const team of MASTERS_2026_TEAMS) {
       const id = matchPlayerToTeamId(team.name, MASTERS_2026_TEAMS);
       if (id === team.id) matchedCount++;
     }
-    expect(matchedCount).toBe(89);
+    expect(matchedCount).toBe(MASTERS_2026_TEAMS.length);
   });
 });
 

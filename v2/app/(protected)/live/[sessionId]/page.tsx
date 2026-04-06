@@ -20,7 +20,7 @@ export default async function LiveAuctionPage({
   const tournament = getTournament(result.session.tournament_id);
   if (!tournament) redirect('/host');
 
-  const oddsRegistry = getOddsRegistry(result.session.tournament_id);
+  const oddsRegistry = await getOddsRegistry(result.session.tournament_id);
 
   return (
     <ParticipantView

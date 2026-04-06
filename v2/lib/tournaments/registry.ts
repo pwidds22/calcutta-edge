@@ -1,6 +1,6 @@
 import type { TournamentConfig, BaseTeam } from './types';
 import type { OddsSourceRegistry } from './odds-sources';
-import { buildMarchMadness2026Registry } from './odds-sources';
+import { buildMarchMadness2026Registry, buildGolfOddsRegistry } from './odds-sources';
 import {
   MARCH_MADNESS_2026_CONFIG,
   MARCH_MADNESS_2026_TEAMS,
@@ -82,10 +82,39 @@ export function listHostableTournaments(): TournamentConfig[] {
   return listTournaments().filter(isHostable);
 }
 
-/** Get odds source registry for a tournament (if available) */
-export function getOddsRegistry(tournamentId: string): OddsSourceRegistry | undefined {
+// ─── Odds Registry (with caching for async sources) ─────────────
+
+let golfRegistryCache: { data: OddsSourceRegistry; expiresAt: number } | null = null;
+const GOLF_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Get odds source registry for a tournament (if available).
+ * March Madness: sync (static data).
+ * Golf tournaments: async (fetches from DataGolf API, cached 1hr).
+ */
+export async function getOddsRegistry(tournamentId: string): Promise<OddsSourceRegistry | undefined> {
   if (tournamentId === 'march_madness_2026') {
     return buildMarchMadness2026Registry();
   }
+
+  // Golf tournaments: fetch from DataGolf API
+  const tournament = TOURNAMENTS[tournamentId];
+  if (tournament?.config.sport === 'golf') {
+    // Return cached if fresh
+    if (golfRegistryCache && Date.now() < golfRegistryCache.expiresAt) {
+      return golfRegistryCache.data;
+    }
+
+    try {
+      const registry = await buildGolfOddsRegistry(tournament.teams);
+      golfRegistryCache = { data: registry, expiresAt: Date.now() + GOLF_CACHE_TTL };
+      return registry;
+    } catch (err) {
+      console.error('[OddsRegistry] Failed to fetch golf odds from DataGolf:', err);
+      // Return stale cache if available, otherwise undefined
+      return golfRegistryCache?.data;
+    }
+  }
+
   return undefined;
 }

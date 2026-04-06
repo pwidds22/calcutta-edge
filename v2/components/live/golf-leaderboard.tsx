@@ -6,13 +6,41 @@ import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/
 import type { DataGolfInPlayPlayer, DataGolfInPlayResponse } from '@/lib/datagolf/client';
 import { formatPlayerName } from '@/lib/datagolf/client';
 import { calculateDeadHeatFractions } from '@/lib/datagolf/leaderboard';
-import { RefreshCw, Activity, Wifi, Trophy } from 'lucide-react';
+import { RefreshCw, Activity, Wifi, Trophy, Calendar, Clock } from 'lucide-react';
 
 interface GolfLeaderboardProps {
   soldTeams: SoldTeam[];
   baseTeams: BaseTeam[];
   config: TournamentConfig;
   payoutRules: PayoutRules;
+}
+
+/**
+ * Check if the in-play API event matches the tournament we're tracking.
+ * DataGolf event names like "Masters Tournament" need fuzzy matching against
+ * our config names like "The Masters 2026".
+ *
+ * We extract keywords from both names and check for overlap.
+ */
+function isMatchingEvent(apiEventName: string, configName: string): boolean {
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+
+  const apiNorm = normalize(apiEventName);
+  const configNorm = normalize(configName);
+
+  // Direct substring match
+  if (apiNorm.includes(configNorm) || configNorm.includes(apiNorm)) return true;
+
+  // Keyword match: extract meaningful words (>3 chars) and check overlap
+  const stopWords = new Set(['the', 'tournament', 'open', 'championship', 'invitational']);
+  const keywords = (s: string) =>
+    s.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+
+  const apiWords = keywords(apiNorm);
+  const configWords = keywords(configNorm);
+
+  return apiWords.some(w => configWords.includes(w));
 }
 
 interface LeaderboardRow {
@@ -220,21 +248,55 @@ export function GolfLeaderboard({
     );
   }
 
-  if (!data || rows.length === 0) {
+  // Check if the in-play data is for a DIFFERENT tournament (stale data)
+  const isWrongEvent = data && !isMatchingEvent(data.event_name, config.name);
+
+  if (!data || rows.length === 0 || isWrongEvent) {
+    const startDate = config.startDate
+      ? new Date(config.startDate + 'T00:00:00')
+      : null;
+    const now = new Date();
+    const daysUntil = startDate
+      ? Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+
     return (
-      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] py-8 text-center space-y-2">
-        <p className="text-sm text-white/40">No leaderboard data available yet.</p>
-        <p className="text-xs text-white/25">
-          Live leaderboard will appear once the tournament begins.
-        </p>
+      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] py-10 text-center space-y-4">
+        <div className="flex justify-center">
+          <div className="rounded-full bg-emerald-500/10 p-3">
+            <Calendar className="size-6 text-emerald-400" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-white/70">{config.name}</p>
+          {startDate && daysUntil !== null && daysUntil > 0 ? (
+            <p className="text-xs text-white/40">
+              Starts {startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              {' '}({daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`})
+            </p>
+          ) : startDate && daysUntil !== null && daysUntil === 0 ? (
+            <p className="text-xs text-white/40 flex items-center justify-center gap-1">
+              <Clock className="size-3" /> Starting today — leaderboard updates when play begins
+            </p>
+          ) : (
+            <p className="text-xs text-white/25">
+              Live leaderboard will appear once the tournament begins.
+            </p>
+          )}
+        </div>
+        {isWrongEvent && data && (
+          <p className="text-[10px] text-white/15">
+            DataGolf currently showing: {data.event_name}
+          </p>
+        )}
       </div>
     );
   }
 
-  // ─── Low Round Leaders ──────────────────────────────────────────
-  // Find the player(s) with the lowest "today" score for the current round.
-  // Only show when at least one player has started (today !== null).
+  // ─── Low Round Leaders (Current + Completed Rounds) ─────────────
   const roundDayLabels: Record<number, string> = { 1: 'Thu', 2: 'Fri', 3: 'Sat', 4: 'Sun' };
+
+  // Current round: use "today" score
   const playersWithScores = rows.filter(
     (r) => r.player.today !== null && r.player.current_pos !== 'CUT'
       && r.player.current_pos !== 'WD' && r.player.current_pos !== 'DQ'
@@ -245,6 +307,30 @@ export function GolfLeaderboard({
   const lowRoundLeaders = lowScore !== null
     ? playersWithScores.filter((r) => r.player.today === lowScore)
     : [];
+
+  // Completed rounds: use R1-R4 stroke counts
+  const roundFields = ['R1', 'R2', 'R3', 'R4'] as const;
+  const completedLowRounds: Array<{
+    round: number; score: number; players: string[];
+  }> = [];
+
+  for (let i = 0; i < data.current_round - 1; i++) {
+    const field = roundFields[i];
+    const scores: Array<{ name: string; score: number }> = [];
+    for (const row of rows) {
+      const val = row.player[field];
+      if (typeof val === 'number' && val > 0) {
+        scores.push({ name: row.displayName, score: val });
+      }
+    }
+    if (scores.length === 0) continue;
+    const min = Math.min(...scores.map(s => s.score));
+    completedLowRounds.push({
+      round: i + 1,
+      score: min,
+      players: scores.filter(s => s.score === min).map(s => s.name),
+    });
+  }
 
   return (
     <div className="space-y-3">
@@ -273,7 +359,35 @@ export function GolfLeaderboard({
         </div>
       </div>
 
-      {/* Low Round Leader banner */}
+      {/* Completed round low-round winners */}
+      {completedLowRounds.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {completedLowRounds.map((lr) => (
+            <div
+              key={lr.round}
+              className="rounded-lg border border-emerald-500/15 bg-emerald-500/5 px-3 py-1.5 flex items-center gap-2"
+            >
+              <Trophy className="size-3 text-emerald-400 shrink-0" />
+              <span className="text-[10px] text-emerald-400/60 uppercase tracking-wider">
+                R{lr.round} Low
+              </span>
+              <span className="text-xs font-medium text-white/80 truncate">
+                {lr.players.join(', ')}
+              </span>
+              <span className="font-mono text-xs font-bold text-white/50">
+                {lr.score}
+              </span>
+              {lr.players.length > 1 && (
+                <span className="rounded bg-emerald-500/10 px-1 py-px text-[8px] text-emerald-400/60">
+                  {lr.players.length}-way
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Current round low-round leader banner */}
       {lowRoundLeaders.length > 0 && lowScore !== null && (
         <div className="rounded-lg border border-amber-500/15 bg-amber-500/5 px-4 py-2.5 flex items-center gap-3">
           <Trophy className="size-4 text-amber-400 shrink-0" />
@@ -325,6 +439,9 @@ export function GolfLeaderboard({
                   Live EV
                 </th>
                 <th className="px-3 py-2 text-right" title="Win probability">Win%</th>
+                <th className="px-3 py-2 text-right hidden lg:table-cell" title="Top 5 probability">T5%</th>
+                <th className="px-3 py-2 text-right hidden lg:table-cell" title="Top 10 probability">T10%</th>
+                <th className="px-3 py-2 text-right hidden xl:table-cell" title="Top 20 probability">T20%</th>
               </tr>
             </thead>
             <tbody>
@@ -427,6 +544,21 @@ export function GolfLeaderboard({
                     {/* Win probability */}
                     <td className="px-3 py-2 text-right font-mono text-white/50">
                       {fmtPct(row.player.win_prob)}
+                    </td>
+
+                    {/* Top 5 probability */}
+                    <td className="px-3 py-2 text-right font-mono text-white/40 hidden lg:table-cell">
+                      {fmtPct(row.player.top_5_prob)}
+                    </td>
+
+                    {/* Top 10 probability */}
+                    <td className="px-3 py-2 text-right font-mono text-white/40 hidden lg:table-cell">
+                      {fmtPct(row.player.top_10_prob)}
+                    </td>
+
+                    {/* Top 20 probability */}
+                    <td className="px-3 py-2 text-right font-mono text-white/35 hidden xl:table-cell">
+                      {fmtPct(row.player.top_20_prob)}
                     </td>
                   </tr>
                 );
