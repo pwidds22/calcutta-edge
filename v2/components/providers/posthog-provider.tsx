@@ -5,17 +5,29 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
 import { Suspense, useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
-if (
-  typeof window !== 'undefined' &&
-  process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN &&
-  !window.location.hostname.includes('localhost')
-) {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN, {
-    api_host: '/ingest',
-    ui_host: 'https://us.i.posthog.com',
-    capture_pageview: false, // We capture manually below for SPA navigation
-    capture_pageleave: true,
-  })
+export function PostHogProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if (
+      process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN &&
+      !window.location.hostname.includes('localhost')
+    ) {
+      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN, {
+        api_host: '/ingest',
+        ui_host: 'https://us.i.posthog.com',
+        capture_pageview: false,
+        capture_pageleave: true,
+      })
+    }
+  }, [])
+
+  return (
+    <PHProvider client={posthog}>
+      <Suspense fallback={null}>
+        <PostHogPageView />
+      </Suspense>
+      {children}
+    </PHProvider>
+  )
 }
 
 function PostHogPageView() {
@@ -34,15 +46,4 @@ function PostHogPageView() {
   }, [pathname, searchParams, posthogClient])
 
   return null
-}
-
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <PHProvider client={posthog}>
-      <Suspense fallback={null}>
-        <PostHogPageView />
-      </Suspense>
-      {children}
-    </PHProvider>
-  )
 }
