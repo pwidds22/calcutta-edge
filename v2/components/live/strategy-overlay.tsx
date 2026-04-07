@@ -6,6 +6,7 @@ import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import { blendProbabilities } from '@/lib/tournaments/odds-sources';
 import { initializeTeams } from '@/lib/calculations/initialize';
+import { calculateTeamValues } from '@/lib/calculations/values';
 import { formatCurrency } from '@/lib/calculations/format';
 import { TrendingUp, Lock, ExternalLink, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
 
@@ -132,40 +133,29 @@ export function StrategyOverlay({
     [oddsRegistry]
   );
 
-  // --- Apply selected odds source to base teams ---
-  const adjustedTeams = useMemo(() => {
-    if (!oddsRegistry) return baseTeams;
+  // --- Resolve source probabilities (already fair/devigged) ---
+  // These are set directly as team.odds, bypassing the devig pipeline.
+  // This matches the SET_ODDS_SOURCE approach in auction-state.ts.
+  const sourceProbs = useMemo((): Record<number, Record<string, number>> | null => {
+    if (!oddsRegistry) return null;
 
-    // Blend mode: compute weighted average
+    // ALL sources (including default) need direct odds override.
+    // Source probabilities are already fair — bypassing devig is mandatory.
     if (selectedSource === 'blend') {
       const activeSources = blendableSources
         .filter(s => (blendWeights[s.id] ?? 0) > 0)
         .map(s => ({ data: oddsRegistry.staticData[s.id], weight: blendWeights[s.id] }))
         .filter(s => s.data);
-      if (activeSources.length === 0) return baseTeams;
+      if (activeSources.length === 0) return null;
 
       const teamIds = baseTeams.map(t => t.id);
       const roundKeys = config.rounds.map(r => r.key);
       const blended = blendProbabilities(activeSources, teamIds, roundKeys);
-
-      return baseTeams.map((bt) => {
-        const teamProbs = blended.teams[bt.id];
-        if (!teamProbs) return bt;
-        return { ...bt, probabilities: teamProbs, americanOdds: {} as Record<string, number> };
-      });
+      return blended.teams;
     }
 
-    if (selectedSource === oddsRegistry.defaultSourceId) {
-      return baseTeams;
-    }
     const sourceData = oddsRegistry.staticData[selectedSource];
-    if (!sourceData) return baseTeams;
-
-    return baseTeams.map((bt) => {
-      const teamProbs = sourceData.teams[bt.id];
-      if (!teamProbs) return bt;
-      return { ...bt, probabilities: teamProbs, americanOdds: {} as Record<string, number> };
-    });
+    return sourceData?.teams ?? null;
   }, [baseTeams, selectedSource, oddsRegistry, blendWeights, blendableSources, config.rounds]);
 
   const currentSourceName = selectedSource === 'blend'
@@ -218,13 +208,28 @@ export function StrategyOverlay({
 
   const totalSpent = soldTeams.reduce((sum, s) => sum + s.amount, 0);
 
+  // Always initialize with unmodified baseTeams (default devig pipeline)
   const teams = initializeTeams(
-    adjustedTeams,
+    baseTeams,
     savedTeams,
     payoutRules,
     estimatedPotSize,
     config
   );
+
+  // Override odds directly from source data (already fair/devigged by odds-builder).
+  // This bypasses the devig pipeline, matching SET_ODDS_SOURCE in auction-state.ts.
+  if (sourceProbs) {
+    const roundKeys = config.rounds.map(r => r.key);
+    for (const team of teams) {
+      const probs = sourceProbs[team.id];
+      if (!probs) continue;
+      for (const key of roundKeys) {
+        team.odds[key] = probs[key] ?? 0;
+      }
+    }
+    calculateTeamValues(teams, payoutRules, estimatedPotSize, config);
+  }
 
   const soldValuePct = savedTeams.reduce((sum, s) => {
     const t = teams.find((team) => team.id === s.id);
