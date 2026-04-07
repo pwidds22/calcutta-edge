@@ -8,8 +8,7 @@ import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_LINKS = [
-  { label: 'Host Free', href: '#hosting', highlight: true },
-  { label: 'Features', href: '#features', highlight: false },
+  { label: 'Features', href: '#features', highlight: true },
   { label: 'How It Works', href: '#how-it-works', highlight: false },
   { label: 'Pricing', href: '#pricing', highlight: false },
   { label: 'Blog', href: '/blog', highlight: false },

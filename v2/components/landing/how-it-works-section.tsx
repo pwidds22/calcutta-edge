@@ -1,62 +1,37 @@
 const STEPS = [
   {
-    number: '01',
-    title: 'Create Account',
-    description: 'Free. No credit card required.',
+    number: '1',
+    title: 'Create & share',
+    description: 'Sign up free, create an auction, share the 6-character join code with your group.',
   },
   {
-    number: '02',
-    title: 'Host or Join',
-    description: 'Create a live auction or join one with a code. Free forever.',
+    number: '2',
+    title: 'Auction night',
+    description: 'Everyone joins from their phone. Live bidding with timers — the commissioner controls the pace.',
   },
   {
-    number: '03',
-    title: 'Unlock Strategy',
-    description: 'See fair values, suggested bids, and profit projections from $19.99.',
-  },
-  {
-    number: '04',
-    title: 'Dominate Your Auction',
-    description: 'Bid with confidence. Track your portfolio. Win.',
+    number: '3',
+    title: 'Track results',
+    description: 'Follow your portfolio as the Masters plays out. Payouts calculated automatically.',
   },
 ]
 
 export function HowItWorksSection() {
   return (
     <section id="how-it-works" className="border-t border-white/[0.06]">
-      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-28">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
-            How it works
-          </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Set up in under 5 minutes
-          </h2>
-        </div>
+      <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 md:py-24">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-white sm:text-3xl">
+          Set up in 5 minutes
+        </h2>
 
-        <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
-          {STEPS.map((step, i) => (
-            <div
-              key={step.number}
-              className="relative flex flex-col items-center text-center lg:px-6"
-            >
-              {/* Connector line — dashed emerald (desktop only, not after last) */}
-              {i < STEPS.length - 1 && (
-                <div
-                  className="absolute right-0 top-7 hidden w-full translate-x-1/2 lg:block"
-                  style={{
-                    height: '1px',
-                    backgroundImage: 'linear-gradient(to right, oklch(0.70 0.17 162 / 0.3) 6px, transparent 6px)',
-                    backgroundSize: '12px 1px',
-                  }}
-                />
-              )}
-
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-full border-2 border-emerald-500 bg-emerald-500/10">
-                <span className="text-sm font-bold text-emerald-400 font-mono">{step.number}</span>
-              </div>
-              <h3 className="text-sm font-semibold text-white">{step.title}</h3>
-              <p className="mt-2 max-w-[200px] text-sm leading-relaxed text-white/40">
+        <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3">
+          {STEPS.map((step) => (
+            <div key={step.number} className="text-center sm:text-left">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-sm font-bold text-emerald-400 font-mono">
+                {step.number}
+              </span>
+              <h3 className="mt-3 text-sm font-semibold text-white">{step.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-white/40">
                 {step.description}
               </p>
             </div>

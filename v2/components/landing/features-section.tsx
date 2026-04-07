@@ -1,80 +1,68 @@
-import Link from 'next/link'
-import { LineChart, Calculator, TrendingUp, Layers } from 'lucide-react'
+import { Radio, Settings, Calculator, TrendingUp } from 'lucide-react'
 
-const FEATURES = [
-  {
-    icon: LineChart,
-    title: 'Devigged Sportsbook Odds',
-    description:
-      'We strip the vig from real sportsbook lines to calculate true implied probabilities for every team, every round of the tournament.',
-    detail: 'Structure-aware devigging across all tournament rounds',
-  },
-  {
-    icon: Calculator,
-    title: 'Fair Value & Bid Ceilings',
-    description:
-      'Know exactly what each team is worth based on your pool\'s payout structure. Get a suggested bid price so you never overpay at the table.',
-    detail: 'Customizable payout rules for any pool format',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Profit Projections',
-    description:
-      'See your projected profit at every stage of the tournament. Track how your portfolio performs round by round as the event unfolds.',
-    detail: 'Round-by-round cumulative P&L tracking',
-  },
-  {
-    icon: Layers,
-    title: 'Live Strategy Overlay',
-    description:
-      'See fair values and edge calculations in real-time during your live auction. Know instantly if a bid is a steal or a trap.',
-    detail: 'Integrated with live auction hosting',
-  },
+const HOSTING_FEATURES = [
+  { icon: Radio, text: 'Live real-time bidding with countdown timers' },
+  { icon: Settings, text: 'Commissioner controls — pause, shuffle, set increments' },
+]
+
+const STRATEGY_FEATURES = [
+  { icon: Calculator, text: 'Fair values & bid ceilings from devigged sportsbook odds' },
+  { icon: TrendingUp, text: 'Live strategy overlay shows edge during your auction' },
 ]
 
 export function FeaturesSection() {
   return (
     <section id="features" className="border-t border-white/[0.06]">
-      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-28">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
-            Strategy analytics
-          </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            The data edge nobody else at your table has
-          </h2>
-          <p className="mt-4 text-base text-white/50">
-            Works with our free hosting or any auction. $19.99 for the Masters. Pays for itself on one smart bid.
-          </p>
-        </div>
+      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 md:py-24">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-12">
+          {/* Hosting column */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
+              Free hosting
+            </p>
+            <h3 className="mt-2 text-xl font-bold text-white sm:text-2xl">
+              No spreadsheets. No group texts.
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-white/50">
+              Create a session, share a 6-character code. Everyone joins from
+              their phone. Bidding, timers, and results — all handled.
+            </p>
+            <ul className="mt-6 space-y-4">
+              {HOSTING_FEATURES.map((f) => (
+                <li key={f.text} className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                    <f.icon className="size-4 text-emerald-400" />
+                  </div>
+                  <span className="text-sm text-white/70 leading-relaxed">{f.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8">
-          {FEATURES.map((feature) => (
-            <div
-              key={feature.title}
-              className="group relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all hover:border-emerald-500/20 hover:bg-white/[0.04]"
-            >
-              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500">
-                <feature.icon className="size-5 text-white" />
-              </div>
-              <h3 className="text-base font-semibold text-white">{feature.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/50">
-                {feature.description}
-              </p>
-              <p className="mt-3 text-xs font-medium text-emerald-400/50 font-mono">
-                {feature.detail}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-8 text-center">
-          <Link
-            href="/register"
-            className="text-sm font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
-          >
-            Try free preview &rarr;
-          </Link>
+          {/* Strategy column */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-amber-400">
+              Strategy analytics &middot; $19.99
+            </p>
+            <h3 className="mt-2 text-xl font-bold text-white sm:text-2xl">
+              Know what every golfer is worth.
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-white/50">
+              We pull odds from 13+ sportsbooks, strip the vig, and calculate
+              fair values based on your pool&apos;s payout structure. One smart
+              bid pays for itself.
+            </p>
+            <ul className="mt-6 space-y-4">
+              {STRATEGY_FEATURES.map((f) => (
+                <li key={f.text} className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-500/10 border border-amber-500/20">
+                    <f.icon className="size-4 text-amber-400" />
+                  </div>
+                  <span className="text-sm text-white/70 leading-relaxed">{f.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </section>

@@ -4,28 +4,20 @@ import { ArrowRight } from 'lucide-react'
 
 export function CtaSection() {
   return (
-    <section className="relative border-t-2 border-emerald-500/30">
-      {/* Green-tinted dark overlay for visual separation from footer */}
-      <div className="absolute inset-0 bg-emerald-950/20" />
-
-      <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-28">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            The Masters starts this week. Your Calcutta should too.
+    <section className="border-t border-white/[0.06]">
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 md:py-20">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            The Masters starts Thursday.
           </h2>
-          <p className="mt-4 text-base text-white/40">
-            Host free. Bid smart. Win.
+          <p className="mt-3 text-base text-white/50">
+            Set up your group&apos;s Calcutta in 5 minutes. Free.
           </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <div className="mt-6">
             <Button size="lg" asChild className="gap-2">
               <Link href="/register">
-                Host Your Masters Calcutta Free
+                Host Your Calcutta
                 <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild className="border-white/10 bg-transparent text-white hover:bg-white/[0.06] hover:text-white">
-              <Link href="/auction">
-                Preview Strategy Analytics
               </Link>
             </Button>
           </div>
