@@ -40,8 +40,12 @@ export function ParticipantList({
   const [kickingId, setKickingId] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
 
-  const handleKick = async (targetUserId: string) => {
+  const handleKick = async (targetUserId: string, displayName: string) => {
     if (!sessionId) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ${displayName} from this auction?`
+    );
+    if (!confirmed) return;
     setKickingId(targetUserId);
     const result = await kickParticipant(sessionId, targetUserId);
     if (result.error) {
@@ -52,6 +56,10 @@ export function ParticipantList({
 
   const handleLeave = async () => {
     if (!sessionId) return;
+    const confirmed = window.confirm(
+      'Are you sure you want to leave this auction? You will lose access to the session.'
+    );
+    if (!confirmed) return;
     setLeaving(true);
     const result = await leaveSession(sessionId);
     if (result.error) {
@@ -130,7 +138,7 @@ export function ParticipantList({
                 {canKick && !user.isCommissioner && (
                   <button
                     type="button"
-                    onClick={() => handleKick(user.userId)}
+                    onClick={() => handleKick(user.userId, user.displayName)}
                     disabled={kickingId === user.userId}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400/60 hover:text-red-400"
                     title={`Remove ${user.displayName}`}

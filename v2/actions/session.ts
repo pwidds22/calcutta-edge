@@ -482,6 +482,9 @@ export async function leaveSession(sessionId: string) {
   if (session.status === 'active') {
     return { error: 'Cannot leave during an active auction' };
   }
+  if (session.status === 'completed') {
+    return { error: 'Cannot leave a completed auction' };
+  }
 
   const { error } = await supabase
     .from('auction_participants')
