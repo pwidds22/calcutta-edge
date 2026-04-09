@@ -6,6 +6,7 @@ import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/
 import type { DataGolfInPlayPlayer, DataGolfInPlayResponse } from '@/lib/datagolf/client';
 import { formatPlayerName } from '@/lib/datagolf/client';
 import { calculateDeadHeatFractions } from '@/lib/datagolf/leaderboard';
+import { calculateLiveEV, normalizeName } from '@/lib/datagolf/ev';
 import { RefreshCw, Activity, Wifi, Trophy, Calendar, Clock } from 'lucide-react';
 
 interface GolfLeaderboardProps {
@@ -74,51 +75,7 @@ function fmtDollar(n: number): string {
   return Number.isInteger(n) ? `$${n.toLocaleString()}` : `$${n.toFixed(2)}`;
 }
 
-/**
- * Calculate live expected value from DataGolf probabilities and session payout rules.
- * EV = sum(prob[tier] * pot * payoutPct[tier]) for each tier.
- */
-function calculateLiveEV(
-  player: DataGolfInPlayPlayer,
-  actualPot: number,
-  payoutRules: PayoutRules
-): number | null {
-  // Map DataGolf probability fields to payout rule keys
-  const probMap: Array<[string, number | undefined]> = [
-    ['winner', player.win_prob],
-    ['top5', player.top_5_prob],
-    ['top10', player.top_10_prob],
-    ['top20', player.top_20_prob],
-    ['makeCut', player.make_cut_prob],
-  ];
-
-  let hasAnyProb = false;
-  let ev = 0;
-
-  for (const [ruleKey, prob] of probMap) {
-    if (prob === undefined || prob === null) continue;
-    const pct = payoutRules[ruleKey];
-    if (pct === undefined || pct === 0) continue;
-    hasAnyProb = true;
-    ev += prob * actualPot * (pct / 100);
-  }
-
-  return hasAnyProb ? ev : null;
-}
-
-/** Normalize a name for matching: lowercase, strip accents (incl. Scandinavian å/ø) */
-function normalizeName(n: string): string {
-  return n.toLowerCase()
-    .replace(/[áàäâå]/g, 'a')
-    .replace(/[éèëê]/g, 'e')
-    .replace(/[íìïî]/g, 'i')
-    .replace(/[óòöôø]/g, 'o')
-    .replace(/[úùüû]/g, 'u')
-    .replace(/[ñ]/g, 'n')
-    .replace(/[ß]/g, 'ss')
-    .replace(/['']/g, '')
-    .trim();
-}
+// calculateLiveEV and normalizeName imported from @/lib/datagolf/ev
 
 /**
  * Build a name-matching map from baseTeams to quickly find teamId by player name.
