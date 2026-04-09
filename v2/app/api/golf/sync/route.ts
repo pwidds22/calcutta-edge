@@ -100,10 +100,11 @@ async function fetchLeaderboard(): Promise<{
   if (process.env.DATAGOLF_API_KEY) {
     try {
       const lb = await fetchDataGolfLeaderboard();
-      // Verify it's returning Masters data (event name check)
+      // MUST verify it's actually the Masters — DataGolf returns whatever event is current.
+      // If it's a different PGA event, player names overlap and we'd write bogus results.
       const isMasters = lb.tournamentName.toLowerCase().includes('masters')
         || lb.tournamentName.toLowerCase().includes('augusta');
-      if (isMasters || lb.status !== 'pre') {
+      if (isMasters) {
         return { leaderboard: lb, error: null };
       }
       console.log(`[Golf Sync] DataGolf returned "${lb.tournamentName}", not Masters. Falling back to ESPN.`);
@@ -115,6 +116,12 @@ async function fetchLeaderboard(): Promise<{
   // Fallback to ESPN
   try {
     const espn = await fetchGolfLeaderboard();
+    // Same guard: only accept if it's actually the Masters
+    const isEspnMasters = espn.tournamentName.toLowerCase().includes('masters')
+      || espn.tournamentName.toLowerCase().includes('augusta');
+    if (!isEspnMasters) {
+      return { leaderboard: null, error: `ESPN returned "${espn.tournamentName}", not Masters. Sync blocked.` };
+    }
     return {
       leaderboard: {
         tournamentName: espn.tournamentName,
@@ -154,12 +161,12 @@ async function syncGolfSession(
     return { error: fetchError ?? 'No leaderboard data', inserted: 0, updated: 0 };
   }
 
-  // Verify it's a Masters event
+  // Verify it's a Masters event — block ALL non-Masters data regardless of status
   const isMasters = leaderboard.tournamentName.toLowerCase().includes('masters')
     || leaderboard.tournamentName.toLowerCase().includes('augusta');
 
-  if (!isMasters && leaderboard.status === 'pre') {
-    return { error: 'Current event is not The Masters and has not started', inserted: 0, updated: 0 };
+  if (!isMasters) {
+    return { error: `Current event is "${leaderboard.tournamentName}", not The Masters. Sync blocked.`, inserted: 0, updated: 0 };
   }
 
   if (leaderboard.status === 'pre') {

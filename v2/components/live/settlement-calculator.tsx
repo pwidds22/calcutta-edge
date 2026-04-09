@@ -55,7 +55,7 @@ export function SettlementCalculator({
               >
                 <span className="text-[10px] text-white/30">{label}</span>
                 <p className="text-xs font-mono font-medium text-emerald-400">
-                  ${Math.round(amount).toLocaleString()}
+                  ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
                 <span className="text-[9px] text-white/20">{pct}%</span>
               </div>
@@ -91,9 +91,10 @@ function ParticipantCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  // Find the earliest round where at least one team breaks even
+  // Find the earliest round where a single team's payout covers the participant's total spend.
+  // This is realistic: "if your best team reaches [round], you break even overall."
   const breakEvenRound = roundLabels.find(({ key }) =>
-    participant.teams.some((t) => (t.roundProfits[key] ?? 0) >= 0)
+    participant.teams.some((t) => (t.roundPayouts[key] ?? 0) >= participant.totalOwed)
   );
 
   return (
@@ -188,7 +189,7 @@ function ParticipantCard({
                           }`}
                         >
                           {profit >= 0 ? '+' : ''}
-                          ${Math.round(profit).toLocaleString()}
+                          ${profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                       );
                     })}
