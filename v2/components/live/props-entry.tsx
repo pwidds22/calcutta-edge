@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { EnabledProp } from '@/lib/tournaments/props';
-import type { PropResult } from '@/lib/tournaments/props';
+import type { PropResult, PropWinner } from '@/lib/tournaments/props';
+import { getPropWinners } from '@/lib/tournaments/props';
 import type { BaseTeam } from '@/lib/tournaments/types';
 import { updatePropResult } from '@/actions/tournament-results';
-import { Dice5, CheckCircle2, Save, AlertTriangle } from 'lucide-react';
+import { Dice5, CheckCircle2, Save, AlertTriangle, Search } from 'lucide-react';
 
 interface PropsEntryProps {
   sessionId: string;
@@ -16,6 +17,7 @@ interface PropsEntryProps {
   baseTeams: BaseTeam[];
   isCommissioner: boolean;
   actualPot: number;
+  isGolf?: boolean;
   onPropResultUpdate?: (result: PropResult) => void;
 }
 
@@ -27,14 +29,17 @@ export function PropsEntry({
   baseTeams,
   isCommissioner,
   actualPot,
+  isGolf = false,
   onPropResultUpdate,
 }: PropsEntryProps) {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<Record<string, string>>({});
 
-  // Local edits — keyed by prop key
+  // Golf mode: track selected team IDs (golfers) — derive participant IDs from them
+  // Non-golf mode: track selected participant IDs directly
   const [localEdits, setLocalEdits] = useState<
-    Record<string, { participantId: string; teamId: string; metadata: string }>
+    Record<string, { selectedTeamIds: number[]; selectedParticipantIds: string[]; metadata: string }>
   >({});
 
   // Build participant list from sold teams (deduplicated)
@@ -49,8 +54,33 @@ export function PropsEntry({
     name,
   }));
 
-  // Build team lookup
-  const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
+  // Build team→owner mapping
+  const teamOwnerMap = useMemo(() => {
+    const map = new Map<number, { ownerId: string; ownerName: string }>();
+    for (const sold of soldTeams) {
+      map.set(sold.teamId, { ownerId: sold.winnerId, ownerName: sold.winnerName });
+    }
+    return map;
+  }, [soldTeams]);
+
+  // Build golfer list (baseTeams that are sold, with owner info)
+  const golfers = useMemo(() => {
+    if (!isGolf) return [];
+    return baseTeams
+      .filter((t) => teamOwnerMap.has(t.id))
+      .map((t) => {
+        const owner = teamOwnerMap.get(t.id)!;
+        return {
+          teamId: t.id,
+          name: t.name,
+          seed: t.seed,
+          group: t.group,
+          ownerId: owner.ownerId,
+          ownerName: owner.ownerName,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [isGolf, baseTeams, teamOwnerMap]);
 
   // Get existing result for a prop
   const getResult = (propKey: string): PropResult | undefined =>
@@ -60,42 +90,88 @@ export function PropsEntry({
   const getEditState = (propKey: string) => {
     if (localEdits[propKey]) return localEdits[propKey];
     const existing = getResult(propKey);
-    return {
-      participantId: existing?.winnerParticipantId ?? '',
-      teamId: existing?.winnerTeamId?.toString() ?? '',
-      metadata: existing?.metadata ?? '',
-    };
+    if (existing) {
+      const winners = getPropWinners(existing);
+      return {
+        selectedTeamIds: winners.filter((w) => w.teamId).map((w) => w.teamId!),
+        selectedParticipantIds: winners.map((w) => w.participantId),
+        metadata: existing.metadata ?? '',
+      };
+    }
+    return { selectedTeamIds: [] as number[], selectedParticipantIds: [] as string[], metadata: '' };
+  };
+
+  // Non-golf: toggle participant
+  const toggleParticipant = (propKey: string, participantId: string) => {
+    const edit = getEditState(propKey);
+    const current = edit.selectedParticipantIds;
+    const updated = current.includes(participantId)
+      ? current.filter((id) => id !== participantId)
+      : [...current, participantId];
+    setLocalEdits((prev) => ({
+      ...prev,
+      [propKey]: { ...edit, selectedParticipantIds: updated },
+    }));
+  };
+
+  // Golf: toggle golfer (team) — tracks team ID and derives participant
+  const toggleGolfer = (propKey: string, teamId: number) => {
+    const edit = getEditState(propKey);
+    const current = edit.selectedTeamIds;
+    const updated = current.includes(teamId)
+      ? current.filter((id) => id !== teamId)
+      : [...current, teamId];
+    // Derive unique participant IDs from selected teams
+    const participantIds = [...new Set(updated.map((tid) => teamOwnerMap.get(tid)?.ownerId).filter(Boolean))] as string[];
+    setLocalEdits((prev) => ({
+      ...prev,
+      [propKey]: { ...edit, selectedTeamIds: updated, selectedParticipantIds: participantIds, metadata: edit.metadata },
+    }));
   };
 
   const handleSave = async (prop: EnabledProp) => {
     const edit = getEditState(prop.key);
-    if (!edit.participantId) {
-      setError(`Select a winner for "${prop.label}"`);
+    const hasWinners = isGolf ? edit.selectedTeamIds.length > 0 : edit.selectedParticipantIds.length > 0;
+    if (!hasWinners) {
+      setError(`Select at least one winner for "${prop.label}"`);
       return;
     }
 
     setSaving(prop.key);
     setError(null);
 
+    // Build winners array — golf mode includes teamId
+    const winners: PropWinner[] = isGolf
+      ? edit.selectedTeamIds.map((tid) => ({
+          participantId: teamOwnerMap.get(tid)?.ownerId ?? '',
+          teamId: tid,
+        }))
+      : edit.selectedParticipantIds.map((pid) => ({
+          participantId: pid,
+        }));
+
+    const firstWinner = winners[0];
+
     const result = await updatePropResult(
       sessionId,
       prop.key,
       prop.label,
-      edit.participantId,
-      edit.teamId ? parseInt(edit.teamId, 10) : null,
+      firstWinner.participantId,
+      firstWinner.teamId ?? null,
       edit.metadata,
-      prop.percentage
+      prop.percentage,
+      winners
     );
 
     if (result.error) {
       setError(result.error);
     } else {
-      // Notify parent of update
       onPropResultUpdate?.({
         key: prop.key,
         label: prop.label,
-        winnerParticipantId: edit.participantId,
-        winnerTeamId: edit.teamId ? parseInt(edit.teamId, 10) : null,
+        winnerParticipantId: firstWinner.participantId,
+        winnerTeamId: firstWinner.teamId ?? null,
+        winners,
         metadata: edit.metadata,
         payoutPercentage: prop.percentage,
       });
@@ -113,12 +189,15 @@ export function PropsEntry({
     );
   }
 
+  // Build team name lookup
+  const teamNameMap = new Map(baseTeams.map((t) => [t.id, t.name]));
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white/70">Prop Bets</h3>
         <span className="text-[10px] text-white/30">
-          {propResults.filter((r) => r.winnerParticipantId).length} / {enabledProps.length} resolved
+          {propResults.filter((r) => r.winnerParticipantId || (r.winners && r.winners.length > 0)).length} / {enabledProps.length} resolved
         </span>
       </div>
 
@@ -132,19 +211,30 @@ export function PropsEntry({
       <div className="space-y-3">
         {enabledProps.map((prop) => {
           const existing = getResult(prop.key);
-          const isResolved = !!existing?.winnerParticipantId;
+          const existingWinners = existing ? getPropWinners(existing) : [];
+          const isResolved = existingWinners.length > 0;
           const edit = getEditState(prop.key);
           const payout = actualPot * (prop.percentage / 100);
-          const winnerName = existing?.winnerParticipantId
-            ? participantMap.get(existing.winnerParticipantId) ?? 'Unknown'
-            : null;
+          const splitCount = isGolf ? edit.selectedTeamIds.length : edit.selectedParticipantIds.length;
 
-          // Teams owned by the selected participant (for optional team selector)
-          const selectedParticipantTeams = edit.participantId
-            ? soldTeams
-                .filter((s) => s.winnerId === edit.participantId)
-                .map((s) => ({ id: s.teamId, name: teamMap.get(s.teamId)?.name ?? `Team ${s.teamId}` }))
-            : [];
+          // Build winner display names
+          const winnerNames = existingWinners.map((w) => {
+            if (w.teamId) {
+              const golferName = teamNameMap.get(w.teamId);
+              const ownerName = participantMap.get(w.participantId) ?? 'Unknown';
+              return golferName ? `${golferName} (${ownerName})` : ownerName;
+            }
+            return participantMap.get(w.participantId) ?? 'Unknown';
+          });
+
+          // Filter golfers by search query for this prop
+          const query = (searchQuery[prop.key] ?? '').toLowerCase();
+          const filteredGolfers = query
+            ? golfers.filter((g) =>
+                g.name.toLowerCase().includes(query) ||
+                g.ownerName.toLowerCase().includes(query)
+              )
+            : golfers;
 
           return (
             <div
@@ -167,13 +257,18 @@ export function PropsEntry({
                   </div>
                   <p className="text-[10px] text-white/30 mt-0.5">
                     {prop.percentage}% of pot = ${Math.round(payout).toLocaleString()}
+                    {splitCount > 1 && (
+                      <span className="text-amber-400/60 ml-1">
+                        (split {splitCount} ways = ${Math.round(payout / splitCount).toLocaleString()} each)
+                      </span>
+                    )}
                   </p>
                 </div>
 
                 {isResolved && !isCommissioner && (
                   <div className="text-right">
                     <p className="text-xs text-emerald-400 font-medium">
-                      {winnerName}
+                      {winnerNames.join(', ')}
                     </p>
                     {existing?.metadata && (
                       <p className="text-[10px] text-white/30 mt-0.5">
@@ -187,61 +282,105 @@ export function PropsEntry({
               {/* Commissioner edit controls */}
               {isCommissioner && (
                 <div className="mt-3 space-y-2">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {/* Winner selector */}
+                  {isGolf ? (
+                    /* Golf mode: search and select golfers */
                     <div>
-                      <label className="block text-[10px] text-white/40 mb-0.5">
-                        Winner
+                      <label className="block text-[10px] text-white/40 mb-1.5">
+                        Golfer(s) <span className="text-white/20">— search by name, select multiple for ties</span>
                       </label>
-                      <select
-                        value={edit.participantId}
-                        onChange={(e) =>
-                          setLocalEdits((prev) => ({
-                            ...prev,
-                            [prop.key]: { ...edit, participantId: e.target.value, teamId: '' },
-                          }))
-                        }
-                        className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 text-xs text-white focus:border-emerald-500/50 focus:outline-none"
-                      >
-                        <option value="" className="bg-zinc-900">
-                          Select winner...
-                        </option>
-                        {participants.map((p) => (
-                          <option key={p.id} value={p.id} className="bg-zinc-900">
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Team selector (optional — shows teams owned by selected participant) */}
-                    {selectedParticipantTeams.length > 0 && (
-                      <div>
-                        <label className="block text-[10px] text-white/40 mb-0.5">
-                          Winning Team <span className="text-white/20">(optional)</span>
-                        </label>
-                        <select
-                          value={edit.teamId}
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-white/25" />
+                        <input
+                          type="text"
+                          value={searchQuery[prop.key] ?? ''}
                           onChange={(e) =>
-                            setLocalEdits((prev) => ({
-                              ...prev,
-                              [prop.key]: { ...edit, teamId: e.target.value },
-                            }))
+                            setSearchQuery((prev) => ({ ...prev, [prop.key]: e.target.value }))
                           }
-                          className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 text-xs text-white focus:border-emerald-500/50 focus:outline-none"
-                        >
-                          <option value="" className="bg-zinc-900">
-                            Any / N/A
-                          </option>
-                          {selectedParticipantTeams.map((t) => (
-                            <option key={t.id} value={t.id} className="bg-zinc-900">
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
+                          placeholder="Search golfers..."
+                          className="h-8 w-full rounded border border-white/10 bg-white/[0.04] pl-7 pr-2 text-xs text-white placeholder:text-white/20 focus:border-emerald-500/50 focus:outline-none"
+                        />
                       </div>
-                    )}
-                  </div>
+                      {/* Selected golfers chips */}
+                      {edit.selectedTeamIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {edit.selectedTeamIds.map((tid) => {
+                            const golferName = teamNameMap.get(tid) ?? `Team ${tid}`;
+                            const ownerName = teamOwnerMap.get(tid)?.ownerName ?? '';
+                            return (
+                              <span
+                                key={tid}
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] text-emerald-400"
+                              >
+                                {golferName}
+                                <span className="text-white/30">({ownerName})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleGolfer(prop.key, tid)}
+                                  className="ml-0.5 text-white/30 hover:text-white/60"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* Golfer grid */}
+                      <div className="max-h-48 overflow-y-auto rounded border border-white/[0.06] bg-white/[0.01]">
+                        {filteredGolfers.map((g) => {
+                          const isSelected = edit.selectedTeamIds.includes(g.teamId);
+                          return (
+                            <button
+                              key={g.teamId}
+                              type="button"
+                              onClick={() => toggleGolfer(prop.key, g.teamId)}
+                              className={`w-full flex items-center justify-between px-3 py-1.5 text-xs border-b border-white/[0.03] last:border-0 transition-colors ${
+                                isSelected
+                                  ? 'bg-emerald-500/10 text-emerald-400'
+                                  : 'text-white/60 hover:bg-white/[0.03]'
+                              }`}
+                            >
+                              <span>
+                                {isSelected && <CheckCircle2 className="inline size-3 mr-1" />}
+                                {g.name}
+                              </span>
+                              <span className="text-[10px] text-white/25">{g.ownerName}</span>
+                            </button>
+                          );
+                        })}
+                        {filteredGolfers.length === 0 && (
+                          <p className="px-3 py-2 text-[10px] text-white/25">No golfers match "{query}"</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Non-golf: participant toggle buttons */
+                    <div>
+                      <label className="block text-[10px] text-white/40 mb-1.5">
+                        Winner(s) <span className="text-white/20">— select multiple for ties</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                        {participants.map((p) => {
+                          const isSelected = edit.selectedParticipantIds.includes(p.id);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => toggleParticipant(prop.key, p.id)}
+                              className={`rounded-md border px-2.5 py-1.5 text-xs text-left transition-colors ${
+                                isSelected
+                                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                                  : 'border-white/10 bg-white/[0.02] text-white/50 hover:bg-white/[0.04]'
+                              }`}
+                            >
+                              {isSelected && <CheckCircle2 className="inline size-3 mr-1" />}
+                              {p.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Metadata / notes */}
                   <div>
@@ -257,7 +396,7 @@ export function PropsEntry({
                           [prop.key]: { ...edit, metadata: e.target.value },
                         }))
                       }
-                      placeholder='e.g. "14-seed Colgate beat 3-seed Baylor by 12"'
+                      placeholder={isGolf ? 'e.g. "Rory McIlroy, Sam Burns — 65 (-5)"' : 'e.g. "14-seed Colgate beat 3-seed Baylor by 12"'}
                       className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 text-xs text-white placeholder:text-white/20 focus:border-emerald-500/50 focus:outline-none"
                     />
                   </div>
@@ -265,7 +404,7 @@ export function PropsEntry({
                   <button
                     type="button"
                     onClick={() => handleSave(prop)}
-                    disabled={saving === prop.key || !edit.participantId}
+                    disabled={saving === prop.key || !( isGolf ? edit.selectedTeamIds.length > 0 : edit.selectedParticipantIds.length > 0)}
                     className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Save className="size-3" />

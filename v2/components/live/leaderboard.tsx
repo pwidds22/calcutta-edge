@@ -5,7 +5,7 @@ import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
-import { calculateLeaderboard } from '@/lib/auction/live/actual-payouts';
+import { calculateLeaderboard, type LeaderboardEntry } from '@/lib/auction/live/actual-payouts';
 import { calculateProjectedStandings, type ProjectedEntry } from '@/lib/auction/live/projected-standings';
 import {
   ChevronDown,
@@ -55,7 +55,6 @@ export function Leaderboard({
 
   const isGolf = config.sport === 'golf';
   const hasResults = results.length > 0;
-  const showProjected = isGolf && !hasResults;
 
   const actualPotCalc = soldTeams.reduce((sum, t) => sum + t.amount, 0);
 
@@ -71,7 +70,9 @@ export function Leaderboard({
       if (data.error && (!data.players || data.players.length === 0)) {
         setProjError(data.error);
       } else {
-        const entries = calculateProjectedStandings(soldTeams, baseTeams, payoutRules, data.players);
+        const entries = calculateProjectedStandings(
+          soldTeams, baseTeams, payoutRules, data.players, results, config, propResults
+        );
         setProjected(entries);
         setProjSource(data.source === 'in-play' ? 'Live odds' : 'Pre-tournament model');
         setProjLastUpdated(new Date().toLocaleTimeString());
@@ -82,7 +83,7 @@ export function Leaderboard({
     } finally {
       setProjLoading(false);
     }
-  }, [isGolf, soldTeams, baseTeams, payoutRules]);
+  }, [isGolf, soldTeams, baseTeams, payoutRules, results, config, propResults]);
 
   // Fetch projections on mount for golf tournaments, auto-refresh every 60s
   useEffect(() => {
@@ -106,7 +107,8 @@ export function Leaderboard({
   const { entries, actualPot, completedRounds, currentRound, isTournamentComplete } =
     leaderboard;
 
-  // ─── Projected Standings View ─────────────────────────────────
+  // ─── Projected Standings View (golf: always show projected until tournament complete) ───
+  const showProjected = isGolf && !isTournamentComplete;
   if (showProjected) {
     return (
       <ProjectedLeaderboard
@@ -119,6 +121,9 @@ export function Leaderboard({
         expandedParticipant={expandedParticipant}
         setExpandedParticipant={setExpandedParticipant}
         onRefresh={fetchProjections}
+        settledEntries={hasResults ? entries : undefined}
+        completedRounds={completedRounds}
+        config={config}
       />
     );
   }
@@ -388,6 +393,9 @@ function ProjectedLeaderboard({
   expandedParticipant,
   setExpandedParticipant,
   onRefresh,
+  settledEntries,
+  completedRounds,
+  config,
 }: {
   projected: ProjectedEntry[] | null;
   loading: boolean;
@@ -398,7 +406,21 @@ function ProjectedLeaderboard({
   expandedParticipant: string | null;
   setExpandedParticipant: (id: string | null) => void;
   onRefresh: () => void;
+  settledEntries?: LeaderboardEntry[];
+  completedRounds?: string[];
+  config?: TournamentConfig;
 }) {
+  // Build settled-earnings lookup by participant
+  const settledMap = new Map<string, { earned: number; propEarnings: { propLabel: string; amount: number }[] }>();
+  if (settledEntries) {
+    for (const e of settledEntries) {
+      settledMap.set(e.participantId, {
+        earned: e.totalEarned,
+        propEarnings: e.propEarnings,
+      });
+    }
+  }
+  const totalSettled = settledEntries?.reduce((s, e) => s + e.totalEarned, 0) ?? 0;
   if (loading && !projected) {
     return (
       <div className="flex items-center justify-center py-12 text-white/40 gap-2">
@@ -465,7 +487,7 @@ function ProjectedLeaderboard({
       </p>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-center">
           <p className="text-[10px] uppercase tracking-wider text-white/30">Pot</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">
@@ -473,14 +495,24 @@ function ProjectedLeaderboard({
           </p>
         </div>
         <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-center">
-          <p className="text-[10px] uppercase tracking-wider text-white/30">Participants</p>
+          <p className="text-[10px] uppercase tracking-wider text-white/30">
+            Rounds Complete
+          </p>
           <p className="mt-1 text-lg font-bold text-white">
-            {projected.length}
+            {completedRounds?.length ?? 0} / {config?.rounds.length ?? '?'}
           </p>
         </div>
-        <div className="hidden sm:block rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-center">
-          <p className="text-[10px] uppercase tracking-wider text-white/30">Status</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">Pre-Tournament</p>
+        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-center">
+          <p className="text-[10px] uppercase tracking-wider text-white/30">Settled</p>
+          <p className="mt-1 text-lg font-bold text-emerald-400">
+            ${fmt(totalSettled)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-center">
+          <p className="text-[10px] uppercase tracking-wider text-white/30">Source</p>
+          <p className="mt-1 text-lg font-bold text-amber-400 text-sm">
+            {source === 'Live odds' ? 'Live Odds' : 'Pre-Tournament'}
+          </p>
         </div>
       </div>
 
@@ -541,7 +573,9 @@ function ProjectedLeaderboard({
                         {entry.projectedPL >= 0 ? '+' : ''}${fmt(entry.projectedPL)}
                       </div>
                       <p className="text-[10px] text-white/20">
-                        proj. value ${fmt(entry.projectedEarnings)}
+                        {entry.settledEarnings > 0
+                          ? `earned $${fmt(entry.settledEarnings)} · proj. $${fmt(entry.blendedEarnings)}`
+                          : `proj. value $${fmt(entry.blendedEarnings)}`}
                       </p>
                     </div>
                     {isExpanded ? (
@@ -560,14 +594,16 @@ function ProjectedLeaderboard({
                       <tr className="border-b border-white/[0.04] text-[10px] uppercase tracking-wider text-white/20">
                         <th className="px-3 py-1.5 text-left">Team</th>
                         <th className="px-3 py-1.5 text-right">Paid</th>
+                        <th className="px-3 py-1.5 text-right">Earned</th>
                         <th className="px-3 py-1.5 text-right">Proj. EV</th>
                         <th className="px-3 py-1.5 text-right">Win %</th>
-                        <th className="px-3 py-1.5 text-right">Proj. P&L</th>
+                        <th className="px-3 py-1.5 text-right">P&L</th>
                       </tr>
                     </thead>
                     <tbody>
                       {entry.teams.map((team) => {
-                        const teamPL = (team.projectedEV ?? 0) - team.purchasePrice;
+                        const displayEV = team.blendedEV ?? team.projectedEV ?? 0;
+                        const teamPL = displayEV - team.purchasePrice;
                         return (
                           <tr
                             key={team.teamId}
@@ -581,8 +617,11 @@ function ProjectedLeaderboard({
                             <td className="px-3 py-1.5 text-right font-mono text-white/40">
                               ${team.purchasePrice.toLocaleString()}
                             </td>
+                            <td className="px-3 py-1.5 text-right font-mono text-emerald-400/70">
+                              {team.settledEarnings > 0 ? `$${fmt(team.settledEarnings)}` : '—'}
+                            </td>
                             <td className="px-3 py-1.5 text-right font-mono text-amber-400/70">
-                              {team.projectedEV !== null ? `$${fmt(team.projectedEV)}` : '—'}
+                              {team.blendedEV !== null ? `$${fmt(team.blendedEV)}` : '—'}
                             </td>
                             <td className="px-3 py-1.5 text-right font-mono text-white/40">
                               {team.winProb !== null ? `${(team.winProb * 100).toFixed(1)}%` : '—'}
@@ -596,7 +635,7 @@ function ProjectedLeaderboard({
                                     : 'text-white/30'
                               }`}
                             >
-                              {team.projectedEV !== null
+                              {(team.blendedEV !== null || team.projectedEV !== null)
                                 ? `${teamPL >= 0 ? '+' : ''}$${fmt(teamPL)}`
                                 : '—'}
                             </td>

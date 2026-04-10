@@ -2,6 +2,7 @@ import type { SoldTeam } from './use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
+import { getPropWinners } from '@/lib/tournaments/props';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -299,11 +300,14 @@ export function calculateLeaderboard(
       });
     }
 
-    // Add prop bet earnings for this participant
+    // Add prop bet earnings for this participant (split among co-winners for ties)
     const participantPropEarnings: PropEarning[] = [];
     for (const pr of propResults) {
-      if (pr.winnerParticipantId === participantId) {
-        const propPayout = actualPot * (pr.payoutPercentage / 100);
+      const winners = getPropWinners(pr);
+      const isWinner = winners.some((w) => w.participantId === participantId);
+      if (isWinner) {
+        const fullPayout = actualPot * (pr.payoutPercentage / 100);
+        const propPayout = fullPayout / winners.length;
         participantPropEarnings.push({
           propKey: pr.key,
           propLabel: pr.label,

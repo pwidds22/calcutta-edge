@@ -227,7 +227,7 @@ export function TournamentDashboard({
       ? [{ key: 'props' as TabKey, label: 'Props', icon: Dice5 }]
       : []),
     ...(config.sport === 'golf'
-      ? [{ key: 'golf-leaderboard' as TabKey, label: 'Live Board', icon: Activity }]
+      ? [{ key: 'golf-leaderboard' as TabKey, label: 'Live Leaderboard', icon: Activity }]
       : []),
     { key: 'leaderboard', label: 'Leaderboard', icon: BarChart3 },
     { key: 'settlement', label: 'Settlement', icon: DollarSign },
@@ -330,6 +330,7 @@ export function TournamentDashboard({
           baseTeams={baseTeams}
           isCommissioner={isCommissioner}
           actualPot={actualPot}
+          isGolf={config.sport === 'golf'}
           onPropResultUpdate={handlePropResultUpdate}
         />
       )}

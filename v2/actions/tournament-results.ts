@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
+import type { PropWinner } from '@/lib/tournaments/props';
 
 export interface TournamentResult {
   team_id: number;
@@ -156,7 +157,8 @@ export async function updatePropResult(
   winnerParticipantId: string,
   winnerTeamId: number | null,
   metadata: string,
-  payoutPercentage: number
+  payoutPercentage: number,
+  winners?: PropWinner[]
 ) {
   const supabase = await createClient();
   const {
@@ -181,6 +183,7 @@ export async function updatePropResult(
     label: string;
     winnerParticipantId: string | null;
     winnerTeamId: number | null;
+    winners?: PropWinner[];
     metadata: string;
     payoutPercentage: number;
   }> = Array.isArray(session.prop_results) ? session.prop_results : [];
@@ -191,6 +194,7 @@ export async function updatePropResult(
     label: propLabel,
     winnerParticipantId,
     winnerTeamId,
+    winners,
     metadata,
     payoutPercentage,
   };
@@ -214,6 +218,7 @@ export async function updatePropResult(
     propLabel,
     winnerParticipantId,
     winnerTeamId,
+    winners,
     metadata,
     payoutPercentage,
   });

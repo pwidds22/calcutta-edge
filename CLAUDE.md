@@ -63,6 +63,7 @@ Next.js 16 (App Router) + TypeScript + Tailwind + shadcn/ui | Vercel (auto-deplo
 - **DON'T** skip `parseTeamOrder()` at data boundaries — DB, broadcasts, and initial state all need it
 - **DON'T** use `gameLabel` for advancement badges — use `label`. `gameLabel` = elimination/results only
 - **Payout rules are per-position** — `top5: 5%` = each of 5 gets 5% (total 25%). Multiply by `teamsAdvancing`
+- **DON'T** use `eliminatedCost` for net P&L — use `totalSpent`. Champion/alive teams still cost money. Settlement balances must sum to zero.
 
 ### Git
 - **DON'T** commit `.env` files or secrets

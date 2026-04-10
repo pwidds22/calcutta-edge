@@ -5,6 +5,9 @@ import { getTournament } from '@/lib/tournaments/registry';
 import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
+import { normalizeName } from '@/lib/datagolf/ev';
+import { fetchInPlay, fetchPreTournament, formatPlayerName } from '@/lib/datagolf/client';
+import type { DataGolfInPlayPlayer } from '@/lib/datagolf/client';
 
 export interface DashboardTeam {
   teamName: string;
@@ -39,6 +42,7 @@ export interface DashboardSession {
   userTotalEarned: number;
   userEliminatedCost: number;
   userNetPL: number; // earnings - eliminated teams cost (alive teams don't count as losses)
+  projectedNetPL: number | null; // DataGolf projected P&L for active golf tournaments
   userTeams: DashboardTeam[];
 }
 
@@ -123,6 +127,52 @@ export async function getDashboardData(): Promise<DashboardData> {
       list.push({ team_id: r.team_id, round_key: r.round_key, result: r.result });
       resultsBySession.set(r.session_id, list);
     }
+  }
+
+  // Fetch DataGolf projections for active golf sessions (best-effort, non-blocking)
+  const hasActiveGolf = sessions.some(
+    (s) => s.status === 'completed' && getTournament(s.tournament_id)?.config.sport === 'golf'
+  );
+  let dgPlayers: DataGolfInPlayPlayer[] = [];
+  if (hasActiveGolf && process.env.DATAGOLF_API_KEY) {
+    try {
+      const inPlay = await fetchInPlay();
+      const isMasters = inPlay.event_name.toLowerCase().includes('masters')
+        || inPlay.event_name.toLowerCase().includes('augusta');
+      if (isMasters) {
+        dgPlayers = inPlay.data;
+      }
+    } catch {
+      try {
+        const preTourney = await fetchPreTournament();
+        const isMasters = preTourney.event_name.toLowerCase().includes('masters')
+          || preTourney.event_name.toLowerCase().includes('augusta');
+        if (isMasters) {
+          dgPlayers = (preTourney.baseline_history_fit ?? preTourney.baseline).map(
+            (p): DataGolfInPlayPlayer => ({
+              player_name: p.player_name,
+              dg_id: p.dg_id,
+              current_pos: null,
+              current_round: 0,
+              thru: null,
+              today: null,
+              total: null,
+              win_prob: p.win,
+              top_5_prob: p.top_5,
+              top_10_prob: p.top_10,
+              top_20_prob: p.top_20,
+              make_cut_prob: p.make_cut,
+            })
+          );
+        }
+      } catch { /* DataGolf unavailable — projections will be null */ }
+    }
+  }
+
+  // Build name→player lookup for projected EV
+  const dgPlayerMap = new Map<string, DataGolfInPlayPlayer>();
+  for (const p of dgPlayers) {
+    dgPlayerMap.set(normalizeName(formatPlayerName(p.player_name)), p);
   }
 
   // Build dashboard sessions
@@ -226,6 +276,60 @@ export async function getDashboardData(): Promise<DashboardData> {
       }
     }
 
+    // Calculate projected P&L for active golf tournaments (blended: settled + projected unsettled)
+    let projectedNetPL: number | null = null;
+    // Build set of settled round keys per team for blended EV
+    const settledRoundsPerTeam = new Map<number, Set<string>>();
+    if (config && results.length > 0) {
+      for (const bid of userBids) {
+        const teamStatus = getTeamStatus(bid.team_id, results, config, playInLosers);
+        settledRoundsPerTeam.set(bid.team_id, new Set(teamStatus.roundsWon));
+      }
+    }
+
+    const PROB_FIELDS: Array<{ ruleKey: string; probField: string }> = [
+      { ruleKey: 'winner', probField: 'win_prob' },
+      { ruleKey: 'top5', probField: 'top_5_prob' },
+      { ruleKey: 'top10', probField: 'top_10_prob' },
+      { ruleKey: 'top20', probField: 'top_20_prob' },
+      { ruleKey: 'makeCut', probField: 'make_cut_prob' },
+    ];
+
+    if (config?.sport === 'golf' && dgPlayers.length > 0 && userBids.length > 0 && actualPot > 0) {
+      let blendedEarnings = 0;
+      let matched = false;
+      for (const bid of userBids) {
+        const baseTeam = teams?.find((t) => t.id === bid.team_id);
+        if (!baseTeam) continue;
+        const dgPlayer = dgPlayerMap.get(normalizeName(baseTeam.name));
+        const settledRounds = settledRoundsPerTeam.get(bid.team_id) ?? new Set<string>();
+
+        // Add settled earnings for this team
+        const teamStatus = config && results.length > 0
+          ? getTeamStatus(bid.team_id, results, config, playInLosers)
+          : null;
+        const settledEarnings = teamStatus
+          ? calculateTeamEarnings(teamStatus.roundsWon, actualPot, payoutRules)
+          : 0;
+        blendedEarnings += settledEarnings;
+
+        // Add projected EV for unsettled rounds only
+        if (dgPlayer) {
+          matched = true;
+          for (const { ruleKey, probField } of PROB_FIELDS) {
+            if (settledRounds.has(ruleKey)) continue;
+            const prob = (dgPlayer as unknown as Record<string, number | undefined>)[probField];
+            const pct = payoutRules[ruleKey];
+            if (prob === undefined || prob === null || !pct) continue;
+            blendedEarnings += prob * actualPot * (pct / 100);
+          }
+        }
+      }
+      if (matched) {
+        projectedNetPL = blendedEarnings - userTotalSpent;
+      }
+    }
+
     dashboardSessions.push({
       id: session.id,
       name: session.name,
@@ -245,20 +349,25 @@ export async function getDashboardData(): Promise<DashboardData> {
       userTotalSpent,
       userTotalEarned,
       userEliminatedCost,
-      userNetPL: userTotalEarned - userEliminatedCost, // Only count eliminated teams as losses
+      // Fully completed tournaments: use totalSpent (all fates known).
+      // In-progress tournaments: use eliminatedCost (alive teams may still earn).
+      userNetPL: (session.status === 'completed' && currentRound === null)
+        ? userTotalEarned - userTotalSpent
+        : userTotalEarned - userEliminatedCost,
+      projectedNetPL,
       userTeams,
     });
   }
 
   const totalPotExposure = dashboardSessions.reduce((s, d) => s + d.userTotalSpent, 0);
   const totalEarned = dashboardSessions.reduce((s, d) => s + d.userTotalEarned, 0);
-  const totalEliminatedCost = dashboardSessions.reduce((s, d) => s + d.userEliminatedCost, 0);
+  const totalNetPL = dashboardSessions.reduce((s, d) => s + d.userNetPL, 0);
 
   return {
     sessions: dashboardSessions,
     totalPotExposure,
     totalEarned,
-    totalNetPL: totalEarned - totalEliminatedCost,
+    totalNetPL,
     aliveTeams: allAliveTeams,
   };
 }

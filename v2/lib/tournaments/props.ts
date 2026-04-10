@@ -8,13 +8,30 @@ export interface PropDefinition {
   autoCalculated: boolean;
 }
 
+export interface PropWinner {
+  participantId: string;
+  teamId?: number;
+}
+
 export interface PropResult {
   key: string;
   label: string;
+  /** @deprecated Use `winners` array instead. Kept for backwards compat with existing data. */
   winnerParticipantId: string | null;
+  /** @deprecated Use `winners` array instead. */
   winnerTeamId: number | null;
-  metadata: string; // e.g. "14-seed Colgate beat 3-seed Baylor by 12"
+  winners?: PropWinner[]; // Multiple winners for ties — payout splits evenly
+  metadata: string; // e.g. "Rory McIlroy, Sam Burns — 65 (-5)"
   payoutPercentage: number;
+}
+
+/** Get effective winners list from a PropResult (handles legacy single-winner format) */
+export function getPropWinners(result: PropResult): PropWinner[] {
+  if (result.winners && result.winners.length > 0) return result.winners;
+  if (result.winnerParticipantId) {
+    return [{ participantId: result.winnerParticipantId, teamId: result.winnerTeamId ?? undefined }];
+  }
+  return [];
 }
 
 /**

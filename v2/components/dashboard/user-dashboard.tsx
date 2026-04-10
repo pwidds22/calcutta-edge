@@ -65,14 +65,23 @@ function StatCard({
 
 function LeagueCard({ session }: { session: DashboardSession }) {
   const href = `/live/${session.id}`;
+
+  // Show projected P&L for active golf sessions, actual P&L for completed
+  const showProjected = session.projectedNetPL !== null && session.status === 'completed' && session.currentRound !== null;
+  const displayPL = showProjected ? session.projectedNetPL! : session.userNetPL;
+  const showPL = session.userTeamsCount > 0 && (
+    session.status === 'completed' ||
+    session.projectedNetPL !== null
+  );
+
   const plColor =
-    session.userNetPL > 0
+    displayPL > 0
       ? 'text-emerald-400'
-      : session.userNetPL < 0
+      : displayPL < 0
         ? 'text-red-400'
         : 'text-white/40';
   const PlIcon =
-    session.userNetPL > 0 ? TrendingUp : session.userNetPL < 0 ? TrendingDown : Minus;
+    displayPL > 0 ? TrendingUp : displayPL < 0 ? TrendingDown : Minus;
 
   return (
     <Link
@@ -127,14 +136,16 @@ function LeagueCard({ session }: { session: DashboardSession }) {
 
       {/* P&L for sessions with bids */}
       <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-        {session.userTeamsCount > 0 && session.status === 'completed' && (
+        {showPL && (
           <div className="text-right">
             <div className={`flex items-center gap-1 text-sm font-mono font-medium ${plColor}`}>
               <PlIcon className="size-3" />
-              {session.userNetPL >= 0 ? '+' : ''}${Math.round(session.userNetPL).toLocaleString()}
+              {displayPL >= 0 ? '+' : ''}${Math.round(displayPL).toLocaleString()}
             </div>
             <p className="text-[10px] text-white/20">
-              bought in ${session.userTotalSpent.toLocaleString()}
+              {showProjected
+                ? `projected · earned $${Math.round(session.userTotalEarned).toLocaleString()}`
+                : `bought in $${session.userTotalSpent.toLocaleString()}`}
             </p>
           </div>
         )}
@@ -306,7 +317,7 @@ export function UserDashboard({ data }: { data: DashboardData }) {
             label="Net P&L"
             value={`${totalNetPL >= 0 ? '+' : ''}$${Math.round(totalNetPL).toLocaleString()}`}
             color={totalNetPL > 0 ? 'text-emerald-400' : totalNetPL < 0 ? 'text-red-400' : 'text-white/40'}
-            tooltip="Earnings minus cost of eliminated teams. Alive teams aren't counted as losses — they still have a chance to earn."
+            tooltip="Earnings minus total cost for completed tournaments. For in-progress tournaments, only eliminated teams count as losses."
           />
           <StatCard
             label="Teams"
