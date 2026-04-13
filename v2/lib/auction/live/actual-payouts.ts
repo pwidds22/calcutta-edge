@@ -253,6 +253,16 @@ export function calculateLeaderboard(
   // Pre-compute play-in losers so they show as eliminated, not alive
   const playInLosers = buildPlayInLoserSet(baseTeams, results, config);
 
+  // Precompute all team statuses + count winners per round for tie adjustment
+  const teamStatusCache = new Map<number, { status: 'alive' | 'eliminated' | 'champion'; roundsWon: string[]; eliminatedInRound: string | null }>();
+  const winnersPerRound = countWinnersPerRound(soldTeams, results, config, playInLosers);
+  for (const sold of soldTeams) {
+    teamStatusCache.set(sold.teamId, getTeamStatus(sold.teamId, results, config, playInLosers));
+  }
+
+  // Adjust payout rules when ties cause more winners than teamsAdvancing
+  const adjustedPayoutRules = adjustPayoutRulesForTies(payoutRules, winnersPerRound, config);
+
   // Build per-participant data
   const byParticipant = new Map<string, { name: string; teams: SoldTeam[] }>();
   for (const sold of soldTeams) {
@@ -273,13 +283,8 @@ export function calculateLeaderboard(
 
     for (const sold of teams) {
       const base = teamMap.get(sold.teamId);
-      const { status, roundsWon, eliminatedInRound } = getTeamStatus(
-        sold.teamId,
-        results,
-        config,
-        playInLosers
-      );
-      const earnings = calculateTeamEarnings(roundsWon, actualPot, payoutRules);
+      const { status, roundsWon, eliminatedInRound } = teamStatusCache.get(sold.teamId)!;
+      const earnings = calculateTeamEarnings(roundsWon, actualPot, adjustedPayoutRules);
       totalEarned += earnings;
 
       if (status === 'alive' || status === 'champion') teamsAlive++;
@@ -301,13 +306,14 @@ export function calculateLeaderboard(
     }
 
     // Add prop bet earnings for this participant (split among co-winners for ties)
+    // A participant may own multiple winning teams — count all their winning slots
     const participantPropEarnings: PropEarning[] = [];
     for (const pr of propResults) {
       const winners = getPropWinners(pr);
-      const isWinner = winners.some((w) => w.participantId === participantId);
-      if (isWinner) {
+      const myWins = winners.filter((w) => w.participantId === participantId).length;
+      if (myWins > 0) {
         const fullPayout = actualPot * (pr.payoutPercentage / 100);
-        const propPayout = fullPayout / winners.length;
+        const propPayout = (fullPayout / winners.length) * myWins;
         participantPropEarnings.push({
           propKey: pr.key,
           propLabel: pr.label,
@@ -341,6 +347,55 @@ export function calculateLeaderboard(
     currentRound,
     isTournamentComplete,
   };
+}
+
+// ─── Tie Adjustment ─────────────────────────────────────────────
+
+/**
+ * Adjust payout percentages so each tier's full budget is distributed
+ * among the actual number of sold-team winners.
+ *
+ * The total budget per tier is `pct * teamsAdvancing`. Regardless of
+ * whether more or fewer teams won than expected, split that budget:
+ *   adjustedPct = (pct * teamsAdvancing) / actualWinners
+ *
+ * This ensures POT === DISTRIBUTED when all tiers have at least one winner.
+ * For unsettled rounds (no winners yet), pct stays unchanged.
+ */
+export function adjustPayoutRulesForTies(
+  payoutRules: PayoutRules,
+  winnersPerRound: Map<string, number>,
+  config: TournamentConfig
+): PayoutRules {
+  const adjusted = { ...payoutRules };
+  for (const round of config.rounds) {
+    const actualWinners = winnersPerRound.get(round.key) ?? 0;
+    const expected = round.teamsAdvancing;
+    if (actualWinners > 0 && expected > 0) {
+      const pct = payoutRules[round.key] ?? 0;
+      adjusted[round.key] = (pct * expected) / actualWinners;
+    }
+  }
+  return adjusted;
+}
+
+/**
+ * Count how many sold teams won each round. Used by adjustPayoutRulesForTies.
+ */
+export function countWinnersPerRound(
+  soldTeams: SoldTeam[],
+  results: TournamentResult[],
+  config: TournamentConfig,
+  playInLosers?: Set<number>
+): Map<string, number> {
+  const winners = new Map<string, number>();
+  for (const sold of soldTeams) {
+    const { roundsWon } = getTeamStatus(sold.teamId, results, config, playInLosers);
+    for (const rk of roundsWon) {
+      winners.set(rk, (winners.get(rk) ?? 0) + 1);
+    }
+  }
+  return winners;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────

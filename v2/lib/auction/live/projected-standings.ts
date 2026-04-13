@@ -14,7 +14,7 @@ import type { PropResult } from '@/lib/tournaments/props';
 import { getPropWinners } from '@/lib/tournaments/props';
 import { formatPlayerName } from '@/lib/datagolf/client';
 import { normalizeName } from '@/lib/datagolf/ev';
-import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet } from './actual-payouts';
+import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from './actual-payouts';
 import type { TournamentConfig } from '@/lib/tournaments/types';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -135,6 +135,14 @@ export function calculateProjectedStandings(
     ? buildPlayInLoserSet(baseTeams, results, config)
     : new Set<number>();
 
+  // Adjust payout rules for ties (more winners than teamsAdvancing)
+  const winnersPerRound = (config && results && results.length > 0)
+    ? countWinnersPerRound(soldTeams, results, config, playInLosers)
+    : new Map<string, number>();
+  const adjustedPayoutRules = (config && winnersPerRound.size > 0)
+    ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config)
+    : payoutRules;
+
   // Group sold teams by participant
   const byParticipant = new Map<string, { name: string; teams: SoldTeam[] }>();
   for (const sold of soldTeams) {
@@ -164,7 +172,7 @@ export function calculateProjectedStandings(
       const settledRoundKeys = new Set<string>();
       if (config && results && results.length > 0) {
         const teamStatus = getTeamStatus(sold.teamId, results, config, playInLosers);
-        roundEarnings = calculateTeamEarnings(teamStatus.roundsWon, actualPot, payoutRules);
+        roundEarnings = calculateTeamEarnings(teamStatus.roundsWon, actualPot, adjustedPayoutRules);
         for (const rk of teamStatus.roundsWon) {
           settledRoundKeys.add(rk);
         }

@@ -2,9 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getTournament } from '@/lib/tournaments/registry';
-import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet } from '@/lib/auction/live/actual-payouts';
+import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
+import type { PropResult } from '@/lib/tournaments/props';
+import { getPropWinners } from '@/lib/tournaments/props';
 import { normalizeName } from '@/lib/datagolf/ev';
 import { fetchInPlay, fetchPreTournament, formatPlayerName } from '@/lib/datagolf/client';
 import type { DataGolfInPlayPlayer } from '@/lib/datagolf/client';
@@ -77,7 +79,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   // Load all sessions
   const { data: sessions } = await supabase
     .from('auction_sessions')
-    .select('id, name, join_code, status, tournament_id, created_at, estimated_pot_size, payout_rules, auction_participants(count)')
+    .select('id, name, join_code, status, tournament_id, created_at, estimated_pot_size, payout_rules, prop_results, auction_participants(count)')
     .in('id', sessionIds)
     .order('created_at', { ascending: false });
 
@@ -101,21 +103,25 @@ export async function getDashboardData(): Promise<DashboardData> {
     bidsBySession.set(bid.session_id, list);
   }
 
-  // Load all winning bids for actual pot calculation
+  // Load all winning bids for actual pot calculation + tie adjustment
   const { data: allWinningBids } = await supabase
     .from('auction_bids')
-    .select('session_id, amount')
+    .select('session_id, team_id, amount')
     .eq('is_winning_bid', true)
     .in('session_id', sessionIds);
 
   const potBySession = new Map<string, number>();
+  const allBidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
   for (const bid of allWinningBids ?? []) {
     potBySession.set(bid.session_id, (potBySession.get(bid.session_id) ?? 0) + Number(bid.amount));
+    const list = allBidsBySession.get(bid.session_id) ?? [];
+    list.push({ team_id: bid.team_id, amount: Number(bid.amount) });
+    allBidsBySession.set(bid.session_id, list);
   }
 
   // Load tournament results for completed sessions
   const completedIds = sessions.filter((s) => s.status === 'completed').map((s) => s.id);
-  let resultsBySession = new Map<string, TournamentResult[]>();
+  const resultsBySession = new Map<string, TournamentResult[]>();
   if (completedIds.length > 0) {
     const { data: results } = await supabase
       .from('tournament_results')
@@ -192,6 +198,19 @@ export async function getDashboardData(): Promise<DashboardData> {
 
     // Compute per-team status and earnings
     const playInLosers = (config && teams) ? buildPlayInLoserSet(teams, results, config) : new Set<number>();
+    const propResults = (session.prop_results ?? []) as PropResult[];
+
+    // Adjust payout rules for ties (more winners than teamsAdvancing)
+    const allSessionBids = allBidsBySession.get(session.id) ?? [];
+    const soldTeamsForTies = allSessionBids.map((b) => ({ teamId: b.team_id, winnerId: '', winnerName: '', amount: b.amount }));
+    const adjustedPayoutRules = (config && results.length > 0)
+      ? adjustPayoutRulesForTies(
+          payoutRules,
+          countWinnersPerRound(soldTeamsForTies, results, config, playInLosers),
+          config
+        )
+      : payoutRules;
+
     const userTeams: DashboardTeam[] = [];
     let userTotalEarned = 0;
     let userTotalSpent = 0;
@@ -211,7 +230,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         const teamStatus = getTeamStatus(bid.team_id, results, config, playInLosers);
         status = teamStatus.status;
         roundsWon = teamStatus.roundsWon;
-        earnings = calculateTeamEarnings(roundsWon, actualPot, payoutRules);
+        earnings = calculateTeamEarnings(roundsWon, actualPot, adjustedPayoutRules);
       }
 
       userTotalEarned += earnings;
@@ -255,6 +274,17 @@ export async function getDashboardData(): Promise<DashboardData> {
       userTeams.push(team);
       if (status === 'alive' || status === 'champion') {
         allAliveTeams.push(team);
+      }
+    }
+
+    // Add prop bet earnings for this user (count all winning slots, not just first match)
+    for (const pr of propResults) {
+      const winners = getPropWinners(pr);
+      const myWins = winners.filter((w) => w.participantId === user.id).length;
+      if (myWins > 0) {
+        const fullPayout = actualPot * (pr.payoutPercentage / 100);
+        const propPayout = (fullPayout / winners.length) * myWins;
+        userTotalEarned += propPayout;
       }
     }
 
@@ -309,7 +339,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           ? getTeamStatus(bid.team_id, results, config, playInLosers)
           : null;
         const settledEarnings = teamStatus
-          ? calculateTeamEarnings(teamStatus.roundsWon, actualPot, payoutRules)
+          ? calculateTeamEarnings(teamStatus.roundsWon, actualPot, adjustedPayoutRules)
           : 0;
         blendedEarnings += settledEarnings;
 
