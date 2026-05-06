@@ -1,6 +1,7 @@
-import type { TournamentConfig, BaseTeam } from './types';
+import type { TournamentConfig, BaseTeam, TournamentPhase } from './types';
 import type { OddsSourceRegistry } from './odds-sources';
 import { buildMarchMadness2026Registry, buildGolfOddsRegistry } from './odds-sources';
+import { getTournamentPhase } from './phase';
 import {
   MARCH_MADNESS_2026_CONFIG,
   MARCH_MADNESS_2026_TEAMS,
@@ -54,13 +55,14 @@ export function getTournament(id: string): TournamentEntry | undefined {
   return TOURNAMENTS[id];
 }
 
+/**
+ * Returns the tournament to default to in protected pages (strategy, payment).
+ * Equivalent to getFeaturedTournament but always returns a value (falls back to first config).
+ */
 export function getActiveTournament(): TournamentEntry {
-  const active = Object.values(TOURNAMENTS).find((t) => t.config.isActive);
-  if (!active) {
-    // Fallback to first tournament
-    return Object.values(TOURNAMENTS)[0];
-  }
-  return active;
+  const featured = getFeaturedTournament();
+  if (featured) return featured;
+  return Object.values(TOURNAMENTS)[0];
 }
 
 export function listTournaments(): TournamentConfig[] {
@@ -80,6 +82,69 @@ export function isHostable(config: TournamentConfig): boolean {
 /** List only tournaments whose hosting window is open */
 export function listHostableTournaments(): TournamentConfig[] {
   return listTournaments().filter(isHostable);
+}
+
+// ─── Phase-Aware Helpers ────────────────────────────────────────
+
+/** Get the current phase for a tournament by ID. */
+export function getPhase(id: string, now: Date = new Date()): TournamentPhase | undefined {
+  const entry = TOURNAMENTS[id];
+  return entry ? getTournamentPhase(entry.config, now) : undefined;
+}
+
+/** All tournaments grouped by current phase. */
+export function listTournamentsByPhase(now: Date = new Date()): Record<TournamentPhase, TournamentEntry[]> {
+  const buckets: Record<TournamentPhase, TournamentEntry[]> = {
+    upcoming: [],
+    hostable: [],
+    live: [],
+    completed: [],
+    archived: [],
+  };
+  for (const entry of Object.values(TOURNAMENTS)) {
+    const phase = getTournamentPhase(entry.config, now);
+    buckets[phase].push(entry);
+  }
+  return buckets;
+}
+
+/** Tournaments to show in selectors and the "upcoming" strip — excludes completed/archived. */
+export function listSelectorTournaments(now: Date = new Date()): TournamentEntry[] {
+  const buckets = listTournamentsByPhase(now);
+  return [...buckets.live, ...buckets.hostable, ...buckets.upcoming].sort((a, b) =>
+    a.config.startDate.localeCompare(b.config.startDate)
+  );
+}
+
+/** Tournaments in the "past" bucket — completed only, sorted by endDate descending (most recent first). */
+export function listPastTournaments(now: Date = new Date()): TournamentEntry[] {
+  const buckets = listTournamentsByPhase(now);
+  return [...buckets.completed].sort((a, b) => b.config.endDate.localeCompare(a.config.endDate));
+}
+
+/**
+ * The single tournament to feature on the homepage hero.
+ * Priority: live (soonest endDate) > hostable (soonest startDate) > upcoming (soonest startDate).
+ * Returns undefined if no tournament is in any of those phases.
+ */
+export function getFeaturedTournament(now: Date = new Date()): TournamentEntry | undefined {
+  const buckets = listTournamentsByPhase(now);
+  if (buckets.live.length > 0) {
+    return [...buckets.live].sort((a, b) =>
+      a.config.endDate.localeCompare(b.config.endDate)
+    )[0];
+  }
+  if (buckets.hostable.length > 0) {
+    return [...buckets.hostable].sort((a, b) =>
+      a.config.startDate.localeCompare(b.config.startDate)
+    )[0];
+  }
+  if (buckets.upcoming.length > 0) {
+    return [...buckets.upcoming].sort((a, b) =>
+      a.config.startDate.localeCompare(b.config.startDate)
+    )[0];
+  }
+  return undefined;
 }
 
 // ─── Odds Registry (with caching for async sources) ─────────────
