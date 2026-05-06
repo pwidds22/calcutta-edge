@@ -11,6 +11,10 @@ import {
   MASTERS_2026_TEAMS,
 } from './configs/masters-2026';
 import {
+  PGA_CHAMPIONSHIP_2026_CONFIG,
+  PGA_CHAMPIONSHIP_2026_TEAMS,
+} from './configs/pga-championship-2026';
+import {
   KENTUCKY_DERBY_2026_CONFIG,
   KENTUCKY_DERBY_2026_TEAMS,
 } from './configs/kentucky-derby-2026';
@@ -36,6 +40,10 @@ const TOURNAMENTS: Record<string, TournamentEntry> = {
   masters_2026: {
     config: MASTERS_2026_CONFIG,
     teams: MASTERS_2026_TEAMS,
+  },
+  pga_championship_2026: {
+    config: PGA_CHAMPIONSHIP_2026_CONFIG,
+    teams: PGA_CHAMPIONSHIP_2026_TEAMS,
   },
   kentucky_derby_2026: {
     config: KENTUCKY_DERBY_2026_CONFIG,
