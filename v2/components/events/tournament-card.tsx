@@ -108,7 +108,7 @@ export function TournamentCard({ config, teamCount, isActive }: TournamentCardPr
           <ArrowRight className="size-3" />
         </Link>
         <Link
-          href={`/auction?tournament=${config.id}`}
+          href={`/strategy?tournament=${config.id}`}
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white"
         >
           Strategy Tool

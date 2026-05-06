@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 // Allowed internal redirect paths after auth callback
-const ALLOWED_PREFIXES = ['/auction', '/host', '/join', '/live', '/profile', '/payment', '/reset-password']
+const ALLOWED_PREFIXES = ['/auction', '/strategy', '/host', '/join', '/live', '/profile', '/payment', '/reset-password']
 
 function isValidInternalPath(path: string): boolean {
   // Must start with / and not contain protocol or double slashes (prevents //evil.com)

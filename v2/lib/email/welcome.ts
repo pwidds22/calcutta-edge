@@ -52,7 +52,7 @@ function buildWelcomeHtml(): string {
 
       <div style="margin: 24px 0;">
         <a href="https://calcuttaedge.com/host" style="${styles.cta}">Host Your Auction →</a>
-        <a href="https://calcuttaedge.com/auction" style="${styles.cta.replace('#10b981', '#f59e0b')}">Preview Strategy →</a>
+        <a href="https://calcuttaedge.com/strategy" style="${styles.cta.replace('#10b981', '#f59e0b')}">Preview Strategy →</a>
       </div>
 
       <hr style="${styles.divider}" />

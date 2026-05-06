@@ -56,7 +56,7 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
     // Validate: must be relative path (prevent open redirect)
     const destination = (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//'))
       ? returnTo
-      : `/auction?tournament=${config.id}`
+      : `/strategy?tournament=${config.id}`
     redirect(destination)
   }
 

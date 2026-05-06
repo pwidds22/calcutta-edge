@@ -98,7 +98,7 @@ function AuctionToolInner({
               </div>
             </div>
             <Link
-              href={`/payment?tournament=${config.id}&returnTo=${encodeURIComponent(`/auction?tournament=${config.id}`)}`}
+              href={`/payment?tournament=${config.id}&returnTo=${encodeURIComponent(`/strategy?tournament=${config.id}`)}`}
               className="w-full shrink-0 rounded-md bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500 transition-colors sm:w-auto"
             >
               Unlock — ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
@@ -164,7 +164,7 @@ function LeagueSelector({
   const switchLeague = useCallback(
     (name: string) => {
       setOpen(false);
-      router.push(`/auction?league=${encodeURIComponent(name)}`);
+      router.push(`/strategy?league=${encodeURIComponent(name)}`);
     },
     [router]
   );
@@ -177,7 +177,7 @@ function LeagueSelector({
     // Navigate to the new league — it will be created on first save
     dispatch({ type: 'SET_LEAGUE_NAME', leagueName: trimmed });
     dispatch({ type: 'CLEAR_ALL_PRICES' }); // Start fresh
-    router.push(`/auction?league=${encodeURIComponent(trimmed)}`);
+    router.push(`/strategy?league=${encodeURIComponent(trimmed)}`);
   }, [newName, dispatch, router]);
 
   const handleRename = useCallback(async () => {
@@ -190,7 +190,7 @@ function LeagueSelector({
     if (result.error) return;
     setRenaming(false);
     dispatch({ type: 'SET_LEAGUE_NAME', leagueName: trimmed });
-    router.push(`/auction?league=${encodeURIComponent(trimmed)}`);
+    router.push(`/strategy?league=${encodeURIComponent(trimmed)}`);
   }, [renameValue, currentLeague, eventType, dispatch, router]);
 
   const handleDelete = useCallback(async () => {
@@ -199,7 +199,7 @@ function LeagueSelector({
     // Switch to another league or default
     const remaining = leagues.filter((l) => l !== currentLeague);
     const next = remaining[0] ?? 'My Auction';
-    router.push(`/auction?league=${encodeURIComponent(next)}`);
+    router.push(`/strategy?league=${encodeURIComponent(next)}`);
   }, [eventType, currentLeague, leagues, router]);
 
   // Only show selector if user has multiple leagues or wants to create one

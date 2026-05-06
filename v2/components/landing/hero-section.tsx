@@ -43,7 +43,7 @@ export function HeroSection() {
               asChild
               className="border-white/10 bg-transparent text-white hover:bg-white/[0.06] hover:text-white"
             >
-              <Link href="/auction">See Strategy Analytics</Link>
+              <Link href="/strategy">See Strategy Analytics</Link>
             </Button>
           </div>
 

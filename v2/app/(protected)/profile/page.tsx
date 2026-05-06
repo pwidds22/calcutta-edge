@@ -27,9 +27,9 @@ export default async function ProfilePage() {
       {/* Quick action */}
       <div className="mt-8">
         <Button asChild className="gap-2">
-          <Link href="/auction">
+          <Link href="/strategy">
             <BarChart3 className="size-4" />
-            Go to Auction Tool
+            Go to Strategy Tool
             <ArrowRight className="size-4" />
           </Link>
         </Button>

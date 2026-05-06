@@ -274,7 +274,7 @@ export function UserDashboard({ data }: { data: DashboardData }) {
               </p>
             </div>
             <div className="flex flex-shrink-0 gap-2">
-              <Link href="/auction?tournament=masters_2026">
+              <Link href="/strategy?tournament=masters_2026">
                 <Button
                   variant="outline"
                   size="sm"

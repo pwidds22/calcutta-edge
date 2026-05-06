@@ -293,7 +293,7 @@ export function TeamTable() {
             Fair values, bid recommendations, and profit projections for every {(config?.teamLabel ?? 'team').toLowerCase()}.
           </p>
           <Link
-            href={`/payment?tournament=${config?.id ?? ''}&returnTo=${encodeURIComponent(`/auction?tournament=${config?.id ?? ''}`)}`}
+            href={`/payment?tournament=${config?.id ?? ''}&returnTo=${encodeURIComponent(`/strategy?tournament=${config?.id ?? ''}`)}`}
             className="rounded-md bg-emerald-600 px-6 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
           >
             Unlock Full Access — ${((config?.strategyPrice ?? 2999) / 100).toFixed(2)}

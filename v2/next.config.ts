@@ -13,6 +13,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/auction",
+        destination: "/strategy",
+        permanent: true,
+      },
+      {
+        source: "/auction/:path*",
+        destination: "/strategy/:path*",
+        permanent: true,
+      },
+    ];
+  },
   // PostHog reverse proxy — prevent ad blockers from blocking analytics
   skipTrailingSlashRedirect: true,
 };
