@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getTournament } from '@/lib/tournaments/registry';
+import { getTournamentPhase } from '@/lib/tournaments/phase';
 import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
@@ -389,12 +390,22 @@ export async function getDashboardData(): Promise<DashboardData> {
     });
   }
 
+  // Totals are lifetime — computed across ALL sessions including completed.
   const totalPotExposure = dashboardSessions.reduce((s, d) => s + d.userTotalSpent, 0);
   const totalEarned = dashboardSessions.reduce((s, d) => s + d.userTotalEarned, 0);
   const totalNetPL = dashboardSessions.reduce((s, d) => s + d.userNetPL, 0);
 
+  // Phase 1: hide sessions for completed/archived tournaments from the active list.
+  // Phase 2 will reintroduce them under a collapsible "Past Leagues" section.
+  const visibleSessions = dashboardSessions.filter((session) => {
+    const tournament = getTournament(session.tournamentId);
+    if (!tournament) return true; // unknown tournament — keep visible to avoid orphaning
+    const phase = getTournamentPhase(tournament.config);
+    return phase === 'live' || phase === 'hostable' || phase === 'upcoming';
+  });
+
   return {
-    sessions: dashboardSessions,
+    sessions: visibleSessions,
     totalPotExposure,
     totalEarned,
     totalNetPL,
