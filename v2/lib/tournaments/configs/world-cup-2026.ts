@@ -46,6 +46,7 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
   teamLabel: 'Nation',
   groupLabel: 'Group',
   startDate: '2026-06-11',
+  endDate: '2026-07-19',
   hostingOpensAt: '2026-05-28',
   isActive: false,
 };

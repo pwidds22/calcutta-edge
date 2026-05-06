@@ -72,6 +72,7 @@ export const MARCH_MADNESS_2026_CONFIG: TournamentConfig = {
   teamLabel: 'Team',
   groupLabel: 'Region',
   startDate: '2026-03-19',
+  endDate: '2026-04-06',
   hostingOpensAt: '2026-03-01',
   isActive: false, // Tournament completed 2026-04-07
   strategyPrice: 2999, // $29.99

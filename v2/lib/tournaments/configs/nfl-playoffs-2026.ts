@@ -30,6 +30,7 @@ export const NFL_PLAYOFFS_2026_CONFIG: TournamentConfig = {
   teamLabel: 'Team',
   groupLabel: 'Conference',
   startDate: '2026-01-10',
+  endDate: '2026-02-08',
   isActive: false,
 };
 

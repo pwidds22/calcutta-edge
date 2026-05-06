@@ -44,8 +44,9 @@ export const MASTERS_2026_CONFIG: TournamentConfig = {
   teamLabel: 'Golfer',
   groupLabel: 'Tier',
   startDate: '2026-04-09',
+  endDate: '2026-04-12',
   hostingOpensAt: '2026-03-26',
-  isActive: true,
+  isActive: false, // Tournament completed 2026-04-12 — kept for legacy alias compat
   strategyPrice: 1999, // $19.99
   stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_MASTERS',
 };

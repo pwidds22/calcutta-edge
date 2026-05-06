@@ -38,6 +38,7 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
   teamLabel: 'Team',
   groupLabel: 'Division',
   startDate: '2026-09-10',
+  endDate: '2027-02-07',
   hostingOpensAt: '2026-08-27',
   isActive: false,
 };

@@ -39,6 +39,7 @@ const mockConfig: TournamentConfig = {
   teamLabel: 'Team',
   groupLabel: 'Region',
   startDate: '2026-03-17',
+  endDate: '2026-04-06',
   isActive: true,
 };
 

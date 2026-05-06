@@ -29,6 +29,7 @@ export const KENTUCKY_DERBY_2026_CONFIG: TournamentConfig = {
   teamLabel: 'Horse',
   groupLabel: 'Tier',
   startDate: '2026-05-02',
+  endDate: '2026-05-02',
   hostingOpensAt: '2026-04-18',
   isActive: false,
 };
