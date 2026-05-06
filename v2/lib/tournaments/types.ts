@@ -9,6 +9,14 @@ export type GroupKey = string;
 /** Devigging strategy — how to normalize odds */
 export type DevigStrategy = 'bracket' | 'global' | 'group' | 'none';
 
+/** Lifecycle phase derived from a tournament's dates. */
+export type TournamentPhase =
+  | 'upcoming'   // hosting not yet open
+  | 'hostable'   // hosts can create auctions, no live data yet
+  | 'live'       // tournament in progress, results syncing
+  | 'completed'  // ended, frozen, visible in past leagues
+  | 'archived';  // fully hidden from selectors and dashboards
+
 export interface RoundConfig {
   key: RoundKey;
   /** Milestone label — the round teams advance TO (e.g., "R32", "S16") */
@@ -58,6 +66,13 @@ export interface TournamentConfig {
   startDate: string;
   /** ISO date when hosting opens (typically 2-3 weeks before startDate). If omitted, hosting is always open. */
   hostingOpensAt?: string;
+  /** ISO date of the last day of competition (inclusive). Required for new configs. */
+  endDate: string;
+  /** ISO date when the tournament should be hidden from all UI. Default: endDate + 30 days. */
+  archiveAt?: string;
+  /** Force a specific phase regardless of dates (escape hatch for delays/cancellations). */
+  phaseOverride?: TournamentPhase;
+  /** @deprecated Use `getTournamentPhase()` and check for 'hostable' or 'live'. Manually maintained during Phase 1 migration; field will be removed when all call sites are updated (Phase 2). */
   isActive: boolean;
   /** Strategy tool price in cents (e.g., 2999 = $29.99). Used for payment gating. */
   strategyPrice?: number;
