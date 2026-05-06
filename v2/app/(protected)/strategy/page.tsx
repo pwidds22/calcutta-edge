@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { loadAuctionData, listUserLeagues } from '@/actions/auction'
 import { AuctionTool } from '@/components/auction/auction-tool'
-import { getActiveTournament, getTournament, listTournaments, getOddsRegistry } from '@/lib/tournaments/registry'
+import { getActiveTournament, getTournament, listSelectorTournaments, getOddsRegistry } from '@/lib/tournaments/registry'
+import { getTournamentPhase } from '@/lib/tournaments/phase'
 import { normalizePayoutRules } from '@/lib/calculations/normalize'
 import { hasTournamentAccess } from '@/lib/auth/tournament-access'
 import Link from 'next/link'
@@ -21,10 +22,13 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
 
   if (!user) redirect('/login')
 
-  // Resolve tournament: use ?tournament= param if it's an active tournament, else default
+  // Resolve tournament: use ?tournament= param if it's still in selector phase, else default
+  // to featured. Visiting a completed/archived tournament URL silently falls back.
   const activeTournament = getActiveTournament()
   const requestedTournament = params.tournament ? getTournament(params.tournament) : null
-  const selectedTournament = (requestedTournament && requestedTournament.config.isActive)
+  const requestedPhase = requestedTournament ? getTournamentPhase(requestedTournament.config) : undefined
+  const isRequestedSelectable = requestedPhase === 'live' || requestedPhase === 'hostable' || requestedPhase === 'upcoming'
+  const selectedTournament = (requestedTournament && isRequestedSelectable)
     ? requestedTournament
     : activeTournament
   const { config, teams: baseTeams } = selectedTournament
@@ -32,8 +36,8 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
   // Check per-tournament payment status
   const hasPaid = await hasTournamentAccess(supabase, user.id, config.id)
 
-  // Get all tournaments for the selector
-  const allTournaments = listTournaments()
+  // Get tournaments for the selector (excludes completed/archived automatically)
+  const allTournaments = listSelectorTournaments().map((entry) => entry.config)
 
   // Load league list and selected league
   const leagueList = await listUserLeagues(config.id)
@@ -54,7 +58,9 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
       {allTournaments.length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {allTournaments.map((t) => {
-            if (t.isActive) {
+            const phase = getTournamentPhase(t)
+            const isSelectable = phase === 'live' || phase === 'hostable'
+            if (isSelectable) {
               const isSelected = t.id === config.id
               return (
                 <Link
@@ -70,7 +76,7 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
                 </Link>
               )
             }
-            // Non-active tournaments: disabled "Coming Soon" pill
+            // Upcoming tournaments: disabled "Coming Soon" pill (Phase 2 makes these click-to-buy)
             const startDate = new Date(t.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
             return (
               <span
