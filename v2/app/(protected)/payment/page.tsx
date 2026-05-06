@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Check, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { getActiveTournament, getTournament } from '@/lib/tournaments/registry'
+import { getTournamentPhase } from '@/lib/tournaments/phase'
 import { hasTournamentAccess } from '@/lib/auth/tournament-access'
 
 const FEATURES_BY_SPORT: Record<string, string[]> = {
@@ -43,9 +44,12 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
 
   if (!user) redirect('/login')
 
-  // Resolve tournament from query param
+  // Resolve tournament from query param: accept any tournament still in selector phases
+  // (live/hostable/upcoming). Completed/archived tournaments fall back to featured.
   const requestedTournament = params.tournament ? getTournament(params.tournament) : null
-  const { config } = (requestedTournament && requestedTournament.config.isActive)
+  const requestedPhase = requestedTournament ? getTournamentPhase(requestedTournament.config) : undefined
+  const isPayable = requestedPhase === 'live' || requestedPhase === 'hostable' || requestedPhase === 'upcoming'
+  const { config } = (requestedTournament && isPayable)
     ? requestedTournament
     : getActiveTournament()
 
