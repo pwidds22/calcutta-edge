@@ -382,9 +382,14 @@ export async function getDashboardData(): Promise<DashboardData> {
       userTotalSpent,
       userTotalEarned,
       userEliminatedCost,
-      // Fully completed tournaments: use totalSpent (all fates known).
-      // In-progress tournaments: use eliminatedCost (alive teams may still earn).
-      userNetPL: (session.status === 'completed' && currentRound === null)
+      // Tournament-over detection: auction officially closed AND results in, OR
+      // tournament's date phase has passed end-of-play. Either signal triggers
+      // the "completed" P&L formula which subtracts ALL buy-in (alive teams cost
+      // money too once the tournament is over).
+      userNetPL: (
+        (session.status === 'completed' && currentRound === null) ||
+        (config && (getTournamentPhase(config) === 'completed' || getTournamentPhase(config) === 'archived'))
+      )
         ? userTotalEarned - userTotalSpent
         : userTotalEarned - userEliminatedCost,
       projectedNetPL,
@@ -398,12 +403,10 @@ export async function getDashboardData(): Promise<DashboardData> {
   const totalEarned = dashboardSessions.reduce((s, d) => s + d.userTotalEarned, 0);
   const totalNetPL = dashboardSessions.reduce((s, d) => s + d.userNetPL, 0);
 
-  // Return ALL sessions; the UI splits them into Active vs Completed using
-  // both auction status (status/currentRound) and tournament phase.
-  // Archive sessions are hidden entirely — those are typically very old.
-  const visibleSessions = dashboardSessions.filter(
-    (s) => s.tournamentPhase !== 'archived'
-  );
+  // Return ALL sessions including archived ones — users want to see their
+  // full league history in the Past Leagues section. The UI splits them into
+  // Active vs Completed using both auction status and tournament phase.
+  const visibleSessions = dashboardSessions;
 
   // Alive teams should only include those from sessions whose tournament is
   // still active (live/hostable/upcoming). Champions of completed tournaments

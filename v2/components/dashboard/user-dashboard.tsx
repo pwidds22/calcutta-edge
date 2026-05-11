@@ -216,7 +216,8 @@ export function UserDashboard({ data }: { data: DashboardData }) {
   // but the real-world tournament is long over (e.g., March Madness 2026).
   const isCompletedSession = (s: DashboardSession) =>
     (s.status === 'completed' && s.currentRound === null) ||
-    s.tournamentPhase === 'completed';
+    s.tournamentPhase === 'completed' ||
+    s.tournamentPhase === 'archived';
   const completedSessions = sessions.filter(isCompletedSession);
   const activeSessions = sessions.filter((s) => !isCompletedSession(s));
   const hasAnyBids = sessions.some((s) => s.userTeamsCount > 0);
