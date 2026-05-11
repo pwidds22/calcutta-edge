@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { getTournament } from '@/lib/tournaments/registry';
+import { getTournament, getFeaturedTournament } from '@/lib/tournaments/registry';
 import { getTournamentPhase } from '@/lib/tournaments/phase';
 import type { TournamentPhase } from '@/lib/tournaments/types';
 import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from '@/lib/auction/live/actual-payouts';
@@ -51,20 +51,58 @@ export interface DashboardSession {
   tournamentPhase: TournamentPhase | null; // null if tournament config not found
 }
 
+export interface DashboardFeaturedEvent {
+  id: string;
+  fullName: string;
+  shortName: string; // name with year suffix stripped
+  sport: string;
+  teamLabel: string; // e.g., "Golfer", "Team", "Horse"
+  teamCount: number;
+  phase: TournamentPhase;
+  startDate: string;
+  hostingOpensAt: string | null;
+}
+
 export interface DashboardData {
   sessions: DashboardSession[];
   totalPotExposure: number;
   totalEarned: number;
   totalNetPL: number;
   aliveTeams: DashboardTeam[];
+  /** The next event to promote (live > soonest hostable > soonest upcoming). null if nothing's coming. */
+  featuredEvent: DashboardFeaturedEvent | null;
+}
+
+/** Compute the featured event for dashboard promo card. Strips year suffix for conversational copy. */
+function computeFeaturedEvent(): DashboardFeaturedEvent | null {
+  const featured = getFeaturedTournament();
+  if (!featured) return null;
+  const phase = getTournamentPhase(featured.config);
+  if (phase !== 'live' && phase !== 'hostable' && phase !== 'upcoming') return null;
+  return {
+    id: featured.config.id,
+    fullName: featured.config.name,
+    shortName: featured.config.name.replace(/\s+20\d\d(-\d\d)?$/, ''),
+    sport: featured.config.sport,
+    teamLabel: featured.config.teamLabel,
+    teamCount: featured.teams.length,
+    phase,
+    startDate: featured.config.startDate,
+    hostingOpensAt: featured.config.hostingOpensAt ?? null,
+  };
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
+  const featuredEvent = computeFeaturedEvent();
+  const emptyResult: DashboardData = {
+    sessions: [], totalPotExposure: 0, totalEarned: 0, totalNetPL: 0, aliveTeams: [], featuredEvent,
+  };
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { sessions: [], totalPotExposure: 0, totalEarned: 0, totalNetPL: 0, aliveTeams: [] };
+  if (!user) return emptyResult;
 
   // Get all sessions user is part of (hosted + joined)
   const { data: participations } = await supabase
@@ -73,7 +111,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     .eq('user_id', user.id);
 
   if (!participations || participations.length === 0) {
-    return { sessions: [], totalPotExposure: 0, totalEarned: 0, totalNetPL: 0, aliveTeams: [] };
+    return emptyResult;
   }
 
   const sessionIds = participations.map((p) => p.session_id);
@@ -87,7 +125,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     .order('created_at', { ascending: false });
 
   if (!sessions || sessions.length === 0) {
-    return { sessions: [], totalPotExposure: 0, totalEarned: 0, totalNetPL: 0, aliveTeams: [] };
+    return emptyResult;
   }
 
   // Load user's winning bids across all sessions
@@ -425,5 +463,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     totalEarned,
     totalNetPL,
     aliveTeams: visibleAliveTeams,
+    featuredEvent,
   };
 }

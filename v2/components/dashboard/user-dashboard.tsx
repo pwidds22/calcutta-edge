@@ -17,7 +17,67 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { DashboardData, DashboardSession, DashboardTeam } from '@/actions/dashboard';
+import type { DashboardData, DashboardFeaturedEvent, DashboardSession, DashboardTeam } from '@/actions/dashboard';
+
+function formatLongDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+}
+
+function FeaturedEventBanner({ event }: { event: DashboardFeaturedEvent }) {
+  const dateLabel =
+    event.phase === 'live'
+      ? 'Happening now'
+      : event.phase === 'hostable'
+        ? `Tournament starts ${formatLongDate(event.startDate)}`
+        : event.hostingOpensAt
+          ? `Hosting opens ${formatLongDate(event.hostingOpensAt)}`
+          : `Coming ${formatLongDate(event.startDate)}`;
+
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-950/40 via-emerald-900/20 to-zinc-900/40 p-5">
+      <div className="absolute -right-8 -top-8 size-32 rounded-full bg-emerald-500/5 blur-2xl" />
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400 border border-emerald-500/20">
+              {event.fullName}
+            </span>
+            <span className="text-[10px] text-white/30">{dateLabel}</span>
+          </div>
+          <h3 className="text-base font-bold text-white">
+            Run a {event.shortName} Calcutta with your group
+          </h3>
+          <p className="text-xs text-white/40 max-w-md">
+            {event.teamCount}-{event.teamLabel.toLowerCase()} field, live bidding,
+            strategy analytics — free to host. See what every {event.teamLabel.toLowerCase()} is worth before the auction.
+          </p>
+        </div>
+        <div className="flex flex-shrink-0 gap-2">
+          <Link href={`/strategy?tournament=${event.id}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
+            >
+              <Sparkles className="size-3.5" />
+              Preview Analytics
+            </Button>
+          </Link>
+          <Link href={`/host/create?tournament=${event.id}`}>
+            <Button
+              size="sm"
+              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              <Plus className="size-3.5" />
+              Host Free
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const statusColors: Record<string, string> = {
   lobby: 'bg-amber-500/10 text-amber-400',
@@ -119,11 +179,18 @@ function LeagueCard({ session }: { session: DashboardSession }) {
           {session.userTeamsCount > 0 && (
             <span>
               {session.userTeamsCount} team{session.userTeamsCount !== 1 ? 's' : ''}
-              {session.status === 'completed' && (
+              {/*
+                For active tournaments, show alive/out breakdown (useful while in play).
+                For completed tournaments, drop the breakdown — partial-payout sports
+                like golf make "alive vs eliminated" misleading (a golfer can earn money
+                even after being "eliminated" at the cut/T20/etc). The P&L column on the
+                right tells the full story.
+              */}
+              {session.status === 'completed' && !tournamentOver && (
                 <>
                   {session.userTeamsAlive > 0 && (
                     <span className="text-emerald-400/60">
-                      {' '}· {session.userTeamsAlive} {tournamentOver ? 'won' : 'alive'}
+                      {' '}· {session.userTeamsAlive} alive
                     </span>
                   )}
                   {session.userTeamsEliminated > 0 && (
@@ -216,7 +283,7 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
 }
 
 export function UserDashboard({ data }: { data: DashboardData }) {
-  const { sessions, totalPotExposure, totalEarned, totalNetPL, aliveTeams } = data;
+  const { sessions, totalPotExposure, totalEarned, totalNetPL, aliveTeams, featuredEvent } = data;
   // A session is "completed" when EITHER (a) the auction is done AND all tournament
   // rounds have results, OR (b) the tournament itself has ended (date-driven phase).
   // The phase check catches leagues where the host never marked the auction complete
@@ -262,52 +329,8 @@ export function UserDashboard({ data }: { data: DashboardData }) {
         </div>
       </div>
 
-      {/* Masters 2026 Promotion — auto-hides after April 13, 2026 */}
-      {new Date() < new Date('2026-04-14') && (
-        <div className="relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-950/40 via-emerald-900/20 to-zinc-900/40 p-5">
-          <div className="absolute -right-8 -top-8 size-32 rounded-full bg-emerald-500/5 blur-2xl" />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400 border border-emerald-500/20">
-                  Masters 2026
-                </span>
-                <span className="text-[10px] text-white/30">
-                  Tournament starts April 9
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-white">
-                Run a Masters Calcutta with your group
-              </h3>
-              <p className="text-xs text-white/40 max-w-md">
-                89-player field, balanced bundles, live bidding — free to host.
-                Strategy analytics show you what every golfer is worth before the auction.
-              </p>
-            </div>
-            <div className="flex flex-shrink-0 gap-2">
-              <Link href="/strategy?tournament=masters_2026">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
-                >
-                  <Sparkles className="size-3.5" />
-                  Preview Analytics
-                </Button>
-              </Link>
-              <Link href="/host/create?tournament=masters_2026">
-                <Button
-                  size="sm"
-                  className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                >
-                  <Plus className="size-3.5" />
-                  Host Free
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Phase-aware Next Event banner — auto-updates as tournaments rotate. */}
+      {featuredEvent && <FeaturedEventBanner event={featuredEvent} />}
 
       {/* Summary stats (only if user has bids) */}
       {hasAnyBids && (

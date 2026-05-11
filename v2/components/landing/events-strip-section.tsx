@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { listTournamentsWithTeams } from '@/lib/tournaments/registry';
+import { listSelectorTournaments } from '@/lib/tournaments/registry';
 import { Calendar, ArrowRight } from 'lucide-react';
 
 const SPORT_COLORS: Record<string, string> = {
@@ -25,12 +25,12 @@ function sportLabel(sport: string): string {
 }
 
 export function EventsStripSection() {
-  const tournaments = listTournamentsWithTeams();
-  const sorted = [...tournaments].sort((a, b) => {
-    if (a.config.isActive && !b.config.isActive) return -1;
-    if (!a.config.isActive && b.config.isActive) return 1;
-    return a.config.startDate.localeCompare(b.config.startDate);
-  });
+  // Phase-aware: shows only live/hostable/upcoming events, already sorted by startDate.
+  // Completed and archived tournaments auto-drop off — no manual maintenance per transition.
+  const sorted = listSelectorTournaments();
+
+  // If no upcoming events at all, hide the section entirely rather than show an empty grid.
+  if (sorted.length === 0) return null;
 
   return (
     <section className="border-t border-white/[0.06]">
