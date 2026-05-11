@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getTournament } from '@/lib/tournaments/registry';
 import { getTournamentPhase } from '@/lib/tournaments/phase';
+import type { TournamentPhase } from '@/lib/tournaments/types';
 import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
@@ -47,6 +48,7 @@ export interface DashboardSession {
   userNetPL: number; // earnings - eliminated teams cost (alive teams don't count as losses)
   projectedNetPL: number | null; // DataGolf projected P&L for active golf tournaments
   userTeams: DashboardTeam[];
+  tournamentPhase: TournamentPhase | null; // null if tournament config not found
 }
 
 export interface DashboardData {
@@ -387,6 +389,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         : userTotalEarned - userEliminatedCost,
       projectedNetPL,
       userTeams,
+      tournamentPhase: config ? getTournamentPhase(config) : null,
     });
   }
 
@@ -395,20 +398,23 @@ export async function getDashboardData(): Promise<DashboardData> {
   const totalEarned = dashboardSessions.reduce((s, d) => s + d.userTotalEarned, 0);
   const totalNetPL = dashboardSessions.reduce((s, d) => s + d.userNetPL, 0);
 
-  // Phase 1: hide sessions for completed/archived tournaments from the active list.
-  // Phase 2 will reintroduce them under a collapsible "Past Leagues" section.
-  const visibleSessions = dashboardSessions.filter((session) => {
-    const tournament = getTournament(session.tournamentId);
-    if (!tournament) return true; // unknown tournament — keep visible to avoid orphaning
-    const phase = getTournamentPhase(tournament.config);
-    return phase === 'live' || phase === 'hostable' || phase === 'upcoming';
-  });
+  // Return ALL sessions; the UI splits them into Active vs Completed using
+  // both auction status (status/currentRound) and tournament phase.
+  // Archive sessions are hidden entirely — those are typically very old.
+  const visibleSessions = dashboardSessions.filter(
+    (s) => s.tournamentPhase !== 'archived'
+  );
 
-  // Filter alive teams to only those from visible (still-active) sessions.
-  // Champions of completed tournaments (Masters/March Madness winners) should NOT
-  // appear in the "My Alive Teams" widget — that view is for ongoing positions.
-  const visibleLeagueIds = new Set(visibleSessions.map((s) => s.id));
-  const visibleAliveTeams = allAliveTeams.filter((team) => visibleLeagueIds.has(team.leagueId));
+  // Alive teams should only include those from sessions whose tournament is
+  // still active (live/hostable/upcoming). Champions of completed tournaments
+  // (Masters/March Madness winners) should NOT appear in "My Alive Teams" —
+  // that widget is for ongoing positions.
+  const activeTournamentLeagueIds = new Set(
+    dashboardSessions
+      .filter((s) => s.tournamentPhase === 'live' || s.tournamentPhase === 'hostable' || s.tournamentPhase === 'upcoming')
+      .map((s) => s.id)
+  );
+  const visibleAliveTeams = allAliveTeams.filter((team) => activeTournamentLeagueIds.has(team.leagueId));
 
   return {
     sessions: visibleSessions,

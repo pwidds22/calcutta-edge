@@ -210,14 +210,15 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
 
 export function UserDashboard({ data }: { data: DashboardData }) {
   const { sessions, totalPotExposure, totalEarned, totalNetPL, aliveTeams } = data;
-  // A session is truly "completed" only when the auction is done AND all tournament
-  // rounds have results (currentRound === null). Otherwise it's still active.
-  const completedSessions = sessions.filter(
-    (s) => s.status === 'completed' && s.currentRound === null
-  );
-  const activeSessions = sessions.filter(
-    (s) => s.status !== 'completed' || s.currentRound !== null
-  );
+  // A session is "completed" when EITHER (a) the auction is done AND all tournament
+  // rounds have results, OR (b) the tournament itself has ended (date-driven phase).
+  // The phase check catches leagues where the host never marked the auction complete
+  // but the real-world tournament is long over (e.g., March Madness 2026).
+  const isCompletedSession = (s: DashboardSession) =>
+    (s.status === 'completed' && s.currentRound === null) ||
+    s.tournamentPhase === 'completed';
+  const completedSessions = sessions.filter(isCompletedSession);
+  const activeSessions = sessions.filter((s) => !isCompletedSession(s));
   const hasAnyBids = sessions.some((s) => s.userTeamsCount > 0);
   const totalAlive = sessions.reduce((s, d) => s + d.userTeamsAlive, 0);
   const totalEliminated = sessions.reduce((s, d) => s + d.userTeamsEliminated, 0);
