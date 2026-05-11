@@ -296,7 +296,7 @@ export function TeamTable() {
             href={`/payment?tournament=${config?.id ?? ''}&returnTo=${encodeURIComponent(`/strategy?tournament=${config?.id ?? ''}`)}`}
             className="rounded-md bg-emerald-600 px-6 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
           >
-            Unlock Full Access — ${((config?.strategyPrice ?? 2999) / 100).toFixed(2)}
+            Unlock Full Access — ${((config?.strategyPrice ?? 1499) / 100).toFixed(2)}
           </Link>
         </div>
       )}

@@ -47,7 +47,7 @@ export const MASTERS_2026_CONFIG: TournamentConfig = {
   endDate: '2026-04-12',
   hostingOpensAt: '2026-03-26',
   isActive: false, // Tournament completed 2026-04-12 — kept for legacy alias compat
-  strategyPrice: 1999, // $19.99
+  strategyPrice: 1499, // $14.99
   stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_MASTERS',
 };
 

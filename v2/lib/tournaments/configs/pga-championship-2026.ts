@@ -47,7 +47,7 @@ export const PGA_CHAMPIONSHIP_2026_CONFIG: TournamentConfig = {
   endDate: '2026-05-17',
   hostingOpensAt: '2026-04-30',
   isActive: true, // legacy alias — phase derives to 'hostable' on 2026-05-05
-  strategyPrice: 1999,
+  strategyPrice: 1499,
   stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_PGA',
 };
 

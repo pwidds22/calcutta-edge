@@ -101,7 +101,7 @@ function AuctionToolInner({
               href={`/payment?tournament=${config.id}&returnTo=${encodeURIComponent(`/strategy?tournament=${config.id}`)}`}
               className="w-full shrink-0 rounded-md bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500 transition-colors sm:w-auto"
             >
-              Unlock — ${((config.strategyPrice ?? 2999) / 100).toFixed(2)}
+              Unlock — ${((config.strategyPrice ?? 1499) / 100).toFixed(2)}
             </Link>
           </div>
         </div>

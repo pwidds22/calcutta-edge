@@ -404,11 +404,17 @@ export async function getDashboardData(): Promise<DashboardData> {
     return phase === 'live' || phase === 'hostable' || phase === 'upcoming';
   });
 
+  // Filter alive teams to only those from visible (still-active) sessions.
+  // Champions of completed tournaments (Masters/March Madness winners) should NOT
+  // appear in the "My Alive Teams" widget — that view is for ongoing positions.
+  const visibleLeagueIds = new Set(visibleSessions.map((s) => s.id));
+  const visibleAliveTeams = allAliveTeams.filter((team) => visibleLeagueIds.has(team.leagueId));
+
   return {
     sessions: visibleSessions,
     totalPotExposure,
     totalEarned,
     totalNetPL,
-    aliveTeams: allAliveTeams,
+    aliveTeams: visibleAliveTeams,
   };
 }

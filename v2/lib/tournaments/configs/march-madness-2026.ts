@@ -75,7 +75,7 @@ export const MARCH_MADNESS_2026_CONFIG: TournamentConfig = {
   endDate: '2026-04-06',
   hostingOpensAt: '2026-03-01',
   isActive: false, // Tournament completed 2026-04-07
-  strategyPrice: 2999, // $29.99
+  strategyPrice: 1499, // $14.99
   stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL',
 };
 
