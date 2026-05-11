@@ -66,6 +66,13 @@ function StatCard({
 function LeagueCard({ session }: { session: DashboardSession }) {
   const href = `/live/${session.id}`;
 
+  // A league is "over" if its tournament dates have passed OR the auction
+  // is officially closed with all results in. Same dual check as elsewhere.
+  const tournamentOver =
+    session.tournamentPhase === 'completed' ||
+    session.tournamentPhase === 'archived' ||
+    (session.status === 'completed' && session.currentRound === null);
+
   // Show projected P&L for active golf sessions, actual P&L for completed
   const showProjected = session.projectedNetPL !== null && session.status === 'completed' && session.currentRound !== null;
   const displayPL = showProjected ? session.projectedNetPL! : session.userNetPL;
@@ -116,7 +123,7 @@ function LeagueCard({ session }: { session: DashboardSession }) {
                 <>
                   {session.userTeamsAlive > 0 && (
                     <span className="text-emerald-400/60">
-                      {' '}· {session.userTeamsAlive} alive
+                      {' '}· {session.userTeamsAlive} {tournamentOver ? 'won' : 'alive'}
                     </span>
                   )}
                   {session.userTeamsEliminated > 0 && (
@@ -128,7 +135,7 @@ function LeagueCard({ session }: { session: DashboardSession }) {
               )}
             </span>
           )}
-          {session.currentRoundLabel && (
+          {session.currentRoundLabel && !tournamentOver && (
             <span className="text-amber-400/60">{session.currentRoundLabel}</span>
           )}
         </div>
@@ -221,7 +228,9 @@ export function UserDashboard({ data }: { data: DashboardData }) {
   const completedSessions = sessions.filter(isCompletedSession);
   const activeSessions = sessions.filter((s) => !isCompletedSession(s));
   const hasAnyBids = sessions.some((s) => s.userTeamsCount > 0);
-  const totalAlive = sessions.reduce((s, d) => s + d.userTeamsAlive, 0);
+  // "Alive" teams in the lifetime stat only count from still-active leagues —
+  // champions of past tournaments aren't actively in play anymore.
+  const totalAlive = activeSessions.reduce((s, d) => s + d.userTeamsAlive, 0);
   const totalEliminated = sessions.reduce((s, d) => s + d.userTeamsEliminated, 0);
 
   return (
