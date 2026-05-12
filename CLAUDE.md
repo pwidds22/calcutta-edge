@@ -7,7 +7,7 @@
 cd v2
 npm run dev       # Next.js dev server (port 3000)
 npm run build     # Production build (MUST pass before deploy)
-npm test          # Vitest unit tests (140+ tests, all must pass)
+npm test          # Vitest unit tests (175+ tests, all must pass)
 npm run lint      # ESLint
 ```
 
@@ -41,6 +41,7 @@ Next.js 16 (App Router) + TypeScript + Tailwind + shadcn/ui | Vercel (auto-deplo
 - **DON'T** link directly to Stripe URLs — route through `/payment?tournament=X` for proper attribution
 - **DON'T** check `profiles.has_paid` — use `hasTournamentAccess()` from `v2/lib/auth/tournament-access.ts`
 - **DON'T** set webhook URL without `www` — Stripe doesn't follow Vercel's 307 redirect
+- **DON'T** create a Payment Link via MCP `create_payment_link` and forget `after_completion` — defaults to generic "Thank you" page with no redirect. PATCH the link with `after_completion.type='redirect'` so buyers land back on `/strategy?tournament=X&purchased=1`.
 
 ### Vercel / Build
 - **DON'T** put Windows-only packages in `dependencies` — use `optionalDependencies`
@@ -65,10 +66,26 @@ Next.js 16 (App Router) + TypeScript + Tailwind + shadcn/ui | Vercel (auto-deplo
 - **Payout rules are per-position** — `top5: 5%` = each of 5 gets 5% (total 25%). Multiply by `teamsAdvancing`
 - **DON'T** use `eliminatedCost` for net P&L — use `totalSpent`. Champion/alive teams still cost money. Settlement balances must sum to zero.
 
+### Tournaments & Lifecycle
+- **DON'T** read `config.isActive` for routing/visibility decisions — use `getTournamentPhase(config)` from `v2/lib/tournaments/phase.ts`. `isActive` is the legacy boolean and only stays for migration.
+- **DON'T** add a new tournament without adding entries in BOTH `PRESET_MAP` (`payout-presets.ts`) AND `liveSyncMatchers` (on the config). PRESET_MAP falls back silently to March Madness presets — caused PGA to show 10% total payout when host filled in tier values. The regression test in `__tests__/payout-presets.test.ts` catches preset-sum violations but doesn't catch a missing PRESET_MAP entry.
+- **DON'T** hardcode tournament IDs in cron / sync routes — the golf-sync was Masters-only in 6 places. Use the registry: `listTournamentsByPhase()` + `liveSyncMatchers` for event-name matching.
+- **DON'T** trust DataGolf's in-play endpoint to be returning the event you expect — it returns whatever PGA event is currently active in betting markets, including last week's. Always verify `event_name` matches your target tournament's `liveSyncMatchers` before writing `tournament_results`.
+- **DON'T** hardcode strategy price strings — use `STRATEGY_PRICE_CENTS` from `v2/lib/pricing.ts` for in-app fallbacks. Per-tournament overrides still live on `TournamentConfig.strategyPrice`.
+- **Payout presets MUST sum to 100%** (±0.5%). `teamsAdvancing` varies per tournament (Masters cuts at 50, PGA at 70), so per-tournament presets are required — reusing another sport's presets will break the total. Run `npm test -- payout-presets` to verify.
+
+### Marketing & Emails
+- **DON'T** trust LLM memory for golf-major dates — they shift week-to-week year-over-year. Verify via Chrome MCP against usopen.com / tourchampionship.com / pgachampionship.com before sending any tournament-date email.
+- **DON'T** hardcode venue names in email templates — Quail Hollow (2025) ≠ Aronimink (2026). Same applies to courses for other recurring events.
+- **DON'T** send email blasts without `DRY_RUN=true` first. The default in `scripts/send-pga-launch.ts` is dry — writes `.preview-*.html` (gitignored) so the body can be eyeballed in a browser before any real send.
+- **DON'T** lump free + paid features in one bullet list — readers infer it's a bundle. Use explicit "What's free for every host" vs "Optional add-on" sections.
+- **Excluded addresses live in script-local `EXCLUDED` sets** (spivack711, camdunn5 as of 2026-05-12). Long-term fix: `email_opt_out` column on `profiles` + unsubscribe link.
+
 ### Git
 - **DON'T** commit `.env` files or secrets
 - **DON'T** force push to main — NEVER
 - **DON'T** push without user approval — always use `/push` or `/pre-deploy-review`
+- **DON'T** assume `.env.local` exists in git worktrees — it's gitignored, so it only lives in the main checkout. For scripts that need real creds, source from the main checkout: `set -a; source ~/.../v2/.env.local; set +a; ./script.ts`
 
 ## Key Reference Documents
 - `ROADMAP.md` — Product strategy, phased build plan
