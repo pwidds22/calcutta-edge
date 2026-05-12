@@ -40,8 +40,12 @@ function getSupabase() {
 }
 
 // Addresses to skip on every blast — known opt-outs (per MEMORY.md).
-// (pwiddoss22@gmail.com removed at user request — they want to receive the launch email.)
-const EXCLUDED = new Set(['spivack711@gmail.com']);
+// camdunn5: unsubscribed after the PGA launch email on 2026-05-12.
+// spivack711: opted out earlier (see MEMORY).
+const EXCLUDED = new Set([
+  'spivack711@gmail.com',
+  'camdunn5@gmail.com',
+]);
 
 // Optional one-shot test mode: when TEST_TO is set, ignore the recipient list
 // and send only to that address. Useful for previewing the rendered email in
