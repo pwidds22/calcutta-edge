@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getTournament, getFeaturedTournament } from '@/lib/tournaments/registry';
 import { getTournamentPhase } from '@/lib/tournaments/phase';
 import type { TournamentPhase } from '@/lib/tournaments/types';
+import { hasTournamentAccess } from '@/lib/auth/tournament-access';
 import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
@@ -61,6 +62,10 @@ export interface DashboardFeaturedEvent {
   phase: TournamentPhase;
   startDate: string;
   hostingOpensAt: string | null;
+  /** True if the current user has purchased strategy access for this tournament. */
+  userHasPaid: boolean;
+  /** True if the current user is the host (commissioner) of an existing session for this tournament. */
+  userHasHostedSession: boolean;
 }
 
 export interface DashboardData {
@@ -73,7 +78,9 @@ export interface DashboardData {
   featuredEvent: DashboardFeaturedEvent | null;
 }
 
-/** Compute the featured event for dashboard promo card. Strips year suffix for conversational copy. */
+/** Compute the featured event for dashboard promo card. Strips year suffix for conversational copy.
+ *  User-specific flags (userHasPaid, userHasHostedSession) default to false and are filled in later
+ *  by getDashboardData once user state + sessions are loaded. */
 function computeFeaturedEvent(): DashboardFeaturedEvent | null {
   const featured = getFeaturedTournament();
   if (!featured) return null;
@@ -89,6 +96,8 @@ function computeFeaturedEvent(): DashboardFeaturedEvent | null {
     phase,
     startDate: featured.config.startDate,
     hostingOpensAt: featured.config.hostingOpensAt ?? null,
+    userHasPaid: false,
+    userHasHostedSession: false,
   };
 }
 
@@ -457,12 +466,24 @@ export async function getDashboardData(): Promise<DashboardData> {
   );
   const visibleAliveTeams = allAliveTeams.filter((team) => activeTournamentLeagueIds.has(team.leagueId));
 
+  // Enrich the featured event with the current user's state (have they paid?
+  // already hosting an auction for it?). The UI uses these to hide the promo
+  // banner when neither CTA is useful anymore.
+  let enrichedFeaturedEvent = featuredEvent;
+  if (featuredEvent) {
+    const userHasPaid = await hasTournamentAccess(supabase, user.id, featuredEvent.id);
+    const userHasHostedSession = dashboardSessions.some(
+      (s) => s.tournamentId === featuredEvent.id && s.isCommissioner
+    );
+    enrichedFeaturedEvent = { ...featuredEvent, userHasPaid, userHasHostedSession };
+  }
+
   return {
     sessions: visibleSessions,
     totalPotExposure,
     totalEarned,
     totalNetPL,
     aliveTeams: visibleAliveTeams,
-    featuredEvent,
+    featuredEvent: enrichedFeaturedEvent,
   };
 }

@@ -54,25 +54,31 @@ function FeaturedEventBanner({ event }: { event: DashboardFeaturedEvent }) {
           </p>
         </div>
         <div className="flex flex-shrink-0 gap-2">
-          <Link href={`/strategy?tournament=${event.id}`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
-            >
-              <Sparkles className="size-3.5" />
-              Preview Analytics
-            </Button>
-          </Link>
-          <Link href={`/host/create?tournament=${event.id}`}>
-            <Button
-              size="sm"
-              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              <Plus className="size-3.5" />
-              Host Free
-            </Button>
-          </Link>
+          {/* Hide "Preview Analytics" once the user has paid — they're not previewing anymore. */}
+          {!event.userHasPaid && (
+            <Link href={`/strategy?tournament=${event.id}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
+              >
+                <Sparkles className="size-3.5" />
+                Preview Analytics
+              </Button>
+            </Link>
+          )}
+          {/* Hide "Host Free" once the user is already hosting an auction for this event. */}
+          {!event.userHasHostedSession && (
+            <Link href={`/host/create?tournament=${event.id}`}>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                <Plus className="size-3.5" />
+                Host Free
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </div>
@@ -329,8 +335,12 @@ export function UserDashboard({ data }: { data: DashboardData }) {
         </div>
       </div>
 
-      {/* Phase-aware Next Event banner — auto-updates as tournaments rotate. */}
-      {featuredEvent && <FeaturedEventBanner event={featuredEvent} />}
+      {/* Phase-aware Next Event banner — hides when the user has already done
+          both things it prompts (purchased strategy access AND set up an auction). */}
+      {featuredEvent &&
+        !(featuredEvent.userHasPaid && featuredEvent.userHasHostedSession) && (
+          <FeaturedEventBanner event={featuredEvent} />
+        )}
 
       {/* Summary stats (only if user has bids) */}
       {hasAnyBids && (
