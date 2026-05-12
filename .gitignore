@@ -45,3 +45,7 @@ v2/.claude/
 # Working docs (not deployed)
 blog/
 docs/
+
+# Email-blast HTML previews written by scripts/send-*.ts in dry-run mode
+.preview-*.html
+v2/.preview-*.html
