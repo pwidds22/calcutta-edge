@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   title: "Calcutta Edge | Free Online Calcutta Auction Hosting + Strategy Analytics",
   description:
-    "Host your Masters, March Madness, or NFL Calcutta auction free. Get devigged odds, fair values, and bid strategy from $19.99/event. The only all-in-one Calcutta platform.",
+    "Host your Masters, March Madness, or NFL Calcutta auction free. Get devigged odds, fair values, and bid strategy from $14.99/event. The only all-in-one Calcutta platform.",
   keywords: [
     "masters calcutta auction 2026",
     "masters calcutta auction",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Calcutta Edge | Free Calcutta Auction Hosting + Strategy Analytics",
     description:
-      "Host your Masters or March Madness Calcutta auction free. Devigged odds, fair values, and bid strategy from $19.99/event.",
+      "Host your Masters or March Madness Calcutta auction free. Devigged odds, fair values, and bid strategy from $14.99/event.",
     url: "https://calcuttaedge.com",
     siteName: "Calcutta Edge",
     type: "website",
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Calcutta Edge | Free Calcutta Auction Hosting + Strategy Analytics",
     description:
-      "Host your Masters Calcutta auction free. Devigged odds, fair values, and profit projections from $19.99/event.",
+      "Host your Masters Calcutta auction free. Devigged odds, fair values, and profit projections from $14.99/event.",
     images: ["/brand/calcutta_edge_banner.png"],
   },
   robots: {
@@ -78,7 +78,7 @@ const jsonLd = {
   name: 'Calcutta Edge',
   url: 'https://calcuttaedge.com',
   description:
-    'Host your Calcutta auction free with real-time bidding. Strategy analytics with devigged odds and fair values from $19.99/event.',
+    'Host your Calcutta auction free with real-time bidding. Strategy analytics with devigged odds and fair values from $14.99/event.',
   applicationCategory: 'SportsApplication',
   operatingSystem: 'Any',
   offers: [
@@ -91,17 +91,10 @@ const jsonLd = {
     },
     {
       '@type': 'Offer',
-      name: 'Masters Strategy Analytics',
-      price: '19.99',
+      name: 'Strategy Analytics',
+      price: '14.99',
       priceCurrency: 'USD',
-      description: 'Devigged odds from 13+ sources, fair value calculations, suggested bids, and profit projections for the Masters.',
-    },
-    {
-      '@type': 'Offer',
-      name: 'March Madness Strategy Analytics',
-      price: '29.99',
-      priceCurrency: 'USD',
-      description: 'Devigged odds, fair value calculations, suggested bids, and round-by-round profit projections.',
+      description: 'Per-tournament unlock: devigged odds from multiple sportsbooks, fair value calculations, suggested bids, and round-by-round profit projections. Available for the Masters, PGA Championship, March Madness, and other supported events.',
     },
   ],
   publisher: {

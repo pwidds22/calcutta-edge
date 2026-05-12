@@ -120,7 +120,7 @@ const maintenanceHtml = `
 
       <p style="${styles.p}">
         <strong style="color: #10b981;">Free:</strong> Live auction hosting — create a room, share a code, everyone bids from their phones with timers. Plus tournament management with automatic payout calculations.<br /><br />
-        <strong style="color: #10b981;">$29.99:</strong> Strategy analytics — fair values from 5 odds sources (FanDuel, DraftKings, Pinnacle, Evan Miya, TeamRankings). Shows which teams are overpriced and which are steals.
+        <strong style="color: #10b981;">$14.99:</strong> Strategy analytics — fair values from 5 odds sources (FanDuel, DraftKings, Pinnacle, Evan Miya, TeamRankings). Shows which teams are overpriced and which are steals.
       </p>
 
       <p style="${styles.p}">If you're still planning a Calcutta for March Madness, there's plenty of time — the tournament runs through early April.</p>

@@ -46,7 +46,7 @@ function buildWelcomeHtml(): string {
       </p>
 
       <p style="${styles.p}">
-        <strong style="color: #f59e0b;">Strategy Analytics ($29.99/event)</strong><br />
+        <strong style="color: #f59e0b;">Strategy Analytics ($14.99/event)</strong><br />
         See which teams are overpriced and which are steals. Devigged odds from 5 sources (FanDuel, DraftKings, Pinnacle, Evan Miya, TeamRankings), fair values, suggested bids, and round-by-round profit projections.
       </p>
 

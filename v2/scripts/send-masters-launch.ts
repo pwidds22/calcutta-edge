@@ -57,7 +57,7 @@ function buildMastersEmail(name?: string): string {
             live bidding with timer — same platform you already know.
           </p>
           <p style="${styles.text}">
-            <strong style="color: #fff;">📊 Strategy Tool</strong> <span style="${styles.badge}">$19.99</span><br/>
+            <strong style="color: #fff;">📊 Strategy Tool</strong> <span style="${styles.badge}">$14.99</span><br/>
             Fair values for every golfer across 5 finish positions (Cut, T20, T10, T5, Win).
             Devigged odds from 13+ sportsbooks. Know exactly what each golfer is worth.
           </p>

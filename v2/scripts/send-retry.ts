@@ -54,7 +54,7 @@ const emailAHtml = `
         <p style="${styles.featureDesc}">Last year: 1 odds source. This year: FanDuel, DraftKings, Pinnacle, Evan Miya, and TeamRankings. Blend them with custom weights. Properly devigged.</p>
       </div>
       <hr style="${styles.divider}" />
-      <p style="${styles.p}">Strategy is <strong style="color: #fff;">$29.99</strong> (same ballpark as last year). Hosting and tournament management are <strong style="color: #10b981;">completely free</strong>.</p>
+      <p style="${styles.p}">Strategy is <strong style="color: #fff;">$14.99</strong> (same ballpark as last year). Hosting and tournament management are <strong style="color: #10b981;">completely free</strong>.</p>
       <p style="${styles.p}"><strong style="color: #fff;">Games start today.</strong> If you're running a Calcutta this year:</p>
       <div style="margin: 24px 0;">
         <a href="https://calcuttaedge.com/register" style="${styles.cta}">Host Free Auction →</a>
@@ -95,7 +95,7 @@ const emailBHtml = `
         <p style="${styles.featureDesc}">Enter results as games happen. The platform calculates who owes who — no spreadsheet needed.</p>
       </div>
       <div style="${styles.featureBlock}">
-        <p style="${styles.featureTitle}">📈 Strategy Analytics ($29.99)</p>
+        <p style="${styles.featureTitle}">📈 Strategy Analytics ($14.99)</p>
         <p style="${styles.featureDesc}">Fair values from 5 odds sources. Know exactly which teams are overpriced and which are steals.</p>
       </div>
       <hr style="${styles.divider}" />

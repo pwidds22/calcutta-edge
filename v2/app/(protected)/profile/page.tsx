@@ -89,7 +89,7 @@ export default async function ProfilePage() {
             </p>
             <Button asChild className="mt-4 gap-2 bg-emerald-600 hover:bg-emerald-700">
               <Link href="/payment">
-                Unlock — from $19.99
+                Unlock — from $14.99
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

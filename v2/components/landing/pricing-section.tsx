@@ -22,7 +22,7 @@ const TIERS = [
   },
   {
     name: 'Strategy Analytics',
-    price: '$19.99',
+    price: '$14.99',
     priceDetail: 'One-time, per event',
     description: 'See what every golfer is actually worth before you bid.',
     features: [

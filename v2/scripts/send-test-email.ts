@@ -60,7 +60,7 @@ const emailAHtml = `
 
       <hr style="${styles.divider}" />
 
-      <p style="${styles.p}">Strategy is <strong style="color: #fff;">$29.99</strong> (same ballpark as last year). Hosting and tournament management are <strong style="color: #10b981;">completely free</strong>.</p>
+      <p style="${styles.p}">Strategy is <strong style="color: #fff;">$14.99</strong> (same ballpark as last year). Hosting and tournament management are <strong style="color: #10b981;">completely free</strong>.</p>
 
       <p style="${styles.p}"><strong style="color: #fff;">Games start today.</strong> If you're running a Calcutta this year:</p>
 

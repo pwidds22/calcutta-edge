@@ -70,7 +70,7 @@ function buildCrossSellEmail(name?: string): string {
 
           <div style="${styles.featureRow}">
             <p style="color: #fff; font-size: 14px; font-weight: 600; margin: 0 0 6px;">
-              Strategy Analytics &mdash; <span style="${styles.badge}">$19.99</span>
+              Strategy Analytics &mdash; <span style="${styles.badge}">$14.99</span>
             </p>
             <p style="color: #a3a3a3; font-size: 13px; line-height: 1.5; margin: 0;">
               Fair values for every golfer across 5 finish tiers (Cut, T20, T10, T5, Win).

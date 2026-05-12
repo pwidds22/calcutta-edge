@@ -42,7 +42,7 @@ export function FeaturesSection() {
           {/* Strategy column */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-amber-400">
-              Strategy analytics &middot; $19.99
+              Strategy analytics &middot; $14.99
             </p>
             <h3 className="mt-2 text-xl font-bold text-white sm:text-2xl">
               Know what every golfer is worth.

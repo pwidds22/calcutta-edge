@@ -74,7 +74,7 @@ export interface TournamentConfig {
   phaseOverride?: TournamentPhase;
   /** @deprecated Use `getTournamentPhase()` and check for 'hostable' or 'live'. Manually maintained during Phase 1 migration; field will be removed when all call sites are updated (Phase 2). */
   isActive: boolean;
-  /** Strategy tool price in cents (e.g., 2999 = $29.99). Used for payment gating. */
+  /** Strategy tool price in cents (e.g., 1499 = $14.99). Used for payment gating. */
   strategyPrice?: number;
   /** Env var key for this tournament's Stripe Payment Link URL */
   stripePaymentLinkEnvKey?: string;

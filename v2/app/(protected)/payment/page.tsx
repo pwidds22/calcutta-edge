@@ -80,7 +80,7 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
     redirect(paymentUrl.toString())
   }
 
-  const price = ((config.strategyPrice ?? 2999) / 100).toFixed(2)
+  const price = ((config.strategyPrice ?? 1499) / 100).toFixed(2)
   const features = FEATURES_BY_SPORT[config.sport] ?? DEFAULT_FEATURES
 
   return (
