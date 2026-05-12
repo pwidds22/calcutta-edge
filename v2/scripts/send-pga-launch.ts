@@ -91,13 +91,14 @@ const html = `
       <p style="${s.p}">Hey,</p>
 
       <p style="${s.p}">
-        The PGA Championship tees off Thursday at Quail Hollow. You can host your Calcutta auction
-        on Calcutta Edge <span style="${s.highlight}">free</span> — full 156-golfer field, live
-        bidding, automatic settlement, the same platform you used for Masters and March Madness.
+        The PGA Championship tees off Thursday at Aronimink Golf Club in Newtown Square, PA.
+        You can host your Calcutta auction on Calcutta Edge <span style="${s.highlight}">free</span> —
+        full 156-golfer field, live bidding, automatic settlement, the same platform you used
+        for Masters and March Madness.
       </p>
 
       <p style="${s.p}">
-        Couple things that are <span style="${s.amber}">new since Masters</span>:
+        Quick reminder of what you get:
       </p>
 
       <div style="${s.featureBlock}">
@@ -127,7 +128,7 @@ const html = `
       <hr style="${s.divider}" />
 
       <p style="${s.p}; color: #9ca3af; font-size: 13px;">
-        <strong style="${s.amber}">What's coming up:</strong> U.S. Open Golf (Jun 11–14), FIFA World Cup 2026 (Jun 11 – Jul 19), The Open Championship (Jul 16–19), Tour Championship (Aug 20–23), then NFL season hosting opens in late August. All on the same platform, all free to host.
+        <strong style="${s.amber}">What's coming up:</strong> U.S. Open Golf at Shinnecock Hills (Jun 18–21), FIFA World Cup 2026 (Jun 11 – Jul 19), The Open Championship (Jul 16–19), Tour Championship at East Lake (Aug 27–30), then NFL season hosting opens in late August. All on the same platform, all free to host.
       </p>
 
       <p style="${s.p}">If something's broken or there's a tournament your group wants that we don't support yet, just reply — I read everything.</p>
