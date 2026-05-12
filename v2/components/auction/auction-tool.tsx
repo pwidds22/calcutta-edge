@@ -15,6 +15,7 @@ import { renameLeague, resetAuctionData } from '@/actions/auction';
 import { Lock, Trash2, ChevronDown, Plus, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { SavedTeamData, PayoutRules, TournamentConfig, BaseTeam } from '@/lib/calculations/types';
+import { STRATEGY_PRICE_CENTS } from '@/lib/pricing';
 import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 
 interface AuctionToolInnerProps {
@@ -101,7 +102,7 @@ function AuctionToolInner({
               href={`/payment?tournament=${config.id}&returnTo=${encodeURIComponent(`/strategy?tournament=${config.id}`)}`}
               className="w-full shrink-0 rounded-md bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500 transition-colors sm:w-auto"
             >
-              Unlock — ${((config.strategyPrice ?? 1499) / 100).toFixed(2)}
+              Unlock — ${((config.strategyPrice ?? STRATEGY_PRICE_CENTS) / 100).toFixed(2)}
             </Link>
           </div>
         </div>

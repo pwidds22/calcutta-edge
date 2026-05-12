@@ -6,6 +6,7 @@ import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { OddsSourceRegistry } from '@/lib/tournaments/odds-sources';
 import { blendProbabilities } from '@/lib/tournaments/odds-sources';
 import { initializeTeams } from '@/lib/calculations/initialize';
+import { STRATEGY_PRICE_CENTS } from '@/lib/pricing';
 import { calculateTeamValues } from '@/lib/calculations/values';
 import { formatCurrency } from '@/lib/calculations/format';
 import { TrendingUp, Lock, ExternalLink, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
@@ -186,7 +187,7 @@ export function StrategyOverlay({
             rel="noopener noreferrer"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
           >
-            Unlock for ${((config.strategyPrice ?? 1499) / 100).toFixed(2)}
+            Unlock for ${((config.strategyPrice ?? STRATEGY_PRICE_CENTS) / 100).toFixed(2)}
             <ExternalLink className="size-3.5" />
           </a>
           <span className="text-[10px] text-white/30">

@@ -15,6 +15,8 @@ import {
   Plus,
   Info,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DashboardData, DashboardFeaturedEvent, DashboardSession, DashboardTeam } from '@/actions/dashboard';
@@ -288,6 +290,43 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
   );
 }
 
+/**
+ * Renders the Completed Leagues section. Collapses by default when there are
+ * 4+ entries — at that volume the section can dwarf the active leagues above,
+ * which is usually what the user actually wants to see.
+ */
+function CompletedLeaguesSection({ sessions }: { sessions: DashboardSession[] }) {
+  const COLLAPSE_THRESHOLD = 3;
+  // Start collapsed when there are more than 3 — visible affordance via the header button.
+  const [expanded, setExpanded] = useState(sessions.length <= COLLAPSE_THRESHOLD);
+  const Icon = expanded ? ChevronUp : ChevronDown;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="group flex items-center gap-2 mb-3 transition-colors hover:text-white/60"
+        aria-expanded={expanded}
+        aria-controls="completed-leagues-list"
+      >
+        <CheckCircle2 className="size-4 text-white/20 group-hover:text-white/40 transition-colors" />
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-white/40 group-hover:text-white/60 transition-colors">
+          Completed Leagues ({sessions.length})
+        </h2>
+        <Icon className="size-3.5 text-white/30 group-hover:text-white/50 transition-colors" />
+      </button>
+      {expanded && (
+        <div id="completed-leagues-list" className="space-y-2">
+          {sessions.map((s) => (
+            <LeagueCard key={s.id} session={s} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function UserDashboard({ data }: { data: DashboardData }) {
   const { sessions, totalPotExposure, totalEarned, totalNetPL, aliveTeams, featuredEvent } = data;
   // A session is "completed" when EITHER (a) the auction is done AND all tournament
@@ -406,21 +445,10 @@ export function UserDashboard({ data }: { data: DashboardData }) {
         </div>
       )}
 
-      {/* Completed Leagues */}
+      {/* Completed Leagues — collapse by default once the list grows past 3
+          so the dashboard stays focused on current activity. */}
       {completedSessions.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 className="size-4 text-white/20" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/40">
-              Completed Leagues ({completedSessions.length})
-            </h2>
-          </div>
-          <div className="space-y-2">
-            {completedSessions.map((s) => (
-              <LeagueCard key={s.id} session={s} />
-            ))}
-          </div>
-        </div>
+        <CompletedLeaguesSection sessions={completedSessions} />
       )}
 
       {/* Empty state */}

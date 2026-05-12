@@ -76,18 +76,20 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
                 </Link>
               )
             }
-            // Upcoming tournaments: disabled "Coming Soon" pill (Phase 2 makes these click-to-buy)
+            // Upcoming tournaments: click-to-buy CTAs that route to /payment so users
+            // can pre-purchase strategy access before the tournament opens for hosting.
             const startDate = new Date(t.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
             return (
-              <span
+              <Link
                 key={t.id}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium bg-white/[0.02] text-white/20 cursor-default select-none"
-                title={`Coming ${startDate}`}
+                href={`/payment?tournament=${t.id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium bg-white/[0.02] text-white/40 ring-1 ring-white/[0.06] hover:bg-amber-500/[0.06] hover:text-amber-400 hover:ring-amber-500/20 transition-colors group"
+                title={`Pre-purchase strategy for the ${t.name} — opens ${startDate}`}
               >
-                <Lock className="size-3 text-white/15" />
+                <Lock className="size-3 text-white/25 group-hover:text-amber-400/60 transition-colors" />
                 {t.name}
-                <span className="text-[10px] text-white/15 ml-0.5">{startDate}</span>
-              </span>
+                <span className="text-[10px] text-white/25 ml-0.5 group-hover:text-amber-400/50 transition-colors">{startDate}</span>
+              </Link>
             )
           })}
         </div>
