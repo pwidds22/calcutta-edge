@@ -39,8 +39,14 @@ function getSupabase() {
   return createAdminClient();
 }
 
-// Addresses to skip on every blast — founder + known opt-outs (per MEMORY.md).
-const EXCLUDED = new Set(['pwiddoss22@gmail.com', 'spivack711@gmail.com']);
+// Addresses to skip on every blast — known opt-outs (per MEMORY.md).
+// (pwiddoss22@gmail.com removed at user request — they want to receive the launch email.)
+const EXCLUDED = new Set(['spivack711@gmail.com']);
+
+// Optional one-shot test mode: when TEST_TO is set, ignore the recipient list
+// and send only to that address. Useful for previewing the rendered email in
+// an actual inbox before going to the full list.
+const TEST_TO = process.env.TEST_TO?.trim() || null;
 
 const SUBJECT = 'PGA Championship starts Thursday — your Calcutta is ready';
 const FROM = 'Patrick from Calcutta Edge <support@calcuttaedge.com>';
@@ -109,11 +115,6 @@ const html = `
         <p style="${s.featureDesc}">Was $19.99 for Masters, $29.99 for March Madness. Single uniform price per event now — pay once when you're hosting (or pre-purchase any upcoming event from the strategy page).</p>
       </div>
 
-      <div style="${s.featureBlock}">
-        <p style="${s.featureTitle}">🏌️ Payout presets calibrated for golf</p>
-        <p style="${s.featureDesc}">"Balanced" rewards make-the-cut + T20 + T10 + T5 + winner so non-winners still earn money. "Winner Takes Most" mirrors the classic 70/20/10. "With Low Round" reserves 15% of pot for daily low-round bonuses. All sum to exactly 100% out of the box.</p>
-      </div>
-
       <hr style="${s.divider}" />
 
       <p style="${s.p}"><strong style="color: #fff;">Quick start:</strong> create your auction, share the 6-character join code with your group, run the auction tonight or Wednesday. Tournament starts Thursday — auto-sync handles the rest.</p>
@@ -126,7 +127,7 @@ const html = `
       <hr style="${s.divider}" />
 
       <p style="${s.p}; color: #9ca3af; font-size: 13px;">
-        <strong style="${s.amber}">What's coming up:</strong> U.S. Open Golf (Jun 11–14), The Open Championship (Jul 16–19), Tour Championship (Aug 20–23), then NFL season hosting opens in late August. All on the same platform, all free to host.
+        <strong style="${s.amber}">What's coming up:</strong> U.S. Open Golf (Jun 11–14), FIFA World Cup 2026 (Jun 11 – Jul 19), The Open Championship (Jul 16–19), Tour Championship (Aug 20–23), then NFL season hosting opens in late August. All on the same platform, all free to host.
       </p>
 
       <p style="${s.p}">If something's broken or there's a tournament your group wants that we don't support yet, just reply — I read everything.</p>
@@ -166,11 +167,12 @@ async function fetchRecipients(): Promise<string[]> {
 }
 
 async function main() {
-  console.log(`\n🏌️  PGA Championship 2026 Launch Email — ${DRY_RUN ? 'DRY RUN' : 'LIVE SEND'}\n`);
+  const mode = TEST_TO ? `TEST SEND (one address: ${TEST_TO})` : DRY_RUN ? 'DRY RUN' : 'LIVE SEND';
+  console.log(`\n🏌️  PGA Championship 2026 Launch Email — ${mode}\n`);
   console.log(`Subject: ${SUBJECT}`);
   console.log(`From: ${FROM}\n`);
 
-  if (DRY_RUN) {
+  if (DRY_RUN && !TEST_TO) {
     // In dry-run mode, write the HTML to a file so you can open it in a browser
     // and eyeball the rendering before sending to live users.
     const previewPath = '.preview-pga-launch.html';
@@ -179,21 +181,27 @@ async function main() {
     console.log(`  Open in browser:  file:///${process.cwd().replace(/\\/g, '/')}/${previewPath}\n`);
   }
 
-  let recipients: string[] = [];
-  try {
-    recipients = await fetchRecipients();
-  } catch (err) {
-    console.error(`✗ Could not fetch recipients: ${err}`);
-    console.log('  (Continuing in preview-only mode — set RESEND_API_KEY + SUPABASE_SERVICE_ROLE_KEY to enable.)');
-    return;
+  let recipients: string[];
+  if (TEST_TO) {
+    // One-shot test: ignore the recipient list, send only to TEST_TO.
+    recipients = [TEST_TO];
+    console.log(`TEST_TO override active — recipient list bypassed.\n`);
+  } else {
+    try {
+      recipients = await fetchRecipients();
+    } catch (err) {
+      console.error(`✗ Could not fetch recipients: ${err}`);
+      console.log('  (Continuing in preview-only mode — set RESEND_API_KEY + SUPABASE_SERVICE_ROLE_KEY to enable.)');
+      return;
+    }
+    console.log(`Recipients: ${recipients.length} (excluded ${EXCLUDED.size} addresses)\n`);
   }
-  console.log(`Recipients: ${recipients.length} (excluded ${EXCLUDED.size} addresses)\n`);
 
-  if (DRY_RUN) {
+  if (DRY_RUN && !TEST_TO) {
     console.log('First 5 recipients (for sanity check):');
     for (const e of recipients.slice(0, 5)) console.log(`  - ${e}`);
     if (recipients.length > 5) console.log(`  ... and ${recipients.length - 5} more.\n`);
-    console.log('Set DRY_RUN=false to actually send.');
+    console.log('Set DRY_RUN=false to send, or TEST_TO=email@example.com to one-shot test.');
     return;
   }
 
