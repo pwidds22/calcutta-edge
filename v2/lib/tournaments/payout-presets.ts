@@ -33,12 +33,12 @@ export const MARCH_MADNESS_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
     label: 'Top Heavy',
     description: 'Most of the pot goes to deep runs and the champion',
     rules: {
-      r32: 0.125,
-      s16: 0.375,
-      e8: 2.5,
-      f4: 7.5,
-      f2: 12.5,
-      champ: 45.0,
+      r32: 0.125,    // ×32 = 4%
+      s16: 0.375,    // ×16 = 6%
+      e8: 1.25,      // ×8  = 10%
+      f4: 2.5,       // ×4  = 10%
+      f2: 5.0,       // ×2  = 10%
+      champ: 60.0,   // ×1  = 60%
       biggestUpset: 0,
       highestSeed: 0,
       largestMargin: 0,
@@ -110,6 +110,72 @@ export const MASTERS_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
       makeCut: 0.08,       // ×50 = 4%
       top20: 0.40,         // ×20 = 8%
       top10: 1.20,         // ×10 = 12%
+      top5: 3.20,          // ×5  = 16%
+      winner: 45.00,       // ×1  = 45%
+      lowRoundR1: 3.75,    // Thu low round = 3.75%
+      lowRoundR2: 3.75,    // Fri low round = 3.75%
+      lowRoundR3: 3.75,    // Sat low round = 3.75%
+      lowRoundR4: 3.75,    // Sun low round = 3.75%  (total: 15%)
+      worstRound: 0,
+      worstOverall: 0,
+    },
+  },
+};
+
+/**
+ * PGA Championship: makeCut×70 + top20×20 + top10×10 + top5×5 + winner×1 + props = 100%
+ *
+ * Same round structure and props as Masters, but the PGA Championship cuts at
+ * the lowest 70 (not 50 like Masters). The per-golfer rates for makeCut differ
+ * accordingly to keep the cut tier at a comparable share of the pot.
+ *
+ * Real-world calcutta inspiration (per BettorEdge / Live Tourney):
+ *   - Classic 70/20/10 split → "Winner Takes Most" preset
+ *   - Spread/positional with daily props → "With Low Round" preset
+ *   - Balanced consistency-rewarding → "Balanced" preset
+ */
+export const PGA_CHAMPIONSHIP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
+  balanced: {
+    label: 'Balanced',
+    description: 'Spread payouts across finishes — rewards consistency',
+    rules: {
+      makeCut: 0.10,       // ×70 = 7%
+      top20: 0.40,         // ×20 = 8%
+      top10: 1.50,         // ×10 = 15%
+      top5: 4.00,          // ×5  = 20%
+      winner: 50.00,       // ×1  = 50%
+      lowRoundR1: 0,
+      lowRoundR2: 0,
+      lowRoundR3: 0,
+      lowRoundR4: 0,
+      worstRound: 0,
+      worstOverall: 0,
+    },
+  },
+  topHeavy: {
+    label: 'Winner Takes Most',
+    description: 'Majority of the pot goes to the champion (close to classic 70/20/10)',
+    rules: {
+      makeCut: 0.05,       // ×70 = 3.5%
+      top20: 0.10,         // ×20 = 2%
+      top10: 0.45,         // ×10 = 4.5%
+      top5: 2.00,          // ×5  = 10%
+      winner: 80.00,       // ×1  = 80%
+      lowRoundR1: 0,
+      lowRoundR2: 0,
+      lowRoundR3: 0,
+      lowRoundR4: 0,
+      worstRound: 0,
+      worstOverall: 0,
+    },
+  },
+  withProps: {
+    label: 'With Low Round',
+    description: '85% placement payouts, 15% for daily low round bonuses',
+    rules: {
+      makeCut: 0.06,       // ×70 = 4.2%
+      top20: 0.40,         // ×20 = 8%
+      top10: 1.18,         // ×10 = 11.8%
       top5: 3.20,          // ×5  = 16%
       winner: 45.00,       // ×1  = 45%
       lowRoundR1: 3.75,    // Thu low round = 3.75%
@@ -251,10 +317,10 @@ export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
 const PRESET_MAP: Record<string, Record<string, PayoutPreset>> = {
   march_madness_2026: MARCH_MADNESS_PAYOUT_PRESETS,
   masters_2026: MASTERS_PAYOUT_PRESETS,
-  // PGA Championship has the same round structure as Masters (makeCut/T20/T10/T5/winner)
-  // and the same prop bets (low round per day, worst round, DFL), so the Masters presets
-  // map cleanly. Every new golf major can reuse these until per-event tuning is needed.
-  pga_championship_2026: MASTERS_PAYOUT_PRESETS,
+  // Golf majors share round/prop structure but cut sizes differ
+  // (Masters cuts at 50, PGA Championship at 70), so each one needs its own
+  // preset where the per-cut-maker rate keeps the tier total constant.
+  pga_championship_2026: PGA_CHAMPIONSHIP_PAYOUT_PRESETS,
   kentucky_derby_2026: KENTUCKY_DERBY_PAYOUT_PRESETS,
   nfl_season_2026: NFL_SEASON_PAYOUT_PRESETS,
   world_cup_2026: WORLD_CUP_PAYOUT_PRESETS,
