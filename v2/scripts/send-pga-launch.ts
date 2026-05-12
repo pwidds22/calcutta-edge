@@ -92,14 +92,18 @@ const html = `
 
       <p style="${s.p}">
         The PGA Championship tees off Thursday at Aronimink Golf Club in Newtown Square, PA.
-        You can host your Calcutta auction on Calcutta Edge <span style="${s.highlight}">free</span> —
-        full 156-golfer field, live bidding, automatic settlement, the same platform you used
-        for Masters and March Madness.
+        Hosting your Calcutta on Calcutta Edge is <span style="${s.highlight}">completely free</span> —
+        no purchase required, no per-player fees, same platform you used for Masters and March Madness.
       </p>
 
       <p style="${s.p}">
-        Quick reminder of what you get:
+        <strong style="color: #fff;">What's free for every host:</strong>
       </p>
+
+      <div style="${s.featureBlock}">
+        <p style="${s.featureTitle}">🎯 Free live auction hosting</p>
+        <p style="${s.featureDesc}">Spin up an auction room, share the 6-character join code with your group, run live bidding from any device with countdown timers and commissioner controls. Unlimited participants, unlimited auctions.</p>
+      </div>
 
       <div style="${s.featureBlock}">
         <p style="${s.featureTitle}">🤖 Live results sync — no manual entry</p>
@@ -107,13 +111,19 @@ const html = `
       </div>
 
       <div style="${s.featureBlock}">
-        <p style="${s.featureTitle}">📊 Real sportsbook odds for all 156 golfers</p>
-        <p style="${s.featureDesc}">Devigged odds from DraftKings (primary), FanDuel, Bovada, Caesars, BetMGM, Bet365 — across 5 markets (winner / T5 / T10 / T20 / make cut). Fair values + bid recommendations for every player in the field.</p>
+        <p style="${s.featureTitle}">💰 Automatic settlement</p>
+        <p style="${s.featureDesc}">When the tournament wraps up, the platform calculates exactly who owes who — simplified to the minimum number of payments. Mark them off as you collect.</p>
       </div>
 
+      <hr style="${s.divider}" />
+
+      <p style="${s.p}">
+        <strong style="color: #fff;">Optional — for the bidders in your group who want an edge:</strong>
+      </p>
+
       <div style="${s.featureBlock}">
-        <p style="${s.featureTitle}">💰 Strategy tool dropped to $14.99</p>
-        <p style="${s.featureDesc}">Was $19.99 for Masters, $29.99 for March Madness. Single uniform price per event now — pay once when you're hosting (or pre-purchase any upcoming event from the strategy page).</p>
+        <p style="${s.featureTitle}">📊 Strategy tool — $14.99 per event (optional)</p>
+        <p style="${s.featureDesc}">Devigged odds from DraftKings (primary), FanDuel, Bovada, Caesars, BetMGM, Bet365 — across all 5 markets (winner / T5 / T10 / T20 / make cut). Fair values + suggested bids + round-by-round profit projections for all 156 golfers. Useful if you actually want to win money. Not required to host or play.</p>
       </div>
 
       <hr style="${s.divider}" />
@@ -121,8 +131,8 @@ const html = `
       <p style="${s.p}"><strong style="color: #fff;">Quick start:</strong> create your auction, share the 6-character join code with your group, run the auction tonight or Wednesday. Tournament starts Thursday — auto-sync handles the rest.</p>
 
       <div style="margin: 24px 0;">
-        <a href="https://www.calcuttaedge.com/host/create?tournament=pga_championship_2026" style="${s.cta}">Host a PGA Calcutta →</a>
-        <a href="https://www.calcuttaedge.com/strategy?tournament=pga_championship_2026" style="${s.ctaSecondary}">Preview Strategy</a>
+        <a href="https://www.calcuttaedge.com/host/create?tournament=pga_championship_2026" style="${s.cta}">Host a PGA Calcutta (Free) →</a>
+        <a href="https://www.calcuttaedge.com/strategy?tournament=pga_championship_2026" style="${s.ctaSecondary}">Preview Strategy Tool</a>
       </div>
 
       <hr style="${s.divider}" />
