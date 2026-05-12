@@ -119,6 +119,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
 
   const handleCustomRuleChange = (key: string, value: string) => {
     setCustomRules((prev) => ({ ...prev, [key]: parseFloat(value) || 0 }));
+    // Editing an individual rule implies "custom" — otherwise the total readout
+    // and submitted rules silently ignore the edit (mode still points at a preset).
+    setPayoutMode('custom');
   };
 
   const rounds = selectedTournament?.rounds ?? [];

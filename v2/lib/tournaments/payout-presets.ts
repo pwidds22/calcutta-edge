@@ -251,6 +251,10 @@ export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
 const PRESET_MAP: Record<string, Record<string, PayoutPreset>> = {
   march_madness_2026: MARCH_MADNESS_PAYOUT_PRESETS,
   masters_2026: MASTERS_PAYOUT_PRESETS,
+  // PGA Championship has the same round structure as Masters (makeCut/T20/T10/T5/winner)
+  // and the same prop bets (low round per day, worst round, DFL), so the Masters presets
+  // map cleanly. Every new golf major can reuse these until per-event tuning is needed.
+  pga_championship_2026: MASTERS_PAYOUT_PRESETS,
   kentucky_derby_2026: KENTUCKY_DERBY_PAYOUT_PRESETS,
   nfl_season_2026: NFL_SEASON_PAYOUT_PRESETS,
   world_cup_2026: WORLD_CUP_PAYOUT_PRESETS,
