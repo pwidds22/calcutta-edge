@@ -76,6 +76,11 @@ export interface TournamentConfig {
   isActive: boolean;
   /** Strategy tool price in cents (e.g., 1499 = $14.99). Used for payment gating. */
   strategyPrice?: number;
+  /** Lowercase substring patterns used to identify this tournament in upstream
+   *  data feeds (DataGolf event_name, ESPN tournament name). Any match accepts.
+   *  Used by /api/golf/sync to avoid writing results from the wrong PGA Tour event.
+   *  Required for any tournament whose live results should auto-sync. */
+  liveSyncMatchers?: string[];
   /** Env var key for this tournament's Stripe Payment Link URL */
   stripePaymentLinkEnvKey?: string;
 }
