@@ -97,12 +97,18 @@ async function main() {
     console.log(`  ${t.label.padEnd(12)} ${t.players.length} players`);
   }
 
+  // Read existing config FIRST so we can preserve IDs for players who were
+  // already in there. This prevents an odds refresh from reshuffling IDs and
+  // breaking any auction session that referenced those IDs (bundles + bids).
+  const configSource = readFileSync(CONFIG_PATH, 'utf-8');
+  const idByDgId = extractIdsFromConfig(configSource);
+  const stableIdBySortedIdx = assignStableIds(sorted, idByDgId);
+
   // Build the new teams array as a string
   const generatedAt = new Date().toISOString().split('T')[0];
-  const teamsBlock = buildTeamsBlock(tiers, sorted, eventName, generatedAt);
+  const teamsBlock = buildTeamsBlock(tiers, sorted, eventName, generatedAt, stableIdBySortedIdx);
 
   // Replace the existing PGA_CHAMPIONSHIP_2026_TEAMS array in the config file.
-  const configSource = readFileSync(CONFIG_PATH, 'utf-8');
   const TEAMS_REGEX = /\/\*\*[\s\S]*?\*\/\nexport const PGA_CHAMPIONSHIP_2026_TEAMS: BaseTeam\[\] = \[[\s\S]*?\n\];/;
   if (!TEAMS_REGEX.test(configSource)) {
     console.error('\nERROR: could not locate PGA_CHAMPIONSHIP_2026_TEAMS array in config file.');
@@ -118,7 +124,7 @@ async function main() {
   console.log(`  Run: git add v2/lib/tournaments/configs/pga-championship-2026.ts && git commit  # ship`);
 }
 
-function buildTeamsBlock(tiers, sorted, eventName, generatedAt) {
+function buildTeamsBlock(tiers, sorted, eventName, generatedAt, stableIdBySortedIdx) {
   const lines = [];
   lines.push('/**');
   lines.push(` * PGA Championship 2026 field — real sportsbook odds from DataGolf API.`);
@@ -127,6 +133,10 @@ function buildTeamsBlock(tiers, sorted, eventName, generatedAt) {
   lines.push(` * Generated: ${generatedAt} from DataGolf outrights API (all 5 markets).`);
   lines.push(` * Event: ${eventName}`);
   lines.push(` * Re-run: DATAGOLF_API_KEY=xxx node scripts/fetch-pga-odds.mjs`);
+  lines.push(` *`);
+  lines.push(` * NOTE: \`id\` is a stable identifier preserved across re-runs (matched by`);
+  lines.push(` * dg_id). \`seed\` reflects current rank by win probability — that's the`);
+  lines.push(` * field that shifts on a refresh, not \`id\`. Don't reorder entries by hand.`);
   lines.push(` */`);
   lines.push(`export const PGA_CHAMPIONSHIP_2026_TEAMS: BaseTeam[] = [`);
 
@@ -134,7 +144,9 @@ function buildTeamsBlock(tiers, sorted, eventName, generatedAt) {
     const { label, players: tierPlayers } = tiers[i];
     lines.push(`  // --- ${label} ---`);
     for (const p of tierPlayers) {
-      const seed = sorted.indexOf(p) + 1;
+      const sortedIdx = sorted.indexOf(p);
+      const seed = sortedIdx + 1;
+      const id = stableIdBySortedIdx.get(sortedIdx) ?? seed;
       const group = label.toLowerCase();
       const mc = p.odds.makeCut ?? estimateMakeCut(p.odds.winner);
       const t20 = p.odds.top20 ?? estimateFromWinner(p.odds.winner, 20);
@@ -142,12 +154,70 @@ function buildTeamsBlock(tiers, sorted, eventName, generatedAt) {
       const t5 = p.odds.top5 ?? estimateFromWinner(p.odds.winner, 5);
       const w = p.odds.winner;
       const safeName = p.name.replace(/'/g, "\\'");
-      lines.push(`  { id: ${seed}, name: '${safeName}', seed: ${seed}, group: '${group}', americanOdds: { makeCut: ${fmt(mc)}, top20: ${fmt(t20)}, top10: ${fmt(t10)}, top5: ${fmt(t5)}, winner: ${fmt(w)} } },`);
+      lines.push(`  { id: ${id}, dg_id: ${p.dg_id}, name: '${safeName}', seed: ${seed}, group: '${group}', americanOdds: { makeCut: ${fmt(mc)}, top20: ${fmt(t20)}, top10: ${fmt(t10)}, top5: ${fmt(t5)}, winner: ${fmt(w)} } },`);
     }
     if (i < tiers.length - 1) lines.push('');
   }
   lines.push(`];`);
   return lines.join('\n');
+}
+
+/**
+ * Parse the current config to learn which `id` each `dg_id` already has.
+ * Returns Map<dg_id, id>. If a config entry has no `dg_id` (legacy entries
+ * from before this script was stabilized), we also index by lowercased name
+ * so the first-time stabilization run can still match.
+ */
+function extractIdsFromConfig(src) {
+  const idByDgId = new Map();
+  const idByName = new Map();
+  // Match `{ id: N, ... }` blocks up to the closing brace. The fields can be
+  // in any order so we just pluck out what we can.
+  const ENTRY_REGEX = /\{\s*id:\s*(\d+),[^}]*?\}/g;
+  let m;
+  while ((m = ENTRY_REGEX.exec(src)) !== null) {
+    const block = m[0];
+    const id = Number(m[1]);
+    const dgMatch = block.match(/dg_id:\s*(\d+)/);
+    const nameMatch = block.match(/name:\s*'([^']+)'/);
+    if (dgMatch) idByDgId.set(Number(dgMatch[1]), id);
+    if (nameMatch) idByName.set(nameMatch[1].replace(/\\'/g, "'").toLowerCase().trim(), id);
+  }
+  return { idByDgId, idByName };
+}
+
+/**
+ * Assign a stable `id` to each player in `sorted`. Players matching an
+ * existing config entry (by dg_id or, on first stabilization, by name) keep
+ * their previous `id`. New players get the smallest unused positive integer.
+ */
+function assignStableIds(sorted, existing) {
+  const used = new Set([...existing.idByDgId.values()]);
+  const result = new Map(); // sortedIdx → id
+
+  // First pass: preserve IDs for players we recognize.
+  for (let i = 0; i < sorted.length; i++) {
+    const p = sorted[i];
+    let preserved = existing.idByDgId.get(p.dg_id);
+    if (preserved === undefined) {
+      preserved = existing.idByName.get(p.name.toLowerCase().trim());
+    }
+    if (preserved !== undefined && !result.has(preserved)) {
+      result.set(i, preserved);
+      used.add(preserved);
+    }
+  }
+
+  // Second pass: allocate fresh IDs for players we didn't match.
+  let next = 1;
+  for (let i = 0; i < sorted.length; i++) {
+    if (result.has(i)) continue;
+    while (used.has(next)) next++;
+    result.set(i, next);
+    used.add(next);
+  }
+
+  return result;
 }
 
 function formatName(dgName) {

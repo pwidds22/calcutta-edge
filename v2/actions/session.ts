@@ -86,6 +86,13 @@ export async function createSession(input: {
     ...bundles.map((b) => `b:${b.id}`),
   ];
 
+  // Freeze the team list at creation time so a later odds-refresh that
+  // reshuffles IDs in the global config can't drift this session.
+  const settingsWithSnapshot: SessionSettings = {
+    ...(input.settings ?? {}),
+    teamSnapshot: tournament.teams,
+  };
+
   const { data: session, error } = await supabase
     .from('auction_sessions')
     .insert({
@@ -97,7 +104,7 @@ export async function createSession(input: {
       estimated_pot_size: input.estimatedPotSize,
       team_order: teamOrder,
       status: 'lobby',
-      settings: input.settings ?? {},
+      settings: settingsWithSnapshot,
       password_hash: input.password ? hashPassword(input.password) : null,
     })
     .select('id, join_code')

@@ -6,6 +6,7 @@ import { useTimer } from '@/lib/auction/live/use-timer';
 import type { BaseTeam, TournamentConfig, PayoutRules, TeamBundle } from '@/lib/tournaments/types';
 import type { BidEntry, SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { SessionSettings } from '@/lib/auction/live/types';
+import { deriveBundleLabel } from '@/lib/tournaments/bundles';
 import { AuctionStatusBar } from './auction-status-bar';
 import { TeamSpotlight } from './team-spotlight';
 import { BidPanel } from './bid-panel';
@@ -150,7 +151,9 @@ export function ParticipantView({
     : null;
   const currentBundleInfo = currentBundle
     ? {
-        name: currentBundle.name,
+        // Derive from current teamMap so the title always matches the chips
+        // (stored `bundle.name` can drift if the team config shifts later).
+        name: deriveBundleLabel(currentBundle, teamMap),
         teams: currentBundle.teamIds
           .map((tid) => teamMap.get(tid))
           .filter((t): t is BaseTeam => !!t),

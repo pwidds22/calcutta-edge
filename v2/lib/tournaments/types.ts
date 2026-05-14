@@ -97,6 +97,10 @@ export interface BaseTeam {
    *  instead of converting americanOdds. Useful for model-based data
    *  (e.g., Evan Miya, KenPom) that already represents fair probabilities. */
   probabilities?: Record<RoundKey, number>;
+  /** DataGolf player ID (golf only) — stable across odds refreshes. Used by
+   *  fetch-*-odds scripts to preserve `id` for the same player even when their
+   *  current rank shifts. Not used at runtime. */
+  dg_id?: number;
 }
 
 /** A group of teams auctioned as a single item */

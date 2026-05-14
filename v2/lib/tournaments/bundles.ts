@@ -286,6 +286,40 @@ export function generateBundles(
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
+/**
+ * Rebuild a bundle's display label from its current team members.
+ *
+ * Bundle `name` is computed and frozen at bundle-creation time. If the team
+ * roster shifts later (e.g., an odds-refresh script reassigns IDs), the stored
+ * `name` can disagree with what `teamIds` now resolves to. Calling this at
+ * render time keeps the title in sync with the chips shown below it.
+ *
+ * Returns the stored `bundle.name` unchanged when:
+ *  - Any team ID doesn't resolve (avoid showing a half-truth)
+ *  - The bundle uses a fixed-format label that doesn't embed member names
+ *    (region/seedline bundles, custom user-named bundles)
+ */
+export function deriveBundleLabel(
+  bundle: TeamBundle,
+  teamMap: Map<number, BaseTeam>,
+): string {
+  const members = bundle.teamIds.map((id) => teamMap.get(id));
+  const allResolved = members.every((m): m is BaseTeam => !!m);
+  if (!allResolved) return bundle.name;
+
+  if (bundle.id.startsWith('golf-group-')) {
+    const num = bundle.id.slice('golf-group-'.length);
+    return `Group ${num} (${members.map((t) => t.name.split(' ').pop()).join(' / ')})`;
+  }
+
+  if (bundle.id.startsWith('playin-')) {
+    return `${members[0].group} ${members[0].seed}-seed (${members.map((t) => t.name).join(' / ')})`;
+  }
+
+  // region-*, seedline-*, custom-* don't embed member names — preserve as-is.
+  return bundle.name;
+}
+
 /** Returns teams that are NOT part of any bundle */
 export function getUnbundledTeams(
   teams: BaseTeam[],

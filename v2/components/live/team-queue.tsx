@@ -3,6 +3,7 @@
 import type { BaseTeam, TeamBundle } from '@/lib/tournaments/types';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import { presentTeam } from '@/actions/bidding';
+import { deriveBundleLabel } from '@/lib/tournaments/bundles';
 import { cn } from '@/lib/utils';
 import { List, Package, Pointer } from 'lucide-react';
 
@@ -101,7 +102,9 @@ export function TeamQueue({
                   </span>
                   <Package className="size-3 flex-shrink-0 text-amber-400/60" />
                   <span className="truncate">
-                    {bundle?.name ?? `Bundle ${bundleId}`}
+                    {bundle
+                      ? deriveBundleLabel(bundle, teamMap)
+                      : `Bundle ${bundleId}`}
                   </span>
                 </span>
                 {allMembersSold && totalSoldAmount > 0 && (
