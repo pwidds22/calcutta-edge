@@ -3,6 +3,8 @@ import {
   listSelectorTournaments,
   listPastTournaments,
   getFeaturedTournament,
+  matchesTournamentEvent,
+  getTournament,
 } from '../registry';
 
 beforeEach(() => {
@@ -42,5 +44,38 @@ describe('phase-aware registry helpers', () => {
     const featured = getFeaturedTournament();
     // On May 10 with PGA hostable May 14, PGA should be the next hostable.
     expect(featured?.config.id).toBe('pga_championship_2026');
+  });
+});
+
+describe('matchesTournamentEvent', () => {
+  // Regression: the /api/golf/projections route used to hardcode an `isMasters`
+  // event-name check and silently fall through for any other tournament. PGA
+  // hosts opening the Leaderboard tab during the 2026 PGA saw "Projected
+  // standings unavailable" because the projections endpoint couldn't match
+  // "PGA Championship" against the Masters substring. The shared helper plus
+  // each config's `liveSyncMatchers` is now the single source of truth — every
+  // event-name check should route through this function.
+
+  it('matches PGA Championship against its liveSyncMatchers', () => {
+    const pga = getTournament('pga_championship_2026');
+    expect(pga).toBeDefined();
+    expect(matchesTournamentEvent('PGA Championship', pga!.config)).toBe(true);
+    expect(matchesTournamentEvent('Pga Championship - Round 1', pga!.config)).toBe(true);
+  });
+
+  it('matches Masters against its liveSyncMatchers (case-insensitive substring)', () => {
+    const masters = getTournament('masters_2026');
+    expect(masters).toBeDefined();
+    expect(matchesTournamentEvent('Masters Tournament', masters!.config)).toBe(true);
+    expect(matchesTournamentEvent('THE MASTERS', masters!.config)).toBe(true);
+    expect(matchesTournamentEvent('augusta national invitational', masters!.config)).toBe(true);
+  });
+
+  it('rejects non-matching events without leaking across tournaments', () => {
+    const pga = getTournament('pga_championship_2026');
+    const masters = getTournament('masters_2026');
+    expect(matchesTournamentEvent('Masters Tournament', pga!.config)).toBe(false);
+    expect(matchesTournamentEvent('PGA Championship', masters!.config)).toBe(false);
+    expect(matchesTournamentEvent('US Open', pga!.config)).toBe(false);
   });
 });

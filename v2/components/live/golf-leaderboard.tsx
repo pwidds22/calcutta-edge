@@ -392,7 +392,14 @@ export function GolfLeaderboard({
                 <th className="px-3 py-2 text-center">Total</th>
                 <th className="px-3 py-2 text-left">Owner</th>
                 <th className="px-3 py-2 text-right">Paid</th>
-                <th className="px-3 py-2 text-right" title="Live Expected Value based on DataGolf model probabilities">
+                <th
+                  className="px-3 py-2 text-right"
+                  title={
+                    "Live Expected Value = sum over each payout tier of\n" +
+                    "(probability × pot × payout %). Green delta = currently up\n" +
+                    "on this player; red delta = currently down."
+                  }
+                >
                   Live EV
                 </th>
                 <th className="px-3 py-2 text-right" title="Win probability">Win%</th>
@@ -487,12 +494,37 @@ export function GolfLeaderboard({
                       {row.purchasePrice !== null ? fmtDollar(row.purchasePrice) : '—'}
                     </td>
 
-                    {/* Live EV */}
+                    {/* Live EV — value on top in neutral white; delta vs paid
+                        on a second line in red/green. Removing the old amber
+                        "below paid" color since amber doesn't read as a loss
+                        signal at a glance, and it ignored magnitude entirely
+                        (a $1 dip and a $20 dip looked identical). For unowned
+                        players we hide the delta — there's no purchase price
+                        to compare against, so coloring is misleading. */}
                     <td className="px-3 py-2 text-right font-mono">
                       {row.liveEV !== null ? (
-                        <span className={row.liveEV > (row.purchasePrice ?? 0) ? 'text-emerald-400' : 'text-amber-400/70'}>
-                          {fmtDollar(row.liveEV)}
-                        </span>
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className={isOwned ? 'text-white/80' : 'text-white/40'}>
+                            {fmtDollar(row.liveEV)}
+                          </span>
+                          {isOwned && row.purchasePrice !== null && (() => {
+                            const delta = row.liveEV - row.purchasePrice;
+                            // Treat tiny absolute deltas as flat so coin-flip
+                            // EV doesn't flicker between red and green.
+                            const flat = Math.abs(delta) < 0.5;
+                            const color = flat
+                              ? 'text-white/30'
+                              : delta > 0
+                                ? 'text-emerald-400/80'
+                                : 'text-red-400/80';
+                            const prefix = delta >= 0 ? '+' : '-';
+                            return (
+                              <span className={`text-[10px] ${color}`}>
+                                {prefix}${fmtDollar(Math.abs(delta)).replace('$', '')}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       ) : (
                         <span className="text-white/15">—</span>
                       )}

@@ -87,6 +87,18 @@ export function isHostable(config: TournamentConfig): boolean {
   return new Date() >= new Date(config.hostingOpensAt);
 }
 
+/**
+ * Check whether an upstream feed's `event_name` corresponds to this tournament.
+ * Uses `config.liveSyncMatchers` (lowercase substrings) — the single source
+ * of truth that the golf-sync, projections endpoint, and dashboard all share.
+ * Returns false if matchers aren't configured.
+ */
+export function matchesTournamentEvent(eventName: string, config: TournamentConfig): boolean {
+  if (!config.liveSyncMatchers || config.liveSyncMatchers.length === 0) return false;
+  const lower = eventName.toLowerCase();
+  return config.liveSyncMatchers.some((m) => lower.includes(m.toLowerCase()));
+}
+
 /** List only tournaments whose hosting window is open */
 export function listHostableTournaments(): TournamentConfig[] {
   return listTournaments().filter(isHostable);

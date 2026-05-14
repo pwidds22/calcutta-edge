@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { getTournament, getFeaturedTournament } from '@/lib/tournaments/registry';
+import { getTournament, getFeaturedTournament, matchesTournamentEvent } from '@/lib/tournaments/registry';
 import { getTournamentPhase } from '@/lib/tournaments/phase';
 import type { TournamentPhase } from '@/lib/tournaments/types';
 import { hasTournamentAccess } from '@/lib/auth/tournament-access';
@@ -185,42 +185,43 @@ export async function getDashboardData(): Promise<DashboardData> {
     }
   }
 
-  // Fetch DataGolf projections for active golf sessions (best-effort, non-blocking)
+  // Fetch DataGolf projections for active golf sessions (best-effort, non-blocking).
+  // The event the API returns can be any active PGA tour event — we match it
+  // against each session's tournament config below via `matchesTournamentEvent`,
+  // so projections only fill in for the right tournament.
   const hasActiveGolf = sessions.some(
     (s) => s.status === 'completed' && getTournament(s.tournament_id)?.config.sport === 'golf'
   );
   let dgPlayers: DataGolfInPlayPlayer[] = [];
+  let dgEventName: string | null = null;
   if (hasActiveGolf && process.env.DATAGOLF_API_KEY) {
     try {
       const inPlay = await fetchInPlay();
-      const isMasters = inPlay.event_name.toLowerCase().includes('masters')
-        || inPlay.event_name.toLowerCase().includes('augusta');
-      if (isMasters) {
+      if (inPlay.data.length > 0) {
         dgPlayers = inPlay.data;
+        dgEventName = inPlay.event_name;
       }
-    } catch {
+    } catch { /* fall through to pre-tournament */ }
+    if (dgPlayers.length === 0) {
       try {
         const preTourney = await fetchPreTournament();
-        const isMasters = preTourney.event_name.toLowerCase().includes('masters')
-          || preTourney.event_name.toLowerCase().includes('augusta');
-        if (isMasters) {
-          dgPlayers = (preTourney.baseline_history_fit ?? preTourney.baseline).map(
-            (p): DataGolfInPlayPlayer => ({
-              player_name: p.player_name,
-              dg_id: p.dg_id,
-              current_pos: null,
-              current_round: 0,
-              thru: null,
-              today: null,
-              total: null,
-              win_prob: p.win,
-              top_5_prob: p.top_5,
-              top_10_prob: p.top_10,
-              top_20_prob: p.top_20,
-              make_cut_prob: p.make_cut,
-            })
-          );
-        }
+        dgPlayers = (preTourney.baseline_history_fit ?? preTourney.baseline).map(
+          (p): DataGolfInPlayPlayer => ({
+            player_name: p.player_name,
+            dg_id: p.dg_id,
+            current_pos: null,
+            current_round: 0,
+            thru: null,
+            today: null,
+            total: null,
+            win_prob: p.win,
+            top_5_prob: p.top_5,
+            top_10_prob: p.top_10,
+            top_20_prob: p.top_20,
+            make_cut_prob: p.make_cut,
+          })
+        );
+        dgEventName = preTourney.event_name;
       } catch { /* DataGolf unavailable — projections will be null */ }
     }
   }
@@ -375,7 +376,12 @@ export async function getDashboardData(): Promise<DashboardData> {
       { ruleKey: 'makeCut', probField: 'make_cut_prob' },
     ];
 
-    if (config?.sport === 'golf' && dgPlayers.length > 0 && userBids.length > 0 && actualPot > 0) {
+    const dgMatchesSession =
+      config?.sport === 'golf'
+      && dgPlayers.length > 0
+      && !!dgEventName
+      && matchesTournamentEvent(dgEventName, config);
+    if (dgMatchesSession && userBids.length > 0 && actualPot > 0) {
       let blendedEarnings = 0;
       let matched = false;
       for (const bid of userBids) {
@@ -429,12 +435,18 @@ export async function getDashboardData(): Promise<DashboardData> {
       userTotalSpent,
       userTotalEarned,
       userEliminatedCost,
-      // Tournament-over detection: auction officially closed AND results in, OR
-      // tournament's date phase has passed end-of-play. Either signal triggers
-      // the "completed" P&L formula which subtracts ALL buy-in (alive teams cost
-      // money too once the tournament is over).
+      // Tournament-over detection: auction officially closed AND at least one
+      // round of results has been entered AND there are no rounds left to grade,
+      // OR the tournament's date phase has passed end-of-play. Either signal
+      // triggers the "completed" P&L formula which subtracts ALL buy-in (alive
+      // teams cost money too once the tournament is over).
+      //
+      // `results.length > 0` is load-bearing: without it, a freshly-drafted
+      // league (auction status='completed', zero tournament_results rows) would
+      // also satisfy `currentRound === null` and incorrectly flip to the
+      // completed formula — showing -$buy-in before the tournament even started.
       userNetPL: (
-        (session.status === 'completed' && currentRound === null) ||
+        (session.status === 'completed' && results.length > 0 && currentRound === null) ||
         (config && (getTournamentPhase(config) === 'completed' || getTournamentPhase(config) === 'archived'))
       )
         ? userTotalEarned - userTotalSpent

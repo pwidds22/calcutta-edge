@@ -1,15 +1,19 @@
-import { fetchInPlay, fetchPreTournament, formatPlayerName } from '@/lib/datagolf/client';
+import { fetchInPlay, fetchPreTournament } from '@/lib/datagolf/client';
 import type { DataGolfInPlayPlayer } from '@/lib/datagolf/client';
 
 /**
  * GET /api/golf/projections
  *
  * Returns player probabilities for projected standings.
- * Strategy: try in-play API first — if it's the Masters, use live odds.
- * Otherwise fall back to pre-tournament model predictions.
+ * Strategy: try in-play API first (live odds during tournament). If that fails
+ * or doesn't return data, fall back to pre-tournament model predictions.
  *
- * Returns a normalized array of { player_name, dg_id, win_prob, top_5_prob, ... }
- * matching the DataGolfInPlayPlayer shape so the client doesn't care about the source.
+ * The endpoint is event-agnostic — it always returns whatever DataGolf has,
+ * along with `event_name` so the client can verify it matches the session's
+ * tournament (via `matchesTournamentEvent` against the config's
+ * `liveSyncMatchers`). Filtering on the server would force this route to know
+ * about every active tournament, which is exactly the Masters-only trap the
+ * sync route already escaped.
  */
 export async function GET() {
   if (!process.env.DATAGOLF_API_KEY) {
@@ -19,13 +23,10 @@ export async function GET() {
     );
   }
 
-  // Try in-play first — best data during tournament
+  // Try in-play first — best data while play is on.
   try {
     const inPlay = await fetchInPlay();
-    const isMasters = inPlay.event_name.toLowerCase().includes('masters')
-      || inPlay.event_name.toLowerCase().includes('augusta');
-
-    if (isMasters) {
+    if (inPlay.data.length > 0) {
       return Response.json({
         source: 'in-play',
         event_name: inPlay.event_name,
@@ -34,29 +35,14 @@ export async function GET() {
         headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=30' },
       });
     }
-    // Not Masters — fall through to pre-tournament
+    // In-play returned empty — fall through to pre-tournament.
   } catch {
-    // In-play failed — fall through to pre-tournament
+    // In-play failed — fall through to pre-tournament.
   }
 
-  // Fall back to pre-tournament model predictions
+  // Fall back to pre-tournament model predictions.
   try {
     const preTourney = await fetchPreTournament();
-    const isMasters = preTourney.event_name.toLowerCase().includes('masters')
-      || preTourney.event_name.toLowerCase().includes('augusta');
-
-    if (!isMasters) {
-      return Response.json({
-        source: 'none',
-        event_name: preTourney.event_name,
-        error: `DataGolf showing "${preTourney.event_name}", not Masters`,
-        players: [],
-      }, {
-        headers: { 'Cache-Control': 'public, max-age=300' },
-      });
-    }
-
-    // Use baseline_history_fit (more accurate) with fallback to baseline
     const players = (preTourney.baseline_history_fit ?? preTourney.baseline).map(
       (p): DataGolfInPlayPlayer => ({
         player_name: p.player_name,
@@ -66,7 +52,6 @@ export async function GET() {
         thru: null,
         today: null,
         total: null,
-        // Map pre-tournament fields to in-play prob fields
         win_prob: p.win,
         top_5_prob: p.top_5,
         top_10_prob: p.top_10,

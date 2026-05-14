@@ -7,6 +7,7 @@ import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
 import { calculateLeaderboard, type LeaderboardEntry } from '@/lib/auction/live/actual-payouts';
 import { calculateProjectedStandings, type ProjectedEntry } from '@/lib/auction/live/projected-standings';
+import { matchesTournamentEvent } from '@/lib/tournaments/registry';
 import {
   ChevronDown,
   ChevronRight,
@@ -51,6 +52,9 @@ export function Leaderboard({
   const [projLoading, setProjLoading] = useState(false);
   const [projError, setProjError] = useState<string | null>(null);
   const [projLastUpdated, setProjLastUpdated] = useState<string | null>(null);
+  // Tracks the latest DataGolf event name so we can hide projections that
+  // belong to a different tournament (DataGolf rotates week-to-week).
+  const [projEventName, setProjEventName] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isGolf = config.sport === 'golf';
@@ -69,14 +73,29 @@ export function Leaderboard({
       const data = await res.json();
       if (data.error && (!data.players || data.players.length === 0)) {
         setProjError(data.error);
+        setProjEventName(null);
       } else {
-        const entries = calculateProjectedStandings(
-          soldTeams, baseTeams, payoutRules, data.players, results, config, propResults
-        );
-        setProjected(entries);
-        setProjSource(data.source === 'in-play' ? 'Live odds' : 'Pre-tournament model');
-        setProjLastUpdated(new Date().toLocaleTimeString());
-        setProjError(null);
+        // The endpoint returns whatever DataGolf has — verify it's THIS
+        // tournament before computing standings. DataGolf rotates weekly,
+        // so a leaderboard for last week's PGA event must not bleed into
+        // this week's tournament view.
+        const matches = data.event_name
+          ? matchesTournamentEvent(data.event_name, config)
+          : false;
+        if (!matches) {
+          setProjected(null);
+          setProjEventName(data.event_name ?? null);
+          setProjError(null);
+        } else {
+          const entries = calculateProjectedStandings(
+            soldTeams, baseTeams, payoutRules, data.players, results, config, propResults
+          );
+          setProjected(entries);
+          setProjEventName(data.event_name ?? null);
+          setProjSource(data.source === 'in-play' ? 'Live odds' : 'Pre-tournament model');
+          setProjLastUpdated(new Date().toLocaleTimeString());
+          setProjError(null);
+        }
       }
     } catch (err) {
       setProjError(err instanceof Error ? err.message : 'Failed to fetch projections');
@@ -124,6 +143,7 @@ export function Leaderboard({
         settledEntries={hasResults ? entries : undefined}
         completedRounds={completedRounds}
         config={config}
+        projEventName={projEventName}
       />
     );
   }
@@ -396,6 +416,7 @@ function ProjectedLeaderboard({
   settledEntries,
   completedRounds,
   config,
+  projEventName,
 }: {
   projected: ProjectedEntry[] | null;
   loading: boolean;
@@ -409,6 +430,8 @@ function ProjectedLeaderboard({
   settledEntries?: LeaderboardEntry[];
   completedRounds?: string[];
   config?: TournamentConfig;
+  /** Event name DataGolf last returned. Drives the "wrong event" empty state. */
+  projEventName?: string | null;
 }) {
   // Build settled-earnings lookup by participant
   const settledMap = new Map<string, { earned: number; propEarnings: { propLabel: string; amount: number }[] }>();
@@ -443,12 +466,23 @@ function ProjectedLeaderboard({
   }
 
   if (!projected || projected.length === 0) {
+    // Distinguish "DataGolf is on a different event" from "no data at all" —
+    // for golf hosts viewing their league between tournaments, the former
+    // looks like a bug if we don't say what's actually happening.
+    const wrongEvent =
+      projEventName && config && !matchesTournamentEvent(projEventName, config);
     return (
       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] py-8 text-center space-y-2">
         <BarChart3 className="size-6 text-white/20 mx-auto" />
-        <p className="text-sm text-white/40">No projection data available yet.</p>
+        <p className="text-sm text-white/40">
+          {wrongEvent
+            ? `${config?.name ?? 'This tournament'} not yet active in DataGolf`
+            : 'No projection data available yet.'}
+        </p>
         <p className="text-xs text-white/25">
-          Projected standings will appear once DataGolf publishes odds.
+          {wrongEvent
+            ? `DataGolf is currently publishing odds for "${projEventName}". Projected standings will appear once this event goes live.`
+            : 'Projected standings will appear once DataGolf publishes odds.'}
         </p>
       </div>
     );

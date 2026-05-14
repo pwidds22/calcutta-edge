@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DashboardData, DashboardFeaturedEvent, DashboardSession, DashboardTeam } from '@/actions/dashboard';
+import { isCompletedDashboardSession } from '@/lib/dashboard/categorize';
 
 function formatLongDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -141,8 +142,16 @@ function LeagueCard({ session }: { session: DashboardSession }) {
     session.tournamentPhase === 'archived' ||
     (session.status === 'completed' && session.currentRound === null);
 
-  // Show projected P&L for active golf sessions, actual P&L for completed
-  const showProjected = session.projectedNetPL !== null && session.status === 'completed' && session.currentRound !== null;
+  // Show projected P&L whenever DataGolf is feeding live EV for an in-play
+  // tournament — both the partial-results state (currentRound !== null) and
+  // the draft-done-but-no-results-yet state (currentRound === null while the
+  // tournament is live/hostable). We gate on `tournamentPhase` to keep the
+  // projected label off Completed Leagues cards even if DataGolf still has
+  // the event on its feed.
+  const showProjected =
+    session.projectedNetPL !== null &&
+    session.status === 'completed' &&
+    (session.tournamentPhase === 'live' || session.tournamentPhase === 'hostable');
   const displayPL = showProjected ? session.projectedNetPL! : session.userNetPL;
   const showPL = session.userTeamsCount > 0 && (
     session.status === 'completed' ||
@@ -220,13 +229,26 @@ function LeagueCard({ session }: { session: DashboardSession }) {
       <div className="flex items-center gap-3 flex-shrink-0 ml-4">
         {showPL && (
           <div className="text-right">
-            <div className={`flex items-center gap-1 text-sm font-mono font-medium ${plColor}`}>
+            <div className={`flex items-center justify-end gap-1 text-sm font-mono font-medium ${plColor}`}>
               <PlIcon className="size-3" />
               {displayPL >= 0 ? '+' : ''}${Math.round(displayPL).toLocaleString()}
+              {/*
+                Visible "PROJ" pill — the subtitle below also says "projected",
+                but readers scan the headline number first. Without an in-line
+                marker, a projected +$45 looks identical to a settled +$45 and
+                people will treat it as money in the bank.
+              */}
+              {showProjected && (
+                <span className="ml-1 rounded bg-amber-500/10 px-1 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400/80">
+                  proj
+                </span>
+              )}
             </div>
             <p className="text-[10px] text-white/20">
               {showProjected
-                ? `projected · earned $${Math.round(session.userTotalEarned).toLocaleString()}`
+                ? session.userTotalEarned > 0
+                  ? `projected · earned $${Math.round(session.userTotalEarned).toLocaleString()} · paid $${session.userTotalSpent.toLocaleString()}`
+                  : `projected · paid $${session.userTotalSpent.toLocaleString()}`
                 : `bought in $${session.userTotalSpent.toLocaleString()}`}
             </p>
           </div>
@@ -291,6 +313,48 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
 }
 
 /**
+ * Renders the "My Alive Teams" section. Stays expanded for small rosters
+ * (bracket sports survivors are useful at-a-glance), collapses when the list
+ * grows past the threshold. A golf host with 30+ owned golfers used to drown
+ * the dashboard in rows before Friday's cut — collapsing keeps the section
+ * informative without taking over the screen.
+ */
+function AliveTeamsSection({ teams }: { teams: DashboardTeam[] }) {
+  const COLLAPSE_THRESHOLD = 6;
+  const [expanded, setExpanded] = useState(teams.length <= COLLAPSE_THRESHOLD);
+  const Icon = expanded ? ChevronUp : ChevronDown;
+  const isCollapsible = teams.length > COLLAPSE_THRESHOLD;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        disabled={!isCollapsible}
+        className="group flex items-center gap-2 mb-3 transition-colors enabled:hover:text-white/60 disabled:cursor-default"
+        aria-expanded={expanded}
+        aria-controls="alive-teams-list"
+      >
+        <Trophy className="size-4 text-emerald-400/60" />
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-white/40 group-enabled:group-hover:text-white/60 transition-colors">
+          My Alive Teams ({teams.length})
+        </h2>
+        {isCollapsible && (
+          <Icon className="size-3.5 text-white/30 group-hover:text-white/50 transition-colors" />
+        )}
+      </button>
+      {expanded && (
+        <div id="alive-teams-list" className="grid gap-1.5 sm:grid-cols-2">
+          {teams.map((team) => (
+            <AliveTeamRow key={`${team.leagueId}-${team.seed}-${team.teamName}`} team={team} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Renders the Completed Leagues section. Collapses by default when there are
  * 4+ entries — at that volume the section can dwarf the active leagues above,
  * which is usually what the user actually wants to see.
@@ -329,16 +393,8 @@ function CompletedLeaguesSection({ sessions }: { sessions: DashboardSession[] })
 
 export function UserDashboard({ data }: { data: DashboardData }) {
   const { sessions, totalPotExposure, totalEarned, totalNetPL, aliveTeams, featuredEvent } = data;
-  // A session is "completed" when EITHER (a) the auction is done AND all tournament
-  // rounds have results, OR (b) the tournament itself has ended (date-driven phase).
-  // The phase check catches leagues where the host never marked the auction complete
-  // but the real-world tournament is long over (e.g., March Madness 2026).
-  const isCompletedSession = (s: DashboardSession) =>
-    (s.status === 'completed' && s.currentRound === null) ||
-    s.tournamentPhase === 'completed' ||
-    s.tournamentPhase === 'archived';
-  const completedSessions = sessions.filter(isCompletedSession);
-  const activeSessions = sessions.filter((s) => !isCompletedSession(s));
+  const completedSessions = sessions.filter(isCompletedDashboardSession);
+  const activeSessions = sessions.filter((s) => !isCompletedDashboardSession(s));
   const hasAnyBids = sessions.some((s) => s.userTeamsCount > 0);
   // "Alive" teams in the lifetime stat only count from still-active leagues —
   // champions of past tournaments aren't actively in play anymore.
@@ -411,22 +467,9 @@ export function UserDashboard({ data }: { data: DashboardData }) {
         </div>
       )}
 
-      {/* Alive teams */}
-      {aliveTeams.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Trophy className="size-4 text-emerald-400/60" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/40">
-              My Alive Teams ({aliveTeams.length})
-            </h2>
-          </div>
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            {aliveTeams.map((team) => (
-              <AliveTeamRow key={`${team.leagueId}-${team.seed}-${team.teamName}`} team={team} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Alive teams — collapses by default for golf-sized rosters so the
+          section is informative without burying the leagues below it. */}
+      {aliveTeams.length > 0 && <AliveTeamsSection teams={aliveTeams} />}
 
       {/* Active / In-Progress Leagues */}
       {activeSessions.length > 0 && (
