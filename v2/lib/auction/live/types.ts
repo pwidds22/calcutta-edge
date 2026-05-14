@@ -1,4 +1,4 @@
-import type { TeamBundle, BundlePreset } from '@/lib/tournaments/types';
+import type { BaseTeam, TeamBundle, BundlePreset } from '@/lib/tournaments/types';
 import type { EnabledProp } from '@/lib/tournaments/props';
 
 export interface TimerSettings {
@@ -15,6 +15,15 @@ export interface SessionSettings {
   bundlePreset?: BundlePreset;
   enabledProps?: EnabledProp[];
   minimumBid?: number; // Global floor price, defaults to 1
+  /**
+   * Frozen snapshot of the team list at session creation. When present,
+   * render code resolves team identity (id, name, seed, group) from here
+   * instead of the live tournament config — so an odds-refresh that
+   * shuffles IDs in the global config can't drift this session's display.
+   * Sessions created before this field existed will have it undefined;
+   * render code falls back to the global config in that case.
+   */
+  teamSnapshot?: BaseTeam[];
 }
 
 export const DEFAULT_TIMER_SETTINGS: TimerSettings = {

@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   detectPlayInBundles,
+  deriveBundleLabel,
   generateBundles,
   getUnbundledTeams,
   countAuctionItems,
 } from '../bundles';
+import type { BaseTeam, TeamBundle } from '../types';
 import {
   MARCH_MADNESS_2026_TEAMS,
   MARCH_MADNESS_2026_CONFIG,
@@ -201,5 +203,84 @@ describe('countAuctionItems', () => {
 
     // Sanity: heavy should be significantly less
     expect(heavyCount).toBeLessThan(50);
+  });
+});
+
+describe('deriveBundleLabel', () => {
+  function makeTeam(id: number, name: string, group = 'field', seed = id): BaseTeam {
+    return { id, name, seed, group, americanOdds: {} };
+  }
+
+  it('rebuilds golf-group-N labels from current team names', () => {
+    // Simulates the PGA drift case: stored name has stale surnames, but
+    // teamMap resolves the IDs to a different set of current golfers.
+    const bundle: TeamBundle = {
+      id: 'golf-group-1',
+      name: 'Group 1 (McNealy / Wallace / Fox / Shattuck / Donald)',
+      teamIds: [54, 59, 106, 111, 122],
+    };
+    const teamMap = new Map<number, BaseTeam>([
+      [54, makeTeam(54, 'Maverick McNealy')],
+      [59, makeTeam(59, 'Tony Fox')],
+      [106, makeTeam(106, 'Andy Li')],
+      [111, makeTeam(111, 'Joey Vermeer')],
+      [122, makeTeam(122, 'Jason Dufner')],
+    ]);
+    expect(deriveBundleLabel(bundle, teamMap)).toBe(
+      'Group 1 (McNealy / Fox / Li / Vermeer / Dufner)'
+    );
+  });
+
+  it('rebuilds playin labels using full names and seed/group from first member', () => {
+    const bundle: TeamBundle = {
+      id: 'playin-West-11',
+      name: 'West 11-seed (Texas / NC State)',
+      teamIds: [101, 102],
+    };
+    const teamMap = new Map<number, BaseTeam>([
+      [101, makeTeam(101, 'Texas', 'West', 11)],
+      [102, makeTeam(102, 'NC State', 'West', 11)],
+    ]);
+    expect(deriveBundleLabel(bundle, teamMap)).toBe(
+      'West 11-seed (Texas / NC State)'
+    );
+  });
+
+  it('returns stored name unchanged when any teamId fails to resolve', () => {
+    // Half-truths are worse than the stored label — preserve as-is.
+    const bundle: TeamBundle = {
+      id: 'golf-group-3',
+      name: 'Group 3 (Smith / Jones)',
+      teamIds: [200, 999],
+    };
+    const teamMap = new Map<number, BaseTeam>([
+      [200, makeTeam(200, 'John Smith')],
+      // 999 deliberately missing
+    ]);
+    expect(deriveBundleLabel(bundle, teamMap)).toBe('Group 3 (Smith / Jones)');
+  });
+
+  it('passes through region/seedline/custom labels (no embedded names)', () => {
+    const region: TeamBundle = {
+      id: 'region-East-13-16',
+      name: 'East 13-16 seeds',
+      teamIds: [1, 2, 3, 4],
+    };
+    const seedline: TeamBundle = {
+      id: 'seedline-13',
+      name: 'All 13-seeds',
+      teamIds: [1, 2, 3, 4],
+    };
+    const custom: TeamBundle = {
+      id: 'custom-abc123',
+      name: 'My favorite longshots',
+      teamIds: [1, 2],
+    };
+    const teamMap = new Map<number, BaseTeam>(
+      [1, 2, 3, 4].map((id) => [id, makeTeam(id, `Team ${id}`)])
+    );
+    expect(deriveBundleLabel(region, teamMap)).toBe('East 13-16 seeds');
+    expect(deriveBundleLabel(seedline, teamMap)).toBe('All 13-seeds');
+    expect(deriveBundleLabel(custom, teamMap)).toBe('My favorite longshots');
   });
 });

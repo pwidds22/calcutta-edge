@@ -22,6 +22,12 @@ export default async function LiveAuctionPage({
 
   const oddsRegistry = await getOddsRegistry(result.session.tournament_id);
 
+  // Prefer the frozen snapshot from session creation when present, so this
+  // view is immune to later config changes (e.g., an odds refresh that
+  // reshuffles team IDs).
+  const baseTeams =
+    result.session.settings?.teamSnapshot ?? tournament.teams;
+
   return (
     <ParticipantView
       session={result.session}
@@ -30,7 +36,7 @@ export default async function LiveAuctionPage({
       winningBids={result.winningBids}
       currentBids={result.currentBids}
       config={tournament.config}
-      baseTeams={tournament.teams}
+      baseTeams={baseTeams}
       userId={result.userId}
       hasPaid={result.hasPaid}
       tournamentResults={result.tournamentResults}
