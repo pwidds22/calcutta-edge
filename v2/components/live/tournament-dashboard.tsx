@@ -229,7 +229,7 @@ export function TournamentDashboard({
     ...(config.sport === 'golf'
       ? [{ key: 'golf-leaderboard' as TabKey, label: 'Live Leaderboard', icon: Activity }]
       : []),
-    { key: 'leaderboard', label: 'Leaderboard', icon: BarChart3 },
+    { key: 'leaderboard', label: 'Standings', icon: BarChart3 },
     { key: 'settlement', label: 'Settlement', icon: DollarSign },
   ];
 
