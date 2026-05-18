@@ -143,6 +143,36 @@ export function listPastTournaments(now: Date = new Date()): TournamentEntry[] {
 }
 
 /**
+ * Tournaments eligible for live-sync attempts.
+ *
+ * `live` + `hostable` always qualify. `completed` tournaments qualify for
+ * `graceDays` after `endDate` (inclusive end-of-day), so the morning-after
+ * cron can backfill the final Sunday round even after the calendar has flipped
+ * the tournament to `completed`. Without this grace window, golf majors whose
+ * play wraps Sunday evening lose their last-round results entirely if the
+ * Sunday-night cron misses or DataGolf hadn't promoted positions yet.
+ *
+ * Why not just rely on phase? Because phase is calendar-driven (endDate +
+ * one second) and the actual "tournament is over" signal lives in upstream
+ * leaderboard data (status === 'post'). The sync route already handles the
+ * data signal correctly via `tournamentOver`; this helper just keeps the
+ * coarse filter open long enough for the data signal to land.
+ */
+export function listSyncEligibleTournaments(
+  graceDays: number,
+  now: Date = new Date()
+): TournamentEntry[] {
+  const buckets = listTournamentsByPhase(now);
+  const graceMs = graceDays * 24 * 60 * 60 * 1000;
+  const inGrace = buckets.completed.filter((t) => {
+    // End of `endDate` (UTC) — same boundary phase.ts uses for live → completed.
+    const endInclusive = new Date(`${t.config.endDate}T23:59:59.999Z`);
+    return now.getTime() < endInclusive.getTime() + graceMs;
+  });
+  return [...buckets.live, ...buckets.hostable, ...inGrace];
+}
+
+/**
  * The single tournament to feature on the homepage hero.
  * Priority: live (soonest endDate) > hostable (soonest startDate) > upcoming (soonest startDate).
  * Returns undefined if no tournament is in any of those phases.

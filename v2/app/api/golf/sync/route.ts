@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
-import { getTournament, listTournamentsByPhase } from '@/lib/tournaments/registry';
+import { getTournament, listSyncEligibleTournaments } from '@/lib/tournaments/registry';
 import type { TournamentConfig, BaseTeam } from '@/lib/tournaments/types';
 import { fetchDataGolfLeaderboard, positionToTierResults, identifyLowRounds } from '@/lib/datagolf/leaderboard';
 import type { GolfLeaderboard } from '@/lib/datagolf/leaderboard';
 import { fetchInPlay } from '@/lib/datagolf/client';
 import { fetchGolfLeaderboard, matchPlayerToTeamId, positionToResults } from '@/lib/espn/golf-leaderboard';
+
+/**
+ * How long after `endDate` a tournament stays eligible for the cron sync.
+ *
+ * Bug we're closing: PGA Championship 2026 wrapped Sunday evening 2026-05-17.
+ * Phase flipped to `completed` at 2026-05-18 00:00 UTC. The next-morning cron
+ * (6am UTC = 1am ET Monday) used to filter on `live + hostable` only and
+ * skipped the tournament entirely, leaving the final cut/T20/T10/T5/winner
+ * tiers ungraded forever. 1 day of grace lets the Monday-morning cron pick
+ * up Sunday's finish. Vercel cron also runs at 0 UTC (Sunday 7pm ET) per
+ * vercel.json, so a Sunday-evening cron has a chance too.
+ */
+const POST_END_SYNC_GRACE_DAYS = 1;
 
 /**
  * POST /api/golf/sync
@@ -83,11 +96,11 @@ export async function GET(req: NextRequest) {
 
 async function syncAllGolfSessions(supabase: ReturnType<typeof createAdminClient>) {
   // Find every golf tournament currently in a phase where results could roll in.
-  // 'live' is the obvious one. 'hostable' is included too because golf tournaments
-  // routinely have ~10 hours of overlap on day 1 where hostingOpensAt is still in
-  // effect for late commissioners but the first tee groups are already playing.
-  const buckets = listTournamentsByPhase();
-  const candidates = [...buckets.live, ...buckets.hostable].filter(
+  // 'live' + 'hostable' are the obvious phases. We ALSO include 'completed' for
+  // POST_END_SYNC_GRACE_DAYS so the morning-after cron can backfill Sunday's
+  // final round — phase flips to 'completed' at 00:00 UTC the day after endDate,
+  // which is hours before the post-tournament cron runs.
+  const candidates = listSyncEligibleTournaments(POST_END_SYNC_GRACE_DAYS).filter(
     (t) => t.config.sport === 'golf' && t.config.liveSyncMatchers && t.config.liveSyncMatchers.length > 0
   );
 

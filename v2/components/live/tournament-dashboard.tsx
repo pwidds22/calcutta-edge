@@ -30,6 +30,20 @@ interface TournamentDashboardProps {
 
 type TabKey = 'summary' | 'bracket' | 'results' | 'props' | 'golf-leaderboard' | 'leaderboard' | 'settlement';
 
+/**
+ * Whether the dashboard should show the "Sync Scores" button for this
+ * tournament. Golf tournaments are eligible if they declare liveSyncMatchers
+ * (the same flag the cron + projections endpoint use). March Madness keeps
+ * its ESPN-specific path. Adding a new tournament? Set liveSyncMatchers on
+ * the config — don't hardcode the id here.
+ */
+function supportsManualSync(config: TournamentConfig): boolean {
+  if (config.sport === 'golf') {
+    return !!(config.liveSyncMatchers && config.liveSyncMatchers.length > 0);
+  }
+  return config.id === 'march_madness_2026';
+}
+
 export function TournamentDashboard({
   sessionId,
   soldTeams,
@@ -258,13 +272,18 @@ export function TournamentDashboard({
           })}
         </div>
 
-        {/* Auto-sync button — available for supported tournaments */}
-        {(config.id === 'march_madness_2026' || config.id === 'masters_2026') && (
+        {/* Auto-sync button — any tournament whose sync route can match upstream
+            feeds. Golf opts in via liveSyncMatchers (PGA, Masters, US Open,
+            Open Championship, TOUR Championship...). Basketball still routes
+            through the ESPN-specific endpoint with its own hardcoded matcher
+            inside the route. Do NOT add a new id here — extend liveSyncMatchers
+            on the tournament config instead (see CLAUDE.md anti-pattern). */}
+        {supportsManualSync(config) && (
           <button
             onClick={handleEspnSync}
             disabled={syncing}
             className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
-            title={`Sync ${config.sport === 'golf' ? 'leaderboard' : 'game results'} from ESPN`}
+            title={`Sync ${config.sport === 'golf' ? 'leaderboard' : 'game results'} from ${config.sport === 'golf' ? 'DataGolf' : 'ESPN'}`}
           >
             <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync Scores'}</span>
