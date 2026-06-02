@@ -126,11 +126,60 @@ export const GOLF_PROPS: PropDefinition[] = [
 ];
 
 /**
+ * Standard props for World Cup / soccer Calcuttas.
+ * Golden Boot + Golden Ball are the iconic individual awards (and back the
+ * "With Individual Awards" preset). The two group-stage goal-differential props
+ * reward the most dominant group team and the worst team (a wooden spoon that
+ * makes weak nations worth bidding on). All are manually graded for now;
+ * the differential props become auto-calculable once group results land.
+ */
+export const WORLD_CUP_PROPS: PropDefinition[] = [
+  {
+    key: 'goldenBoot',
+    label: 'Golden Boot (Top Scorer)',
+    description: 'Player with the most goals across the tournament',
+    defaultPercentage: 10,
+    autoCalculated: false,
+  },
+  {
+    key: 'goldenBall',
+    label: 'Golden Ball (Best Player)',
+    description: 'Best player of the tournament',
+    defaultPercentage: 10,
+    autoCalculated: false,
+  },
+  {
+    key: 'topScoringTeam',
+    label: 'Top Scoring Team',
+    description: 'Nation that scores the most goals across the tournament',
+    defaultPercentage: 5,
+    autoCalculated: false,
+  },
+  {
+    key: 'bestGroupDiff',
+    label: 'Best Group-Stage Differential',
+    description: 'Nation with the best goal differential after the group stage',
+    defaultPercentage: 5,
+    autoCalculated: false,
+  },
+  {
+    key: 'worstGroupDiff',
+    label: 'Worst Group-Stage Differential (Wooden Spoon)',
+    description: 'Nation with the worst goal differential after the group stage — rewards owning a weak team',
+    defaultPercentage: 5,
+    autoCalculated: false,
+  },
+];
+
+/**
  * Get standard prop definitions for a tournament.
  */
 export function getStandardProps(tournamentId: string): PropDefinition[] {
   if (tournamentId.startsWith('march_madness')) {
     return MARCH_MADNESS_PROPS;
+  }
+  if (tournamentId.startsWith('world_cup')) {
+    return WORLD_CUP_PROPS;
   }
   if (tournamentId.startsWith('masters') || tournamentId.includes('golf') || tournamentId.includes('open') || tournamentId.includes('pga')) {
     return GOLF_PROPS;

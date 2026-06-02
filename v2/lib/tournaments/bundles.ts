@@ -50,9 +50,34 @@ const GOLF_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: st
   },
 };
 
+/** Soccer-specific bundle presets — groups the weakest teams within each group. */
+const SOCCER_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: string }> = {
+  none: {
+    label: 'No Bundling',
+    description: 'Every nation auctioned individually (48 items)',
+  },
+  light: {
+    label: 'Light Bundling',
+    description: 'Bottom 2 of each group bundled (~36 items)',
+  },
+  standard: {
+    label: 'Standard Bundling',
+    description: 'Bottom 3 of each group bundled — only group favorites solo (~24 items)',
+  },
+  heavy: {
+    label: 'Heavy Bundling',
+    description: 'Each group sold as one bundle (12 items)',
+  },
+  custom: {
+    label: 'Custom',
+    description: 'Define your own nation groupings',
+  },
+};
+
 /** Get bundle preset metadata based on sport type */
 export function getBundlePresets(sport?: string): Record<BundlePreset, { label: string; description: string }> {
   if (sport === 'golf') return GOLF_BUNDLE_PRESETS;
+  if (sport === 'soccer') return SOCCER_BUNDLE_PRESETS;
   return BRACKET_BUNDLE_PRESETS;
 }
 
@@ -214,6 +239,36 @@ function bundleGolf(
     }));
 }
 
+// ─── Soccer Bundling ────────────────────────────────────────────────
+
+/**
+ * Bundle the weakest teams within each group. `bundleFromSeed` is the within-group
+ * seed (1 = group favorite … 4 = weakest) at/above which teams get bundled:
+ *   - 3 → bottom 2 of each group (light)
+ *   - 2 → bottom 3, leaving only the group favorite solo (standard)
+ *   - 1 → the whole group as one item (heavy)
+ * Concentrates longshot value into a biddable item and keeps groups intact.
+ */
+function bundleSoccer(
+  teams: BaseTeam[],
+  config: TournamentConfig,
+  bundleFromSeed: number
+): TeamBundle[] {
+  const bundles: TeamBundle[] = [];
+  for (const group of config.groups) {
+    const groupTeams = teams
+      .filter((t) => t.group === group.key && t.seed >= bundleFromSeed)
+      .sort((a, b) => a.seed - b.seed);
+    if (groupTeams.length < 2) continue; // a "bundle" needs at least two teams
+    bundles.push({
+      id: `soccer-group-${group.key}`,
+      name: `Group ${group.key} — ${groupTeams.map((t) => t.name).join(' / ')}`,
+      teamIds: groupTeams.map((t) => t.id),
+    });
+  }
+  return bundles;
+}
+
 // ─── Main Generator ─────────────────────────────────────────────────
 
 /**
@@ -244,6 +299,22 @@ export function generateBundles(
           return bundleGolf(teams, customConfig.cutoff, customConfig.groupSize);
         }
         return [];
+    }
+  }
+
+  // Soccer-specific bundling (World Cup): bundle the weakest teams per group.
+  if (config.sport === 'soccer') {
+    switch (preset) {
+      case 'none':
+        return [];
+      case 'light':
+        return bundleSoccer(teams, config, 3); // bottom 2 per group
+      case 'standard':
+        return bundleSoccer(teams, config, 2); // bottom 3 per group
+      case 'heavy':
+        return bundleSoccer(teams, config, 1); // whole group
+      case 'custom':
+        return []; // manual builder handles custom bundles
     }
   }
 
@@ -310,6 +381,10 @@ export function deriveBundleLabel(
   if (bundle.id.startsWith('golf-group-')) {
     const num = bundle.id.slice('golf-group-'.length);
     return `Group ${num} (${members.map((t) => t.name.split(' ').pop()).join(' / ')})`;
+  }
+
+  if (bundle.id.startsWith('soccer-group-')) {
+    return `Group ${members[0].group} — ${members.map((t) => t.name).join(' / ')}`;
   }
 
   if (bundle.id.startsWith('playin-')) {

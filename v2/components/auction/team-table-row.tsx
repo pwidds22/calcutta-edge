@@ -59,6 +59,7 @@ export const TeamTableRow = memo(function TeamTableRow({
 }: TeamTableRowProps) {
   const { config } = useAuction();
   const rounds = config?.rounds ?? [];
+  const showSeed = config?.showSeedColumn !== false;
 
   const profits = config
     ? calculateRoundProfits(team.purchasePrice, payoutRules, potSize, config)
@@ -95,7 +96,7 @@ export const TeamTableRow = memo(function TeamTableRow({
   if (locked) {
     return (
       <TableRow className="opacity-60">
-        <TableCell className="px-2 py-1.5 text-xs">{team.seed}</TableCell>
+        {showSeed && <TableCell className="px-2 py-1.5 text-xs">{team.seed}</TableCell>}
         <TableCell className="px-2 py-1.5 text-xs font-medium whitespace-nowrap">
           {team.name}
         </TableCell>
@@ -125,7 +126,7 @@ export const TeamTableRow = memo(function TeamTableRow({
 
   return (
     <TableRow className={`${team.isMyTeam ? 'bg-emerald-500/10' : ''} ${indented ? 'bg-muted/10' : ''}`}>
-      <TableCell className="px-2 py-1.5 text-xs">{team.seed}</TableCell>
+      {showSeed && <TableCell className="px-2 py-1.5 text-xs">{team.seed}</TableCell>}
       <TableCell className={`px-2 py-1.5 text-xs font-medium whitespace-nowrap ${indented ? 'pl-6' : ''}`}>
         {team.name}
       </TableCell>
@@ -192,6 +193,7 @@ export const BundleRow = memo(function BundleRow({
 }: BundleRowProps) {
   const { config } = useAuction();
   const rounds = config?.rounds ?? [];
+  const showSeed = config?.showSeedColumn !== false;
   const [expanded, setExpanded] = useState(false);
 
   // Combined fair value = sum of member fair values
@@ -265,7 +267,7 @@ export const BundleRow = memo(function BundleRow({
     return (
       <>
         <TableRow className="opacity-60 bg-muted/30">
-          <TableCell className="px-2 py-1.5 text-xs">{seedDisplay}</TableCell>
+          {showSeed && <TableCell className="px-2 py-1.5 text-xs">{seedDisplay}</TableCell>}
           <TableCell className="px-2 py-1.5 text-xs font-medium whitespace-nowrap">
             <span className="inline-flex items-center gap-1">
               <ChevronRight className="h-3 w-3 text-muted-foreground" />
@@ -300,7 +302,7 @@ export const BundleRow = memo(function BundleRow({
         className={`cursor-pointer hover:bg-muted/40 ${allMine ? 'bg-emerald-500/10' : 'bg-muted/20'}`}
         onClick={() => setExpanded(!expanded)}
       >
-        <TableCell className="px-2 py-1.5 text-xs">{seedDisplay}</TableCell>
+        {showSeed && <TableCell className="px-2 py-1.5 text-xs">{seedDisplay}</TableCell>}
         <TableCell className="px-2 py-1.5 text-xs font-medium whitespace-nowrap">
           <span className="inline-flex items-center gap-1">
             {expanded ? (

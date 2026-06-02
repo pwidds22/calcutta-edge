@@ -41,11 +41,17 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
     champion: 35.00,
     goldenBoot: 0.0,
     goldenBall: 0.0,
+    topScoringTeam: 0.0,
+    bestGroupDiff: 0.0,
+    worstGroupDiff: 0.0,
   },
   defaultPotSize: 10000,
   propBets: [
     { key: 'goldenBoot', label: 'Golden Boot (Top Scorer)' },
     { key: 'goldenBall', label: 'Golden Ball (Best Player)' },
+    { key: 'topScoringTeam', label: 'Top Scoring Team' },
+    { key: 'bestGroupDiff', label: 'Best Group-Stage Differential' },
+    { key: 'worstGroupDiff', label: 'Worst Group-Stage Differential (Wooden Spoon)' },
   ],
   badge: 'World Cup 2026',
   teamLabel: 'Nation',
@@ -58,6 +64,13 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
   stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_WORLDCUP',
   // Live results are ESPN-sourced (Phase 2); liveSyncMatchers intentionally unset so
   // the golf-sync cron (DataGolf event-name matching) skips this soccer tournament.
+  // Soccer seed is only within-group position (1–4), not a global strength rank — so
+  // sort the strategy table by value, hide the Seed column, and gate the free preview
+  // on top-N-by-value instead of the seed cutoff (which would leak all 24 seeds 1–2).
+  defaultSort: 'valuePercentage',
+  defaultSortDirection: 'desc',
+  showSeedColumn: false,
+  previewTeamCount: 8,
 };
 
 /**

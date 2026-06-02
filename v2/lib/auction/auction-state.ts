@@ -118,6 +118,9 @@ export function auctionReducer(
         config: action.config,
         bundles,
         leagueName: action.leagueName ?? state.leagueName,
+        // Per-tournament default sort (e.g. soccer sorts by value, not group-position seed)
+        sortOption: action.config.defaultSort ?? state.sortOption,
+        sortDirection: action.config.defaultSortDirection ?? state.sortDirection,
         isLoading: false,
         isDirty: false,
       };

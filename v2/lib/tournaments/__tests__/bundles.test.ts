@@ -11,6 +11,10 @@ import {
   MARCH_MADNESS_2026_TEAMS,
   MARCH_MADNESS_2026_CONFIG,
 } from '../configs/march-madness-2026';
+import {
+  WORLD_CUP_2026_TEAMS,
+  WORLD_CUP_2026_CONFIG,
+} from '../configs/world-cup-2026';
 
 const teams = MARCH_MADNESS_2026_TEAMS;
 const config = MARCH_MADNESS_2026_CONFIG;
@@ -282,5 +286,86 @@ describe('deriveBundleLabel', () => {
     expect(deriveBundleLabel(region, teamMap)).toBe('East 13-16 seeds');
     expect(deriveBundleLabel(seedline, teamMap)).toBe('All 13-seeds');
     expect(deriveBundleLabel(custom, teamMap)).toBe('My favorite longshots');
+  });
+});
+
+// ─── Soccer (World Cup) bundling: bottom-of-group tiers ──────────────
+describe('generateBundles — soccer (World Cup)', () => {
+  const wc = WORLD_CUP_2026_CONFIG;
+  const wcTeams = WORLD_CUP_2026_TEAMS;
+  const NUM_GROUPS = wc.groups.length; // 12
+
+  it('none preset creates no bundles (48 individual nations)', () => {
+    const bundles = generateBundles('none', wcTeams, wc);
+    expect(bundles).toHaveLength(0);
+    expect(countAuctionItems(wcTeams, bundles)).toBe(48);
+  });
+
+  it('light bundles the bottom 2 of each group (→ 36 items)', () => {
+    const bundles = generateBundles('light', wcTeams, wc);
+    expect(bundles).toHaveLength(NUM_GROUPS);
+    for (const b of bundles) {
+      expect(b.teamIds).toHaveLength(2);
+      const members = b.teamIds.map((id) => wcTeams.find((t) => t.id === id)!);
+      expect(members.every((m) => m.seed >= 3)).toBe(true); // two weakest per group
+      expect(new Set(members.map((m) => m.group)).size).toBe(1); // same group
+    }
+    expect(countAuctionItems(wcTeams, bundles)).toBe(36);
+  });
+
+  it('standard bundles the bottom 3 of each group, leaving only the favorite solo (→ 24 items)', () => {
+    const bundles = generateBundles('standard', wcTeams, wc);
+    expect(bundles).toHaveLength(NUM_GROUPS);
+    for (const b of bundles) {
+      expect(b.teamIds).toHaveLength(3);
+      const members = b.teamIds.map((id) => wcTeams.find((t) => t.id === id)!);
+      expect(members.every((m) => m.seed >= 2)).toBe(true);
+    }
+    expect(countAuctionItems(wcTeams, bundles)).toBe(24);
+  });
+
+  it('heavy bundles whole groups (→ 12 items)', () => {
+    const bundles = generateBundles('heavy', wcTeams, wc);
+    expect(bundles).toHaveLength(NUM_GROUPS);
+    for (const b of bundles) expect(b.teamIds).toHaveLength(4);
+    expect(getUnbundledTeams(wcTeams, bundles)).toHaveLength(0);
+    expect(countAuctionItems(wcTeams, bundles)).toBe(12);
+  });
+
+  it('custom preset auto-generates nothing (manual builder handles it)', () => {
+    expect(generateBundles('custom', wcTeams, wc)).toHaveLength(0);
+  });
+
+  it('accounts for every nation in each preset, and more bundling = fewer items', () => {
+    const counts: number[] = [];
+    for (const preset of ['none', 'light', 'standard', 'heavy'] as const) {
+      const bundles = generateBundles(preset, wcTeams, wc);
+      const unbundled = getUnbundledTeams(wcTeams, bundles);
+      const bundledCount = bundles.reduce((s, b) => s + b.teamIds.length, 0);
+      expect(unbundled.length + bundledCount).toBe(48);
+      counts.push(countAuctionItems(wcTeams, bundles));
+    }
+    // none > light > standard > heavy
+    expect(counts[0]).toBeGreaterThan(counts[1]);
+    expect(counts[1]).toBeGreaterThan(counts[2]);
+    expect(counts[2]).toBeGreaterThan(counts[3]);
+  });
+});
+
+describe('deriveBundleLabel — soccer-group', () => {
+  function makeTeam(id: number, name: string, group: string, seed: number): BaseTeam {
+    return { id, name, seed, group, americanOdds: {} };
+  }
+  it('rebuilds soccer-group labels from current member names', () => {
+    const bundle: TeamBundle = {
+      id: 'soccer-group-A',
+      name: 'Group A — stale / names',
+      teamIds: [3, 4],
+    };
+    const teamMap = new Map<number, BaseTeam>([
+      [3, makeTeam(3, 'Czechia', 'A', 3)],
+      [4, makeTeam(4, 'South Africa', 'A', 4)],
+    ]);
+    expect(deriveBundleLabel(bundle, teamMap)).toBe('Group A — Czechia / South Africa');
   });
 });

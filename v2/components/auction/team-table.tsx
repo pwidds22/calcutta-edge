@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuction } from '@/lib/auction/auction-context';
 import { STRATEGY_PRICE_CENTS } from '@/lib/pricing';
@@ -36,12 +36,38 @@ export function TeamTable() {
     ? ['All', ...config.groups.map((g) => g.key)]
     : ['All'];
 
+  // Soccer hides the Seed column (seed is just group position, not a strength rank).
+  const showSeed = config?.showSeedColumn !== false;
+
   const sortOptions: { value: SortOption; label: string }[] = [
-    { value: 'seed', label: 'Seed' },
+    ...(showSeed ? [{ value: 'seed' as SortOption, label: 'Seed' }] : []),
     { value: 'name', label: 'Name' },
     { value: 'valuePercentage', label: 'Value' },
     { value: 'group', label: config?.groupLabel ?? 'Group' },
   ];
+
+  // Free-preview unlock: top N by value when the tournament opts in (e.g. soccer),
+  // otherwise the legacy seed-based cutoff. Without this, soccer (seeds 1–2 = 24
+  // nations) would give away half the field for free.
+  const previewUnlockedIds = useMemo(() => {
+    const n = config?.previewTeamCount;
+    if (!n) return null;
+    return new Set(
+      [...state.teams]
+        .sort((a, b) => (b.valuePercentage || 0) - (a.valuePercentage || 0))
+        .slice(0, n)
+        .map((t) => t.id)
+    );
+  }, [state.teams, config?.previewTeamCount]);
+
+  const isTeamLocked = useCallback(
+    (team: { id: number; seed: number }) => {
+      if (hasPaid) return false;
+      if (previewUnlockedIds) return !previewUnlockedIds.has(team.id);
+      return team.seed > PREVIEW_SEED_CUTOFF;
+    },
+    [hasPaid, previewUnlockedIds]
+  );
 
   const handlePriceChange = useCallback(
     (teamId: number, price: number) => {
@@ -190,7 +216,7 @@ export function TeamTable() {
           <TableHeader>
             {/* Group headers */}
             <TableRow className="bg-muted/50">
-              <TableHead colSpan={3} className="text-center text-xs font-semibold">
+              <TableHead colSpan={showSeed ? 3 : 2} className="text-center text-xs font-semibold">
                 {config?.teamLabel ?? 'Team'} Info
               </TableHead>
               <TableHead colSpan={rounds.length} className="text-center text-xs font-semibold">
@@ -205,7 +231,7 @@ export function TeamTable() {
             </TableRow>
             {/* Column headers */}
             <TableRow>
-              <TableHead className="px-2 text-xs w-12">Seed</TableHead>
+              {showSeed && <TableHead className="px-2 text-xs w-12">Seed</TableHead>}
               <TableHead className="px-2 text-xs">{config?.teamLabel ?? 'Team'}</TableHead>
               <TableHead className="px-2 text-xs w-16">{config?.groupLabel ?? 'Group'}</TableHead>
               {rounds.map((round) => (
@@ -242,7 +268,7 @@ export function TeamTable() {
                           potSize={effectivePotSize}
                           onPriceChange={handlePriceChange}
                           onMyTeamToggle={handleMyTeamToggle}
-                          locked={!hasPaid && team.seed > PREVIEW_SEED_CUTOFF}
+                          locked={isTeamLocked(team)}
                         />
                       ))}
                       {visibleBundles.map((bundle) => {
@@ -258,7 +284,7 @@ export function TeamTable() {
                             potSize={effectivePotSize}
                             onPriceChange={handlePriceChange}
                             onMyTeamToggle={handleMyTeamToggle}
-                            locked={!hasPaid && members.every((t) => t.seed > PREVIEW_SEED_CUTOFF)}
+                            locked={members.every((t) => isTeamLocked(t))}
                           />
                         );
                       })}

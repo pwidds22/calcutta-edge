@@ -91,6 +91,20 @@ export interface TournamentConfig {
   liveSyncMatchers?: string[];
   /** Env var key for this tournament's Stripe Payment Link URL */
   stripePaymentLinkEnvKey?: string;
+  /** Default sort for the strategy table. Defaults to 'seed'. Set to 'valuePercentage'
+   *  for tournaments where `seed` is not a global strength rank (e.g. soccer, where
+   *  seed is only within-group position 1–4). */
+  defaultSort?: SortOption;
+  /** Direction for the default sort. Defaults to 'asc' (use 'desc' for value, so the
+   *  most valuable teams sort first). */
+  defaultSortDirection?: SortDirection;
+  /** Show the Seed column in the strategy table. Defaults to true. Set false for
+   *  sports where seed is not a meaningful global rank (soccer group position). */
+  showSeedColumn?: boolean;
+  /** Free preview unlocks the top N teams by value instead of the seed-based cutoff.
+   *  Required for sports where `seed` isn't a strength rank, otherwise the seed
+   *  cutoff leaks far too many teams (e.g. soccer: all seeds 1–2 = 24 nations). */
+  previewTeamCount?: number;
 }
 
 // ─── Team Types ─────────────────────────────────────────────────────

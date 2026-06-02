@@ -480,7 +480,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                                 : 'border-white/[0.06] bg-white/[0.02] text-white/50 hover:border-white/10 hover:text-white/70'
                           }`}
                         >
-                          <span className="font-medium">{team.seed}</span>{' '}
+                          <span className="font-medium">{selectedTournament?.showSeedColumn === false ? team.group : team.seed}</span>{' '}
                           {team.name}
                         </button>
                       );
