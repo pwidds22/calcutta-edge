@@ -147,17 +147,37 @@ function devigGlobal(teams: Team[], config: TournamentConfig): void {
 }
 
 /**
- * Group-based devigging: normalize within groups per round.
- * Useful for World Cup group stage or similar structures.
+ * Scope-aware devigging for group-stage-then-knockout tournaments (e.g. World Cup).
+ *
+ * Each round declares a `devigScope`:
+ *   - 'group':  normalize WITHIN each group to sum→1 (e.g. "win your group" — exactly
+ *               one winner per group). Group-scoped rounds are devigged independently
+ *               and are NOT part of the knockout cap chain, because winning a group is
+ *               not a prerequisite for advancing (a runner-up can still progress).
+ *   - 'global' (default): normalize across the whole field to the round's
+ *               `teamsAdvancing`, forming a nested ladder where each global round is
+ *               capped at the previous global round (P(reach QF) ≤ P(reach R16) ≤ …).
+ *
+ * This is the World Cup's strategy: `winGroup` is group-scoped; the reach-round
+ * ladder (r16 → champion) is global-scoped.
  */
 function devigByGroup(teams: Team[], config: TournamentConfig): void {
-  for (let i = 0; i < config.rounds.length; i++) {
-    const round = config.rounds[i];
-    const capRound = i > 0 ? config.rounds[i - 1].key : undefined;
+  // Group-scoped rounds: one normalization per group, target sum = 1, no ladder cap.
+  for (const round of config.rounds) {
+    if (round.devigScope !== 'group') continue;
     for (const group of config.groups) {
       const groupTeams = teams.filter((t) => t.group === group.key);
-      devigGroup(groupTeams, round.key, capRound);
+      devigGroup(groupTeams, round.key, undefined, 1);
     }
+  }
+
+  // Global-scoped rounds: nested knockout ladder across the whole field. Each round
+  // normalizes to its teamsAdvancing and caps at the previous *global* round.
+  const ladder = config.rounds.filter((r) => (r.devigScope ?? 'global') === 'global');
+  for (let i = 0; i < ladder.length; i++) {
+    const round = ladder[i];
+    const capRound = i > 0 ? ladder[i - 1].key : undefined;
+    devigGroup(teams, round.key, capRound, round.teamsAdvancing);
   }
 }
 

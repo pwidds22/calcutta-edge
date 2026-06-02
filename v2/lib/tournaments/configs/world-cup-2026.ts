@@ -4,13 +4,16 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
   id: 'world_cup_2026',
   name: 'FIFA World Cup 2026',
   sport: 'soccer',
+  // Round model is Kalshi-aligned: winGroup (per-group market) + the reach-round
+  // ladder (global markets). teamsAdvancing drives the payout-preset sum math
+  // (winGroup = 12 group winners); the per-group devig target is always 1.
   rounds: [
-    { key: 'groupStage', label: 'Group', teamsAdvancing: 32, payoutLabel: 'Advance from Group', gameLabel: 'Groups' },
-    { key: 'r32', label: 'R32', teamsAdvancing: 16, payoutLabel: 'Win Round of 32', gameLabel: 'R32' },
-    { key: 'r16', label: 'R16', teamsAdvancing: 8, payoutLabel: 'Win Round of 16', gameLabel: 'R16' },
-    { key: 'qf', label: 'QF', teamsAdvancing: 4, payoutLabel: 'Win Quarterfinal', gameLabel: 'QF' },
-    { key: 'sf', label: 'SF', teamsAdvancing: 2, payoutLabel: 'Win Semifinal', gameLabel: 'SF' },
-    { key: 'champion', label: 'Final', teamsAdvancing: 1, payoutLabel: 'Win Final', gameLabel: 'Final' },
+    { key: 'winGroup', label: 'Win Group', teamsAdvancing: 12, payoutLabel: 'Win Group', gameLabel: 'Group', devigScope: 'group' },
+    { key: 'r16', label: 'R16', teamsAdvancing: 16, payoutLabel: 'Reach Round of 16', gameLabel: 'R16', devigScope: 'global' },
+    { key: 'qf', label: 'QF', teamsAdvancing: 8, payoutLabel: 'Reach Quarterfinals', gameLabel: 'QF', devigScope: 'global' },
+    { key: 'sf', label: 'SF', teamsAdvancing: 4, payoutLabel: 'Reach Semifinals', gameLabel: 'SF', devigScope: 'global' },
+    { key: 'final', label: 'Final', teamsAdvancing: 2, payoutLabel: 'Reach Final', gameLabel: 'Final', devigScope: 'global' },
+    { key: 'champion', label: 'Champion', teamsAdvancing: 1, payoutLabel: 'Champion', gameLabel: 'Champion', devigScope: 'global' },
   ],
   groups: [
     { key: 'A', label: 'Group A' },
@@ -27,13 +30,15 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
     { key: 'L', label: 'Group L' },
   ],
   devigStrategy: 'group',
+  // Per-position % — Σ(% × teamsAdvancing) = 100%:
+  // winGroup 0.75×12=9 · r16 1.0×16=16 · qf 2.0×8=16 · sf 3.5×4=14 · final 5.0×2=10 · champion 35×1=35
   defaultPayoutRules: {
-    groupStage: 0.125,
-    r32: 0.375,
-    r16: 1.25,
-    qf: 4.00,
-    sf: 7.00,
-    champion: 50.00,
+    winGroup: 0.75,
+    r16: 1.00,
+    qf: 2.00,
+    sf: 3.50,
+    final: 5.00,
+    champion: 35.00,
     goldenBoot: 0.0,
     goldenBall: 0.0,
   },
@@ -48,96 +53,98 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
   startDate: '2026-06-11',
   endDate: '2026-07-19',
   hostingOpensAt: '2026-05-28',
-  isActive: false,
+  isActive: true, // legacy alias — phase derives to 'hostable' (now) → 'live' on 2026-06-11
+  strategyPrice: 1499,
+  stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_WORLDCUP',
+  // Live results are ESPN-sourced (Phase 2); liveSyncMatchers intentionally unset so
+  // the golf-sync cron (DataGolf event-name matching) skips this soccer tournament.
 };
 
 /**
- * FIFA World Cup 2026 — 48 teams across 12 groups.
+ * FIFA World Cup 2026 — 48 nations across 12 groups.
  * First expanded World Cup (USA/Mexico/Canada hosts).
- * Draw held December 5, 2025 at Kennedy Center, Washington DC.
  *
- * Winner odds sourced from DraftKings (Feb 2026).
- * Round-by-round odds derived from winner odds using probability scaling.
+ * Probabilities are REAL Kalshi prediction-market prices (mid of yes_bid/yes_ask,
+ * last-trade fallback) — fed directly as fair-ish probabilities and normalized by
+ * the scope-aware 'group' devig (winGroup per-group → 1; reach-round ladder global).
  *
- * NOTE: 6 spots are pending playoff results (March 2026):
- *   - Group A pos 4: UEFA Playoff D (Denmark*, Czechia, Rep. of Ireland, North Macedonia)
- *   - Group B pos 4: UEFA Playoff A (Italy*, Wales, Bosnia-Herzegovina, N. Ireland)
- *   - Group D pos 4: UEFA Playoff C (Turkey*, Slovakia, Kosovo, Romania)
- *   - Group F pos 4: UEFA Playoff B (Ukraine*, Poland, Albania, Sweden)
- *   - Group I pos 4: Inter-conf Playoff 2 (Bolivia*, Iraq, Suriname)
- *   - Group K pos 4: Inter-conf Playoff 1 (DR Congo*, Jamaica, New Caledonia)
- *   * = most likely qualifier (used as placeholder). Update after playoffs conclude.
+  * Generated: 2026-06-02 from Kalshi (KXWCGROUPWIN / KXWCROUND / KXMENWORLDCUP).
+ * Re-run: KALSHI_ENV_FILE=/path/.env.local node scripts/fetch-worldcup-odds.mjs
+ *
+ * The active group-winner markets are the field of record — re-running self-corrects
+ * the roster. `id` is stable across re-runs (matched by name); `seed` reflects current
+ * within-group win odds. Don't reorder entries by hand.
  */
 export const WORLD_CUP_2026_TEAMS: BaseTeam[] = [
-  // ─── Group A: Mexico, South Korea, South Africa, [Playoff D → Denmark*] ───
-  { id: 1, name: 'Mexico', seed: 1, group: 'A', americanOdds: { groupStage: -300, r32: -100, r16: +250, qf: +700, sf: +2000, champion: +8000 } },
-  { id: 2, name: 'South Korea', seed: 2, group: 'A', americanOdds: { groupStage: +100, r32: +350, r16: +900, qf: +3000, sf: +7000, champion: +15000 } },
-  { id: 3, name: 'South Africa', seed: 3, group: 'A', americanOdds: { groupStage: +350, r32: +1000, r16: +3500, qf: +10000, sf: +25000, champion: +100000 } },
-  { id: 4, name: 'Denmark', seed: 4, group: 'A', americanOdds: { groupStage: +100, r32: +400, r16: +1200, qf: +3500, sf: +8000, champion: +20000 } },
+  // ─── Group A ───
+  { id: 1, name: 'Mexico', seed: 1, group: 'A', americanOdds: {}, probabilities: { winGroup: 0.525, r16: 0.515, qf: 0.23, sf: 0.115, final: 0.05, champion: 0.0115 } },
+  { id: 2, name: 'South Korea', seed: 2, group: 'A', americanOdds: {}, probabilities: { winGroup: 0.22, r16: 0.3, qf: 0.085, sf: 0.025, final: 0.01, champion: 0.0025 } },
+  { id: 4, name: 'Czechia', seed: 3, group: 'A', americanOdds: {}, probabilities: { winGroup: 0.215, r16: 0.31, qf: 0.08, sf: 0.02, final: 0.02, champion: 0.01 } },
+  { id: 3, name: 'South Africa', seed: 4, group: 'A', americanOdds: {}, probabilities: { winGroup: 0.055, r16: 0.105, qf: 0.025, sf: 0.02, final: 0.01, champion: 0.001 } },
 
-  // ─── Group B: Canada, Switzerland, Qatar, [Playoff A → Italy*] ───
-  { id: 5, name: 'Canada', seed: 1, group: 'B', americanOdds: { groupStage: -120, r32: +200, r16: +700, qf: +2500, sf: +6000, champion: +25000 } },
-  { id: 6, name: 'Switzerland', seed: 2, group: 'B', americanOdds: { groupStage: -110, r32: +250, r16: +800, qf: +2500, sf: +5000, champion: +10000 } },
-  { id: 7, name: 'Qatar', seed: 3, group: 'B', americanOdds: { groupStage: +400, r32: +1200, r16: +4000, qf: +12000, sf: +30000, champion: +100000 } },
-  { id: 8, name: 'Italy', seed: 4, group: 'B', americanOdds: { groupStage: -250, r32: +100, r16: +350, qf: +800, sf: +1800, champion: +3000 } },
+  // ─── Group B ───
+  { id: 6, name: 'Switzerland', seed: 1, group: 'B', americanOdds: {}, probabilities: { winGroup: 0.535, r16: 0.535, qf: 0.21, sf: 0.085, final: 0.04, champion: 0.0105 } },
+  { id: 5, name: 'Canada', seed: 2, group: 'B', americanOdds: {}, probabilities: { winGroup: 0.305, r16: 0.375, qf: 0.14, sf: 0.04, final: 0.015, champion: 0.0025 } },
+  { id: 8, name: 'Bosnia and Herzegovina', seed: 3, group: 'B', americanOdds: {}, probabilities: { winGroup: 0.125, r16: 0.21, qf: 0.065, sf: 0.02, final: 0.01, champion: 0.01 } },
+  { id: 7, name: 'Qatar', seed: 4, group: 'B', americanOdds: {}, probabilities: { winGroup: 0.025, r16: 0.055, qf: 0.02, sf: 0.02, final: 0.02, champion: 0.001 } },
 
-  // ─── Group C: Brazil, Morocco, Scotland, Haiti ───
-  { id: 9, name: 'Brazil', seed: 1, group: 'C', americanOdds: { groupStage: -800, r32: -300, r16: -100, qf: +150, sf: +350, champion: +800 } },
-  { id: 10, name: 'Morocco', seed: 2, group: 'C', americanOdds: { groupStage: -120, r32: +250, r16: +800, qf: +2500, sf: +5000, champion: +10000 } },
-  { id: 11, name: 'Scotland', seed: 3, group: 'C', americanOdds: { groupStage: +180, r32: +600, r16: +1800, qf: +5000, sf: +12000, champion: +25000 } },
-  { id: 12, name: 'Haiti', seed: 4, group: 'C', americanOdds: { groupStage: +500, r32: +1500, r16: +5000, qf: +15000, sf: +40000, champion: +200000 } },
+  // ─── Group C ───
+  { id: 9, name: 'Brazil', seed: 1, group: 'C', americanOdds: {}, probabilities: { winGroup: 0.725, r16: 0.69, qf: 0.435, sf: 0.305, final: 0.185, champion: 0.0855 } },
+  { id: 10, name: 'Morocco', seed: 2, group: 'C', americanOdds: {}, probabilities: { winGroup: 0.195, r16: 0.43, qf: 0.22, sf: 0.09, final: 0.04, champion: 0.0145 } },
+  { id: 11, name: 'Scotland', seed: 3, group: 'C', americanOdds: {}, probabilities: { winGroup: 0.065, r16: 0.24, qf: 0.085, sf: 0.03, final: 0.03, champion: 0.0025 } },
+  { id: 12, name: 'Haiti', seed: 4, group: 'C', americanOdds: {}, probabilities: { winGroup: 0.01, r16: 0.04, qf: 0.04, sf: 0.04, final: 0.04, champion: 0.002 } },
 
-  // ─── Group D: USA, Paraguay, Australia, [Playoff C → Turkey*] ───
-  { id: 13, name: 'United States', seed: 1, group: 'D', americanOdds: { groupStage: -500, r32: -180, r16: +100, qf: +300, sf: +800, champion: +8000 } },
-  { id: 14, name: 'Paraguay', seed: 2, group: 'D', americanOdds: { groupStage: +100, r32: +400, r16: +1200, qf: +3500, sf: +8000, champion: +15000 } },
-  { id: 15, name: 'Australia', seed: 3, group: 'D', americanOdds: { groupStage: +250, r32: +700, r16: +2500, qf: +8000, sf: +20000, champion: +50000 } },
-  { id: 16, name: 'Turkey', seed: 4, group: 'D', americanOdds: { groupStage: +150, r32: +500, r16: +1500, qf: +4500, sf: +10000, champion: +25000 } },
+  // ─── Group D ───
+  { id: 13, name: 'United States', seed: 1, group: 'D', americanOdds: {}, probabilities: { winGroup: 0.385, r16: 0.445, qf: 0.22, sf: 0.085, final: 0.04, champion: 0.0135 } },
+  { id: 16, name: 'Turkey', seed: 2, group: 'D', americanOdds: {}, probabilities: { winGroup: 0.335, r16: 0.46, qf: 0.2, sf: 0.08, final: 0.03, champion: 0.007 } },
+  { id: 14, name: 'Paraguay', seed: 3, group: 'D', americanOdds: {}, probabilities: { winGroup: 0.185, r16: 0.285, qf: 0.085, sf: 0.03, final: 0.015, champion: 0.0025 } },
+  { id: 15, name: 'Australia', seed: 4, group: 'D', americanOdds: {}, probabilities: { winGroup: 0.095, r16: 0.17, qf: 0.05, sf: 0.02, final: 0.01, champion: 0.0015 } },
 
-  // ─── Group E: Germany, Ecuador, Ivory Coast, Curacao ───
-  { id: 17, name: 'Germany', seed: 1, group: 'E', americanOdds: { groupStage: -600, r32: -200, r16: +100, qf: +250, sf: +600, champion: +1200 } },
-  { id: 18, name: 'Ecuador', seed: 2, group: 'E', americanOdds: { groupStage: -110, r32: +250, r16: +800, qf: +2500, sf: +5000, champion: +10000 } },
-  { id: 19, name: 'Ivory Coast', seed: 3, group: 'E', americanOdds: { groupStage: +100, r32: +350, r16: +1200, qf: +3500, sf: +8000, champion: +20000 } },
-  { id: 20, name: 'Curacao', seed: 4, group: 'E', americanOdds: { groupStage: +500, r32: +1500, r16: +5000, qf: +15000, sf: +40000, champion: +200000 } },
+  // ─── Group E ───
+  { id: 17, name: 'Germany', seed: 1, group: 'E', americanOdds: {}, probabilities: { winGroup: 0.665, r16: 0.67, qf: 0.385, sf: 0.255, final: 0.135, champion: 0.0575 } },
+  { id: 18, name: 'Ecuador', seed: 2, group: 'E', americanOdds: {}, probabilities: { winGroup: 0.215, r16: 0.405, qf: 0.155, sf: 0.065, final: 0.03, champion: 0.0075 } },
+  { id: 19, name: 'Ivory Coast', seed: 3, group: 'E', americanOdds: {}, probabilities: { winGroup: 0.115, r16: 0.265, qf: 0.09, sf: 0.035, final: 0.015, champion: 0.0025 } },
+  { id: 20, name: 'Curacao', seed: 4, group: 'E', americanOdds: {}, probabilities: { winGroup: 0.01, r16: 0.015, qf: 0.015, sf: 0.015, final: 0.015, champion: 0.001 } },
 
-  // ─── Group F: Netherlands, Japan, Tunisia, [Playoff B → Ukraine*] ───
-  { id: 21, name: 'Netherlands', seed: 1, group: 'F', americanOdds: { groupStage: -500, r32: -150, r16: +120, qf: +400, sf: +1000, champion: +2000 } },
-  { id: 22, name: 'Japan', seed: 2, group: 'F', americanOdds: { groupStage: -120, r32: +250, r16: +800, qf: +2500, sf: +5000, champion: +10000 } },
-  { id: 23, name: 'Tunisia', seed: 3, group: 'F', americanOdds: { groupStage: +250, r32: +700, r16: +2500, qf: +7000, sf: +18000, champion: +40000 } },
-  { id: 24, name: 'Ukraine', seed: 4, group: 'F', americanOdds: { groupStage: +120, r32: +400, r16: +1200, qf: +3500, sf: +8000, champion: +20000 } },
+  // ─── Group F ───
+  { id: 21, name: 'Netherlands', seed: 1, group: 'F', americanOdds: {}, probabilities: { winGroup: 0.535, r16: 0.565, qf: 0.375, sf: 0.205, final: 0.115, champion: 0.0405 } },
+  { id: 22, name: 'Japan', seed: 2, group: 'F', americanOdds: {}, probabilities: { winGroup: 0.255, r16: 0.39, qf: 0.195, sf: 0.085, final: 0.035, champion: 0.0135 } },
+  { id: 24, name: 'Sweden', seed: 3, group: 'F', americanOdds: {}, probabilities: { winGroup: 0.155, r16: 0.265, qf: 0.115, sf: 0.035, final: 0.02, champion: 0.0055 } },
+  { id: 23, name: 'Tunisia', seed: 4, group: 'F', americanOdds: {}, probabilities: { winGroup: 0.055, r16: 0.105, qf: 0.035, sf: 0.035, final: 0.01, champion: 0.001 } },
 
-  // ─── Group G: Belgium, Iran, Egypt, New Zealand ───
-  { id: 25, name: 'Belgium', seed: 1, group: 'G', americanOdds: { groupStage: -400, r32: -130, r16: +200, qf: +600, sf: +1500, champion: +5000 } },
-  { id: 26, name: 'Iran', seed: 2, group: 'G', americanOdds: { groupStage: +200, r32: +600, r16: +2000, qf: +6000, sf: +15000, champion: +50000 } },
-  { id: 27, name: 'Egypt', seed: 3, group: 'G', americanOdds: { groupStage: +150, r32: +500, r16: +1500, qf: +4500, sf: +10000, champion: +25000 } },
-  { id: 28, name: 'New Zealand', seed: 4, group: 'G', americanOdds: { groupStage: +400, r32: +1200, r16: +4000, qf: +12000, sf: +30000, champion: +100000 } },
+  // ─── Group G ───
+  { id: 25, name: 'Belgium', seed: 1, group: 'G', americanOdds: {}, probabilities: { winGroup: 0.675, r16: 0.59, qf: 0.365, sf: 0.14, final: 0.07, champion: 0.0185 } },
+  { id: 27, name: 'Egypt', seed: 2, group: 'G', americanOdds: {}, probabilities: { winGroup: 0.165, r16: 0.315, qf: 0.08, sf: 0.025, final: 0.02, champion: 0.0025 } },
+  { id: 26, name: 'Iran', seed: 3, group: 'G', americanOdds: {}, probabilities: { winGroup: 0.12, r16: 0.215, qf: 0.06, sf: 0.02, final: 0.02, champion: 0.001 } },
+  { id: 28, name: 'New Zealand', seed: 4, group: 'G', americanOdds: {}, probabilities: { winGroup: 0.035, r16: 0.095, qf: 0.02, sf: 0.01, final: 0.01, champion: 0.001 } },
 
-  // ─── Group H: Spain, Uruguay, Saudi Arabia, Cape Verde ───
-  { id: 29, name: 'Spain', seed: 1, group: 'H', americanOdds: { groupStage: -900, r32: -350, r16: -150, qf: +100, sf: +220, champion: +450 } },
-  { id: 30, name: 'Uruguay', seed: 2, group: 'H', americanOdds: { groupStage: -200, r32: +100, r16: +400, qf: +1200, sf: +3000, champion: +5000 } },
-  { id: 31, name: 'Saudi Arabia', seed: 3, group: 'H', americanOdds: { groupStage: +350, r32: +1000, r16: +3500, qf: +10000, sf: +25000, champion: +100000 } },
-  { id: 32, name: 'Cape Verde', seed: 4, group: 'H', americanOdds: { groupStage: +500, r32: +1500, r16: +5000, qf: +15000, sf: +40000, champion: +200000 } },
+  // ─── Group H ───
+  { id: 29, name: 'Spain', seed: 1, group: 'H', americanOdds: {}, probabilities: { winGroup: 0.775, r16: 0.775, qf: 0.575, sf: 0.435, final: 0.285, champion: 0.1665 } },
+  { id: 30, name: 'Uruguay', seed: 2, group: 'H', americanOdds: {}, probabilities: { winGroup: 0.185, r16: 0.395, qf: 0.2, sf: 0.095, final: 0.045, champion: 0.0115 } },
+  { id: 31, name: 'Saudi Arabia', seed: 3, group: 'H', americanOdds: {}, probabilities: { winGroup: 0.015, r16: 0.085, qf: 0.025, sf: 0.02, final: 0.02, champion: 0.001 } },
+  { id: 32, name: 'Cape Verde', seed: 4, group: 'H', americanOdds: {}, probabilities: { winGroup: 0.015, r16: 0.055, qf: 0.025, sf: 0.025, final: 0.01, champion: 0.001 } },
 
-  // ─── Group I: France, Senegal, Norway, [Inter-conf 2 → Bolivia*] ───
-  { id: 33, name: 'France', seed: 1, group: 'I', americanOdds: { groupStage: -800, r32: -300, r16: -120, qf: +130, sf: +300, champion: +700 } },
-  { id: 34, name: 'Senegal', seed: 2, group: 'I', americanOdds: { groupStage: -100, r32: +300, r16: +900, qf: +2500, sf: +6000, champion: +12000 } },
-  { id: 35, name: 'Norway', seed: 3, group: 'I', americanOdds: { groupStage: -150, r32: +200, r16: +600, qf: +1500, sf: +2000, champion: +3000 } },
-  { id: 36, name: 'Bolivia', seed: 4, group: 'I', americanOdds: { groupStage: +300, r32: +800, r16: +2500, qf: +7000, sf: +18000, champion: +25000 } },
+  // ─── Group I ───
+  { id: 33, name: 'France', seed: 1, group: 'I', americanOdds: {}, probabilities: { winGroup: 0.655, r16: 0.785, qf: 0.565, sf: 0.425, final: 0.275, champion: 0.1705 } },
+  { id: 35, name: 'Norway', seed: 2, group: 'I', americanOdds: {}, probabilities: { winGroup: 0.235, r16: 0.545, qf: 0.3, sf: 0.13, final: 0.075, champion: 0.0245 } },
+  { id: 34, name: 'Senegal', seed: 3, group: 'I', americanOdds: {}, probabilities: { winGroup: 0.105, r16: 0.3, qf: 0.14, sf: 0.055, final: 0.015, champion: 0.0075 } },
+  { id: 36, name: 'Iraq', seed: 4, group: 'I', americanOdds: {}, probabilities: { winGroup: 0.02, r16: 0.025, qf: 0.02, sf: 0.01, final: 0.01, champion: 0.01 } },
 
-  // ─── Group J: Argentina, Austria, Algeria, Jordan ───
-  { id: 37, name: 'Argentina', seed: 1, group: 'J', americanOdds: { groupStage: -800, r32: -300, r16: -100, qf: +150, sf: +350, champion: +800 } },
-  { id: 38, name: 'Austria', seed: 2, group: 'J', americanOdds: { groupStage: -100, r32: +300, r16: +1000, qf: +3000, sf: +7000, champion: +15000 } },
-  { id: 39, name: 'Algeria', seed: 3, group: 'J', americanOdds: { groupStage: +100, r32: +400, r16: +1200, qf: +3500, sf: +8000, champion: +20000 } },
-  { id: 40, name: 'Jordan', seed: 4, group: 'J', americanOdds: { groupStage: +400, r32: +1200, r16: +4000, qf: +12000, sf: +30000, champion: +150000 } },
+  // ─── Group J ───
+  { id: 37, name: 'Argentina', seed: 1, group: 'J', americanOdds: {}, probabilities: { winGroup: 0.715, r16: 0.685, qf: 0.495, sf: 0.31, final: 0.19, champion: 0.089 } },
+  { id: 38, name: 'Austria', seed: 2, group: 'J', americanOdds: {}, probabilities: { winGroup: 0.185, r16: 0.32, qf: 0.135, sf: 0.05, final: 0.015, champion: 0.0055 } },
+  { id: 39, name: 'Algeria', seed: 3, group: 'J', americanOdds: {}, probabilities: { winGroup: 0.095, r16: 0.22, qf: 0.075, sf: 0.03, final: 0.015, champion: 0.0015 } },
+  { id: 40, name: 'Jordan', seed: 4, group: 'J', americanOdds: {}, probabilities: { winGroup: 0.015, r16: 0.03, qf: 0.01, sf: 0.01, final: 0.01, champion: 0.001 } },
 
-  // ─── Group K: Portugal, Colombia, Uzbekistan, [Inter-conf 1 → DR Congo*] ───
-  { id: 41, name: 'Portugal', seed: 1, group: 'K', americanOdds: { groupStage: -700, r32: -280, r16: -100, qf: +180, sf: +400, champion: +1000 } },
-  { id: 42, name: 'Colombia', seed: 2, group: 'K', americanOdds: { groupStage: -200, r32: +100, r16: +400, qf: +1200, sf: +3000, champion: +5000 } },
-  { id: 43, name: 'Uzbekistan', seed: 3, group: 'K', americanOdds: { groupStage: +350, r32: +1000, r16: +3500, qf: +10000, sf: +25000, champion: +200000 } },
-  { id: 44, name: 'DR Congo', seed: 4, group: 'K', americanOdds: { groupStage: +350, r32: +1000, r16: +3500, qf: +10000, sf: +25000, champion: +100000 } },
+  // ─── Group K ───
+  { id: 41, name: 'Portugal', seed: 1, group: 'K', americanOdds: {}, probabilities: { winGroup: 0.645, r16: 0.705, qf: 0.495, sf: 0.295, final: 0.19, champion: 0.0925 } },
+  { id: 42, name: 'Colombia', seed: 2, group: 'K', americanOdds: {}, probabilities: { winGroup: 0.305, r16: 0.495, qf: 0.25, sf: 0.14, final: 0.055, champion: 0.0185 } },
+  { id: 44, name: 'DR Congo', seed: 3, group: 'K', americanOdds: {}, probabilities: { winGroup: 0.035, r16: 0.11, qf: 0.035, sf: 0.02, final: 0.01, champion: 0.01 } },
+  { id: 43, name: 'Uzbekistan', seed: 4, group: 'K', americanOdds: {}, probabilities: { winGroup: 0.015, r16: 0.075, qf: 0.02, sf: 0.02, final: 0.02, champion: 0.001 } },
 
-  // ─── Group L: England, Croatia, Panama, Ghana ───
-  { id: 45, name: 'England', seed: 1, group: 'L', americanOdds: { groupStage: -700, r32: -280, r16: -110, qf: +160, sf: +350, champion: +600 } },
-  { id: 46, name: 'Croatia', seed: 2, group: 'L', americanOdds: { groupStage: -120, r32: +250, r16: +800, qf: +2500, sf: +5000, champion: +10000 } },
-  { id: 47, name: 'Panama', seed: 3, group: 'L', americanOdds: { groupStage: +350, r32: +1000, r16: +3500, qf: +10000, sf: +25000, champion: +70000 } },
-  { id: 48, name: 'Ghana', seed: 4, group: 'L', americanOdds: { groupStage: +100, r32: +400, r16: +1200, qf: +3500, sf: +8000, champion: +15000 } },
+  // ─── Group L ───
+  { id: 45, name: 'England', seed: 1, group: 'L', americanOdds: {}, probabilities: { winGroup: 0.695, r16: 0.735, qf: 0.565, sf: 0.33, final: 0.205, champion: 0.1105 } },
+  { id: 46, name: 'Croatia', seed: 2, group: 'L', americanOdds: {}, probabilities: { winGroup: 0.215, r16: 0.44, qf: 0.175, sf: 0.08, final: 0.04, champion: 0.0095 } },
+  { id: 48, name: 'Ghana', seed: 3, group: 'L', americanOdds: {}, probabilities: { winGroup: 0.065, r16: 0.185, qf: 0.065, sf: 0.02, final: 0.01, champion: 0.0015 } },
+  { id: 47, name: 'Panama', seed: 4, group: 'L', americanOdds: {}, probabilities: { winGroup: 0.025, r16: 0.075, qf: 0.025, sf: 0.01, final: 0.01, champion: 0.001 } },
 ];

@@ -28,6 +28,14 @@ export interface RoundConfig {
    *  Used for elimination badges: "⊗ R64" means lost in the Round of 64.
    *  If omitted, falls back to `label`. */
   gameLabel?: string;
+  /** How this round is devigged under the `'group'` strategy.
+   *  - 'global' (default): normalize across the whole field to `teamsAdvancing`,
+   *    capped at the previous global round (a nested knockout ladder).
+   *  - 'group': normalize WITHIN each group to sum→1 (e.g., "win your group" —
+   *    exactly one winner per group). Group-scoped rounds sit OUTSIDE the ladder
+   *    cap chain, since winning a group is not a prerequisite for advancing.
+   *  Ignored by the 'bracket' / 'global' / 'none' strategies. */
+  devigScope?: 'group' | 'global';
 }
 
 export interface GroupConfig {

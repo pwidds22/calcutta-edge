@@ -267,19 +267,20 @@ export const NFL_SEASON_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
 };
 
 /**
- * World Cup: groupStage×32 + r32×16 + r16×8 + qf×4 + sf×2 + champion×1 = 100%
+ * World Cup: winGroup×12 + r16×16 + qf×8 + sf×4 + final×2 + champion×1 (+props) = 100%
+ * Round keys are Kalshi-aligned: "Win Group" (per-group) + the reach-round ladder.
  */
 export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
   balanced: {
     label: 'Balanced',
     description: 'Reward every knockout win — keeps all nations\u2019 owners engaged',
     rules: {
-      groupStage: 0.125,  // ×32 = 4%
-      r32: 0.375,         // ×16 = 6%
-      r16: 1.25,          // ×8  = 10%
-      qf: 4.00,           // ×4  = 16%
-      sf: 7.00,           // ×2  = 14%
-      champion: 50.00,    // ×1  = 50%
+      winGroup: 0.75,     // ×12 = 9%
+      r16: 1.00,          // ×16 = 16%
+      qf: 2.00,           // ×8  = 16%
+      sf: 3.50,           // ×4  = 14%
+      final: 5.00,        // ×2  = 10%
+      champion: 35.00,    // ×1  = 35%
       goldenBoot: 0,
       goldenBall: 0,
     },
@@ -288,12 +289,12 @@ export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
     label: 'Champion Heavy',
     description: 'Most of the pot goes to the World Cup winner',
     rules: {
-      groupStage: 0.125,  // ×32 = 4%
-      r32: 0.25,          // ×16 = 4%
-      r16: 0.75,          // ×8  = 6%
-      qf: 2.00,           // ×4  = 8%
-      sf: 4.00,           // ×2  = 8%
-      champion: 70.00,    // ×1  = 70%
+      winGroup: 0.50,     // ×12 = 6%
+      r16: 0.75,          // ×16 = 12%
+      qf: 1.25,           // ×8  = 10%
+      sf: 2.00,           // ×4  = 8%
+      final: 4.00,        // ×2  = 8%
+      champion: 56.00,    // ×1  = 56%
       goldenBoot: 0,
       goldenBall: 0,
     },
@@ -302,12 +303,12 @@ export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
     label: 'With Individual Awards',
     description: '80% match payouts, 20% for Golden Boot + Golden Ball',
     rules: {
-      groupStage: 0.125,  // ×32 = 4%
-      r32: 0.25,          // ×16 = 4%
-      r16: 1.00,          // ×8  = 8%
-      qf: 3.00,           // ×4  = 12%
-      sf: 6.00,           // ×2  = 12%
-      champion: 40.00,    // ×1  = 40%
+      winGroup: 0.50,     // ×12 = 6%
+      r16: 0.75,          // ×16 = 12%
+      qf: 1.75,           // ×8  = 14%
+      sf: 3.00,           // ×4  = 12%
+      final: 4.00,        // ×2  = 8%
+      champion: 28.00,    // ×1  = 28%
       goldenBoot: 10.00,
       goldenBall: 10.00,
     },
