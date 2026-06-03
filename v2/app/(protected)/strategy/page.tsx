@@ -4,6 +4,7 @@ import { loadAuctionData, listUserLeagues } from '@/actions/auction'
 import { AuctionTool } from '@/components/auction/auction-tool'
 import { getActiveTournament, getTournament, listSelectorTournaments, getOddsRegistry } from '@/lib/tournaments/registry'
 import { getTournamentPhase } from '@/lib/tournaments/phase'
+import { getWorldCupLiveTeams } from '@/lib/tournaments/world-cup-live-odds'
 import { normalizePayoutRules } from '@/lib/calculations/normalize'
 import { hasTournamentAccess } from '@/lib/auth/tournament-access'
 import Link from 'next/link'
@@ -31,7 +32,17 @@ export default async function AuctionPage({ searchParams }: AuctionPageProps) {
   const selectedTournament = (requestedTournament && isRequestedSelectable)
     ? requestedTournament
     : activeTournament
-  const { config, teams: baseTeams } = selectedTournament
+  const { config } = selectedTournament
+  let baseTeams = selectedTournament.teams
+
+  // World Cup: while still draftable (hostable/upcoming), swap in LIVE Kalshi odds
+  // (cached ~1hr via Next's data cache). Once the Cup goes live this is skipped, so the
+  // tool falls back to the static config odds — drafts are done, odds no longer matter.
+  // getWorldCupLiveTeams falls back to the static teams on any fetch failure.
+  const selectedPhase = getTournamentPhase(config)
+  if (config.id === 'world_cup_2026' && (selectedPhase === 'hostable' || selectedPhase === 'upcoming')) {
+    baseTeams = await getWorldCupLiveTeams(baseTeams)
+  }
 
   // Check per-tournament payment status
   const hasPaid = await hasTournamentAccess(supabase, user.id, config.id)
