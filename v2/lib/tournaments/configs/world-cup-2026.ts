@@ -72,7 +72,7 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
   defaultSort: 'valuePercentage',
   defaultSortDirection: 'desc',
   showSeedColumn: false,
-  previewTeamCount: 8,
+  previewTeamCount: 3,
 };
 
 /**

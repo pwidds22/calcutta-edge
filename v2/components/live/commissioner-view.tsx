@@ -449,6 +449,10 @@ export function CommissionerView({
               bundles={bundles}
               isCommissioner={true}
               biddingStatus={channel.biddingStatus}
+              config={config}
+              payoutRules={session.payout_rules}
+              estimatedPotSize={session.estimated_pot_size}
+              hasPaid={hasPaid}
             />
           </div>
 
