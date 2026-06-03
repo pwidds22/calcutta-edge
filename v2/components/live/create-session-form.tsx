@@ -522,6 +522,25 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
             </div>
           )}
 
+          {/* Preset bundle preview — show exactly which teams get grouped */}
+          {bundlePreset !== 'none' && bundlePreset !== 'custom' && currentBundles.length > 0 && (
+            <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <p className="text-[10px] font-medium text-white/40 uppercase tracking-wide mb-1.5">
+                Bundles created ({currentBundles.length})
+              </p>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                {currentBundles.map((bundle) => (
+                  <div
+                    key={bundle.id}
+                    className="rounded border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5"
+                  >
+                    <span className="text-xs text-white/80">{bundle.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {selectedTournament && tournamentTeams.length > 0 && (
             <p className="mt-1.5 text-xs text-white/30">
               Auction items: <span className="font-medium text-white/50">{auctionItemCount}</span>

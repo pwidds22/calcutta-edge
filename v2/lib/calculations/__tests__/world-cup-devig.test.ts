@@ -174,8 +174,8 @@ describe('World Cup 2026 — real config sanity', () => {
     expect(sumOdds('champion')).toBeGreaterThan(0.9);
   });
 
-  it('ladder is monotone non-increasing per team (r16 ≥ qf ≥ sf ≥ final ≥ champion)', () => {
-    const ladder = ['r16', 'qf', 'sf', 'final', 'champion'];
+  it('ladder is monotone non-increasing per team (r32 ≥ r16 ≥ qf ≥ sf ≥ final ≥ champion)', () => {
+    const ladder = ['r32', 'r16', 'qf', 'sf', 'final', 'champion'];
     for (const t of teams) {
       for (let i = 1; i < ladder.length; i++) {
         expect(t.odds[ladder[i - 1]]).toBeGreaterThanOrEqual(t.odds[ladder[i]] - 1e-9);

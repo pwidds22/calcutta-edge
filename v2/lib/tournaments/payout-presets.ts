@@ -267,7 +267,7 @@ export const NFL_SEASON_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
 };
 
 /**
- * World Cup: winGroup×12 + r16×16 + qf×8 + sf×4 + final×2 + champion×1 (+props) = 100%
+ * World Cup: winGroup×12 + r32×32 + r16×16 + qf×8 + sf×4 + final×2 + champion×1 (+props) = 100%
  * Round keys are Kalshi-aligned: "Win Group" (per-group) + the reach-round ladder.
  */
 export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
@@ -275,12 +275,13 @@ export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
     label: 'Balanced',
     description: 'Reward every knockout win — keeps all nations\u2019 owners engaged',
     rules: {
-      winGroup: 0.75,     // ×12 = 9%
-      r16: 1.00,          // ×16 = 16%
-      qf: 2.00,           // ×8  = 16%
-      sf: 3.50,           // ×4  = 14%
+      winGroup: 0.50,     // ×12 = 6%
+      r32: 0.50,          // ×32 = 16%
+      r16: 0.75,          // ×16 = 12%
+      qf: 1.50,           // ×8  = 12%
+      sf: 3.00,           // ×4  = 12%
       final: 5.00,        // ×2  = 10%
-      champion: 35.00,    // ×1  = 35%
+      champion: 32.00,    // ×1  = 32%
       goldenBoot: 0,
       goldenBall: 0,
     },
@@ -289,12 +290,13 @@ export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
     label: 'Champion Heavy',
     description: 'Most of the pot goes to the World Cup winner',
     rules: {
-      winGroup: 0.50,     // ×12 = 6%
-      r16: 0.75,          // ×16 = 12%
-      qf: 1.25,           // ×8  = 10%
+      winGroup: 0.25,     // ×12 = 3%
+      r32: 0.25,          // ×32 = 8%
+      r16: 0.50,          // ×16 = 8%
+      qf: 1.00,           // ×8  = 8%
       sf: 2.00,           // ×4  = 8%
-      final: 4.00,        // ×2  = 8%
-      champion: 56.00,    // ×1  = 56%
+      final: 3.50,        // ×2  = 7%
+      champion: 58.00,    // ×1  = 58%
       goldenBoot: 0,
       goldenBall: 0,
     },
@@ -304,11 +306,12 @@ export const WORLD_CUP_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
     description: '80% match payouts, 20% for Golden Boot + Golden Ball',
     rules: {
       winGroup: 0.50,     // ×12 = 6%
-      r16: 0.75,          // ×16 = 12%
-      qf: 1.75,           // ×8  = 14%
-      sf: 3.00,           // ×4  = 12%
-      final: 4.00,        // ×2  = 8%
-      champion: 28.00,    // ×1  = 28%
+      r32: 0.375,         // ×32 = 12%
+      r16: 0.50,          // ×16 = 8%
+      qf: 1.25,           // ×8  = 10%
+      sf: 2.50,           // ×4  = 10%
+      final: 3.50,        // ×2  = 7%
+      champion: 27.00,    // ×1  = 27%
       goldenBoot: 10.00,
       goldenBall: 10.00,
     },

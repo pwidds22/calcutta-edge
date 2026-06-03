@@ -206,8 +206,33 @@ async function main() {
     if (onlyInGroups.length) console.warn(`  ! In group markets but no active winner market: ${onlyInGroups.join(', ')}`);
   }
 
+  // 3b) Advance-from-group (reach Round of 32) from the stage-of-elimination market:
+  //     P(advance) = 1 − P(eliminated in Group Stage). Each per-nation event
+  //     (KXWCSTAGEOFELIM-26XXX) carries the nation in its TITLE ("USA: Stage of
+  //     Elimination"), not in the market yes_sub_title (which is the stage name) —
+  //     so map event → nation via the title, then read the "Group Stage" leg.
+  {
+    const events = (await kget('/events', { series_ticker: 'KXWCSTAGEOFELIM', limit: 200 })).events ?? [];
+    const eventNation = new Map();
+    for (const e of events) {
+      const title = (e.title || '').replace(/:\s*Stage of Elimination\s*$/i, '').trim();
+      if (title) eventNation.set(e.event_ticker, norm(title));
+    }
+    const stageMarkets = (await kget('/markets', { series_ticker: 'KXWCSTAGEOFELIM', limit: 1000 })).markets ?? [];
+    let matched = 0;
+    for (const m of stageMarkets) {
+      if (m.yes_sub_title !== 'Group Stage') continue; // only the group-stage-elim leg
+      const nation = eventNation.get(m.event_ticker);
+      const team = nation ? field.get(nation) : undefined;
+      if (!team) continue;
+      team.probabilities.r32 = Math.max(0, Math.min(0.999, 1 - priceOf(m)));
+      matched++;
+    }
+    console.log(`  ${'KXWCSTAGEOFELIM'.padEnd(20)} → ${'r32'.padEnd(8)} matched ${matched}/${field.size} (advance = 1 − P(group-stage elim))`);
+  }
+
   // 4) Validate completeness — fail loudly so a stale/partial roster can't ship.
-  const ROUNDS = ['winGroup', 'r16', 'qf', 'sf', 'final', 'champion'];
+  const ROUNDS = ['winGroup', 'r32', 'r16', 'qf', 'sf', 'final', 'champion'];
   const teams = [...field.values()];
   const incomplete = teams.filter((t) => ROUNDS.some((r) => t.probabilities[r] === undefined));
   if (incomplete.length) {
@@ -228,7 +253,7 @@ async function main() {
   //     1%-to-win-group side); clamping stops that noise from polluting the global
   //     normalization and stealing probability mass from legitimate contenders.
   //     (winGroup is excluded — winning a group does not guarantee reaching the R16.)
-  const LADDER = ['r16', 'qf', 'sf', 'final', 'champion'];
+  const LADDER = ['r32', 'r16', 'qf', 'sf', 'final', 'champion'];
   let clamped = 0;
   for (const t of teams) {
     for (let i = 1; i < LADDER.length; i++) {
@@ -307,7 +332,7 @@ function buildTeamsBlock(ordered, groupKeys, generatedAt, EOL = '\n') {
   lines.push(' * last-trade fallback) — fed directly as fair-ish probabilities and normalized by');
   lines.push(" * the scope-aware 'group' devig (winGroup per-group → 1; reach-round ladder global).");
   lines.push(' *');
-  lines.push(`  * Generated: ${generatedAt} from Kalshi (KXWCGROUPWIN / KXWCROUND / KXMENWORLDCUP).`);
+  lines.push(`  * Generated: ${generatedAt} from Kalshi (KXWCGROUPWIN / KXWCSTAGEOFELIM / KXWCROUND / KXMENWORLDCUP).`);
   lines.push(' * Re-run: KALSHI_ENV_FILE=/path/.env.local node scripts/fetch-worldcup-odds.mjs');
   lines.push(' *');
   lines.push(' * The active group-winner markets are the field of record — re-running self-corrects');
@@ -324,7 +349,7 @@ function buildTeamsBlock(ordered, groupKeys, generatedAt, EOL = '\n') {
       const safeName = t.name.replace(/'/g, "\\'");
       lines.push(
         `  { id: ${t.id}, name: '${safeName}', seed: ${t.seed}, group: '${g}', americanOdds: {}, ` +
-        `probabilities: { winGroup: ${p4(pr.winGroup)}, r16: ${p4(pr.r16)}, qf: ${p4(pr.qf)}, ` +
+        `probabilities: { winGroup: ${p4(pr.winGroup)}, r32: ${p4(pr.r32)}, r16: ${p4(pr.r16)}, qf: ${p4(pr.qf)}, ` +
         `sf: ${p4(pr.sf)}, final: ${p4(pr.final)}, champion: ${p4(pr.champion)} } },`
       );
     }
