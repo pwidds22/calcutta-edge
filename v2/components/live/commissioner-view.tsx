@@ -450,8 +450,8 @@ export function CommissionerView({
               isCommissioner={true}
               biddingStatus={channel.biddingStatus}
               config={config}
-              payoutRules={session.payout_rules}
-              estimatedPotSize={session.estimated_pot_size}
+              payoutRules={localPayoutRules}
+              estimatedPotSize={localPotSize}
               hasPaid={hasPaid}
             />
           </div>

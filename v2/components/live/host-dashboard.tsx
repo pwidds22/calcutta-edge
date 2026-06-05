@@ -169,7 +169,7 @@ function SessionCard({
               e.stopPropagation();
               onDelete(session);
             }}
-            className="rounded-lg p-2 text-white/20 sm:opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 sm:group-hover:opacity-100"
+            className="rounded-lg p-2 text-white/30 transition-all hover:bg-red-500/10 hover:text-red-400"
             title="Delete session"
           >
             <Trash2 className="size-4" />
