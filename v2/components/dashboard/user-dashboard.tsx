@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   TrendingUp,
   TrendingDown,
@@ -9,6 +10,7 @@ import {
   Users,
   Trophy,
   ArrowRight,
+  Trash2,
   CheckCircle2,
   XCircle,
   Radio,
@@ -21,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import type { DashboardData, DashboardFeaturedEvent, DashboardSession, DashboardTeam } from '@/actions/dashboard';
 import { isCompletedDashboardSession } from '@/lib/dashboard/categorize';
+import { deleteSession } from '@/actions/session';
 
 function formatLongDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -132,8 +135,52 @@ function StatCard({
   );
 }
 
-function LeagueCard({ session }: { session: DashboardSession }) {
+function DeleteConfirmDialog({
+  sessionName,
+  onConfirm,
+  onCancel,
+  isPending,
+}: {
+  sessionName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-sm rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-2xl">
+        <h3 className="text-lg font-semibold text-white">Delete Auction</h3>
+        <p className="mt-2 text-sm text-white/50">
+          Are you sure you want to delete{' '}
+          <span className="font-medium text-white/70">{sessionName}</span>? This
+          will permanently remove the session, all participants, and all bid
+          history. This action cannot be undone.
+        </p>
+        <div className="mt-5 flex gap-2 justify-end">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            disabled={isPending}
+            className="border-white/10 text-white/60 hover:bg-white/[0.06]"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={onConfirm}
+            disabled={isPending}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            {isPending ? 'Deleting...' : 'Delete'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeagueCard({ session, onDelete }: { session: DashboardSession; onDelete?: (session: DashboardSession) => void }) {
   const href = `/live/${session.id}`;
+  const canDelete = session.isCommissioner && session.status !== 'active';
 
   // A league is "over" if its tournament dates have passed OR the auction
   // is officially closed with all results in. Same dual check as elsewhere.
@@ -253,6 +300,19 @@ function LeagueCard({ session }: { session: DashboardSession }) {
             </p>
           </div>
         )}
+        {canDelete && onDelete && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(session);
+            }}
+            className="rounded-lg p-2 text-white/30 transition-all hover:bg-red-500/10 hover:text-red-400"
+            title="Delete league"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        )}
         <ArrowRight className="size-4 text-white/20 group-hover:text-white/40 transition-colors" />
       </div>
     </Link>
@@ -359,7 +419,7 @@ function AliveTeamsSection({ teams }: { teams: DashboardTeam[] }) {
  * 4+ entries — at that volume the section can dwarf the active leagues above,
  * which is usually what the user actually wants to see.
  */
-function CompletedLeaguesSection({ sessions }: { sessions: DashboardSession[] }) {
+function CompletedLeaguesSection({ sessions, onDelete }: { sessions: DashboardSession[]; onDelete?: (session: DashboardSession) => void }) {
   const COLLAPSE_THRESHOLD = 3;
   // Start collapsed when there are more than 3 — visible affordance via the header button.
   const [expanded, setExpanded] = useState(sessions.length <= COLLAPSE_THRESHOLD);
@@ -383,7 +443,7 @@ function CompletedLeaguesSection({ sessions }: { sessions: DashboardSession[] })
       {expanded && (
         <div id="completed-leagues-list" className="space-y-2">
           {sessions.map((s) => (
-            <LeagueCard key={s.id} session={s} />
+            <LeagueCard key={s.id} session={s} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -393,6 +453,29 @@ function CompletedLeaguesSection({ sessions }: { sessions: DashboardSession[] })
 
 export function UserDashboard({ data }: { data: DashboardData }) {
   const { sessions, totalPotExposure, totalEarned, totalNetPL, aliveTeams, featuredEvent } = data;
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [deleteTarget, setDeleteTarget] = useState<DashboardSession | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleDelete(session: DashboardSession) {
+    setError(null);
+    setDeleteTarget(session);
+  }
+
+  function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    startTransition(async () => {
+      const result = await deleteSession(deleteTarget.id);
+      if (result.error) {
+        setError(result.error);
+        setDeleteTarget(null);
+      } else {
+        setDeleteTarget(null);
+        router.refresh();
+      }
+    });
+  }
   const completedSessions = sessions.filter(isCompletedDashboardSession);
   const activeSessions = sessions.filter((s) => !isCompletedDashboardSession(s));
   const hasAnyBids = sessions.some((s) => s.userTeamsCount > 0);
@@ -403,6 +486,27 @@ export function UserDashboard({ data }: { data: DashboardData }) {
 
   return (
     <div className="space-y-8">
+      {/* Delete confirmation dialog */}
+      {deleteTarget && (
+        <DeleteConfirmDialog
+          sessionName={deleteTarget.name}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+          isPending={isPending}
+        />
+      )}
+      {error && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          {error}
+          <button
+            onClick={() => setError(null)}
+            className="ml-2 text-red-400/60 hover:text-red-400"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -482,7 +586,7 @@ export function UserDashboard({ data }: { data: DashboardData }) {
           </div>
           <div className="space-y-2">
             {activeSessions.map((s) => (
-              <LeagueCard key={s.id} session={s} />
+              <LeagueCard key={s.id} session={s} onDelete={handleDelete} />
             ))}
           </div>
         </div>
@@ -491,7 +595,7 @@ export function UserDashboard({ data }: { data: DashboardData }) {
       {/* Completed Leagues — collapse by default once the list grows past 3
           so the dashboard stays focused on current activity. */}
       {completedSessions.length > 0 && (
-        <CompletedLeaguesSection sessions={completedSessions} />
+        <CompletedLeaguesSection sessions={completedSessions} onDelete={handleDelete} />
       )}
 
       {/* Empty state */}
