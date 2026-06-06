@@ -167,8 +167,11 @@ export function TeamQueue({
                 <span className="text-xs text-white/30 w-5 text-right">
                   {idx + 1}
                 </span>
+                {/* Soccer (showSeedColumn=false): `seed` is only within-group position,
+                    not a strength rank — show the group letter instead, like the
+                    strategy table + the bundle rows above. Other sports keep the seed. */}
                 <span className="truncate">
-                  ({team?.seed}) {team?.name ?? `Team ${teamId}`}
+                  ({config?.showSeedColumn === false && team?.group ? team.group : team?.seed}) {team?.name ?? `Team ${teamId}`}
                 </span>
               </span>
               {sold ? (
