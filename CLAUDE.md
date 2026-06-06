@@ -55,6 +55,7 @@ Next.js 16 (App Router) + TypeScript + Tailwind + shadcn/ui | Vercel (auto-deplo
 - **DON'T** transition to `bidding_status: 'waiting'` without calling `autoOpenBidding()` when autoMode is on
 - **DON'T** use `closeBidding()` for "Close Early" in auto-mode — use `autoAdvance()`
 - **DON'T** display odds/values in `team-spotlight.tsx` — `strategy-overlay.tsx` is the single source of truth
+- **DON'T** feed child components in `commissioner-view.tsx` the static `session.payout_rules` / `session.estimated_pot_size` props — the commissioner edits settings into LIVE state (`localPayoutRules` / `localPotSize`). Wire children (`TeamQueue`, `StrategyOverlay`, and any new one) to that local state or their fair values freeze while the center overlay updates. Caught 2026-06-05: the left Team Queue didn't react to pot/payout changes because it read the stale `session.*` props.
 - **DON'T** read `americanOdds` directly — use `initializeTeams()` output (some tournaments use `probabilities`)
 - **DON'T** forget to update first team's bid `amount` when selling bundles — split price, not full
 - **DON'T** label participant-rankings UI as "Leaderboard" in golf contexts — the word collides with the real golf tournament leaderboard (Min Woo Lee, Schauffele, etc.). Use **"Standings"** for owner/participant rankings (fantasy-sports vernacular). The body of `Leaderboard.tsx` already uses "Projected Standings"; align tab labels and section headers with the body. Tab rename shipped 2026-05-14.
