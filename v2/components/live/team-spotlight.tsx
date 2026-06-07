@@ -42,9 +42,12 @@ export function TeamSpotlight({
               key={member.id}
               className="flex items-center gap-1.5 rounded-lg bg-white/[0.03] border border-white/[0.04] px-3 py-1.5"
             >
-              <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-                #{member.seed}
-              </span>
+              {/* Soccer: hide the within-group seed; the group is shown after the name. */}
+              {config.showSeedColumn !== false && (
+                <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                  #{member.seed}
+                </span>
+              )}
               <span className="text-sm font-medium text-white">
                 {member.name}
               </span>
@@ -74,12 +77,22 @@ export function TeamSpotlight({
           </p>
           <h2 className="text-2xl font-bold text-white">{team.name}</h2>
           <div className="mt-1.5 flex items-center gap-2">
-            <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
-              #{team.seed}{config.sport !== 'golf' ? ' Seed' : ''}
-            </span>
-            <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-white/60">
-              {team.group}
-            </span>
+            {config.showSeedColumn === false ? (
+              // Soccer: `seed` is only within-group position, not a rank — show the
+              // group (e.g. "Group A") instead of a meaningless "#N Seed" badge.
+              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
+                {config.groupLabel} {team.group}
+              </span>
+            ) : (
+              <>
+                <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
+                  #{team.seed}{config.sport !== 'golf' ? ' Seed' : ''}
+                </span>
+                <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-white/60">
+                  {team.group}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
