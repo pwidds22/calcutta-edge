@@ -902,7 +902,7 @@ export async function pauseAuction(sessionId: string) {
  * the updated timer so the commissioner's client resyncs. This prevents "sniping"
  * where a valid bid's timer extension is lost due to broadcast latency.
  */
-export async function autoAdvance(sessionId: string) {
+export async function autoAdvance(sessionId: string, opts?: { manual?: boolean }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -920,18 +920,26 @@ export async function autoAdvance(sessionId: string) {
   session.team_order = parseTeamOrder(session.team_order);
   if (session.status !== 'active') return { error: 'Auction not active' };
 
-  // ── SERVER-AUTHORITATIVE TIMER CHECK ──
-  // The commissioner's client thinks the timer expired, but a last-second bid
-  // may have extended timer_ends_at in the DB. Check the DB truth + add a
-  // grace period to absorb broadcast latency.
+  const hasBids =
+    !!session.current_highest_bidder_id && session.current_highest_bid > 0;
+
+  // ── SERVER-AUTHORITATIVE ANTI-SNIPE CHECK ──
+  // A last-second bid extends timer_ends_at in the DB. We must not let the
+  // *automatic* client-side timer-expiry close a team while that extension is
+  // still propagating over broadcast (that would snipe the late bidder). So
+  // this guard applies ONLY when (a) there's a real bid to protect AND (b) the
+  // close is automatic. A no-bids team has nothing to protect, and an explicit
+  // host "Close & Sell Now" (opts.manual) is a deliberate override — both skip
+  // the guard and proceed to close. (Previously this fired on ANY running
+  // timer, so a fresh no-bid team and every deliberate early-close were wrongly
+  // blocked with "Timer was extended by a recent bid".)
   const GRACE_PERIOD_MS = 2000; // 2-second buffer for broadcast propagation
-  if (session.timer_ends_at) {
+  if (!opts?.manual && hasBids && session.timer_ends_at) {
     const dbEndsAt = new Date(session.timer_ends_at).getTime();
     const now = Date.now();
     if (dbEndsAt > now - GRACE_PERIOD_MS) {
-      // Timer was extended by a bid OR hasn't truly expired yet.
-      // If still in the future, re-broadcast the active timer so the
-      // commissioner's client resyncs its countdown.
+      // Still in the future → re-broadcast the active timer so the
+      // commissioner's client resyncs its countdown, and reject the close.
       if (dbEndsAt > now) {
         await broadcastToChannel(channelName(sessionId), 'TIMER_RESET', {
           endsAt: session.timer_ends_at,
@@ -939,7 +947,7 @@ export async function autoAdvance(sessionId: string) {
         });
         return { error: 'Timer was extended by a recent bid', timerExtended: true };
       }
-      // Timer ended within the grace window — it's truly expired, proceed.
+      // Timer ended within the grace window — truly expired, proceed.
     }
   }
 
@@ -973,9 +981,6 @@ export async function autoAdvance(sessionId: string) {
 
   await broadcastToChannel(channelName(sessionId), 'BIDDING_CLOSED', {});
   await broadcastToChannel(channelName(sessionId), 'TIMER_STOP', {});
-
-  const hasBids =
-    session.current_highest_bidder_id && session.current_highest_bid > 0;
 
   const nextIdx = session.current_team_idx + 1;
   const isLastTeam = nextIdx >= session.team_order.length;

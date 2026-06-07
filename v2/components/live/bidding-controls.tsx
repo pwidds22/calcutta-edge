@@ -113,7 +113,7 @@ export function BiddingControls({
         {biddingStatus === 'open' && (
           <>
             <Button
-              onClick={() => handle(() => autoMode ? autoAdvance(sessionId) : closeBidding(sessionId), 'close')}
+              onClick={() => handle(() => autoMode ? autoAdvance(sessionId, { manual: true }) : closeBidding(sessionId), 'close')}
               disabled={loading === 'close'}
               className="flex-1 gap-2 bg-amber-600 text-white hover:bg-amber-700"
             >
