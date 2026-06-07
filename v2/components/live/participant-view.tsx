@@ -198,9 +198,6 @@ export function ParticipantView({
             bundles={bundles}
             isCommissioner={false}
             config={config}
-            payoutRules={session.payout_rules}
-            estimatedPotSize={session.estimated_pot_size}
-            hasPaid={hasPaid}
           />
           <ParticipantList
               registeredParticipants={participants.map((p) => ({
@@ -270,9 +267,6 @@ export function ParticipantView({
               auctionStatus={channel.auctionStatus}
               bundles={bundles}
               config={config}
-              payoutRules={session.payout_rules}
-              estimatedPotSize={session.estimated_pot_size}
-              hasPaid={hasPaid}
             />
           </div>
 

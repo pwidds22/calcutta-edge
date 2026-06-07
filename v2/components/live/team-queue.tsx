@@ -1,12 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
-import type { BaseTeam, TeamBundle, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import type { BaseTeam, TeamBundle, TournamentConfig } from '@/lib/tournaments/types';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import { presentTeam } from '@/actions/bidding';
 import { deriveBundleLabel } from '@/lib/tournaments/bundles';
-import { initializeTeams } from '@/lib/calculations/initialize';
-import { formatCurrency } from '@/lib/calculations/format';
 import { cn } from '@/lib/utils';
 import { List, Package, Pointer } from 'lucide-react';
 
@@ -22,12 +19,8 @@ interface TeamQueueProps {
   isCommissioner?: boolean;
   /** Current bidding status — commissioner can only jump when not 'open' */
   biddingStatus?: string;
-  /** Strategy inputs — when provided AND the viewer has paid, the queue shows each
-   *  unsold team's fair value next to its name. */
+  /** Tournament config — drives sport-aware display (e.g. group letter vs seed). */
   config?: TournamentConfig;
-  payoutRules?: PayoutRules;
-  estimatedPotSize?: number;
-  hasPaid?: boolean;
 }
 
 export function TeamQueue({
@@ -41,21 +34,10 @@ export function TeamQueue({
   isCommissioner = false,
   biddingStatus,
   config,
-  payoutRules,
-  estimatedPotSize,
-  hasPaid = false,
 }: TeamQueueProps) {
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
   const soldMap = new Map(soldTeams.map((s) => [s.teamId, s]));
   const bundleMap = new Map(bundles.map((b) => [b.id, b]));
-
-  // Fair value per team — only for paying viewers (others get the unlock CTA in the
-  // strategy overlay). Memoized: the inputs are stable for the life of the auction.
-  const fairValueByTeam = useMemo(() => {
-    if (!hasPaid || !config || !payoutRules) return null;
-    const computed = initializeTeams(baseTeams, [], payoutRules, estimatedPotSize ?? 0, config);
-    return new Map(computed.map((t) => [t.id, t.fairValue]));
-  }, [hasPaid, config, payoutRules, estimatedPotSize, baseTeams]);
 
   // Commissioner can click unsold teams to present them (only when bidding isn't open)
   const canJump = isCommissioner && auctionStatus === 'active' && biddingStatus !== 'open';
@@ -132,10 +114,6 @@ export function TeamQueue({
                   <span className="ml-2 flex-shrink-0 text-xs font-mono text-white/30">
                     ${totalSoldAmount}
                   </span>
-                ) : !allMembersSold && fairValueByTeam && bundle ? (
-                  <span className="ml-2 flex-shrink-0 text-xs font-mono text-emerald-400/50" title="Combined fair value">
-                    {formatCurrency(bundle.teamIds.reduce((s, id) => s + (fairValueByTeam.get(id) ?? 0), 0))}
-                  </span>
                 ) : null}
               </button>
             );
@@ -177,10 +155,6 @@ export function TeamQueue({
               {sold ? (
                 <span className="ml-2 flex-shrink-0 text-xs font-mono text-white/30">
                   ${sold.amount}
-                </span>
-              ) : fairValueByTeam ? (
-                <span className="ml-2 flex-shrink-0 text-xs font-mono text-emerald-400/50" title="Fair value">
-                  {formatCurrency(fairValueByTeam.get(teamId) ?? 0)}
                 </span>
               ) : null}
             </button>
