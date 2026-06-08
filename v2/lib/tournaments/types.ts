@@ -36,6 +36,12 @@ export interface RoundConfig {
    *    cap chain, since winning a group is not a prerequisite for advancing.
    *  Ignored by the 'bracket' / 'global' / 'none' strategies. */
   devigScope?: 'group' | 'global';
+  /** A "parallel" round is a standalone bonus, NOT a rung in the advancement
+   *  ladder. It is credited when won but never gates advancement, eliminates a
+   *  team, or blocks completion tracking. Soccer's "win your group" is the only
+   *  consumer: a nation can advance (r32) without winning its group, so winGroup
+   *  must not sit in the sequential elimination walk. Defaults to false. */
+  parallel?: boolean;
 }
 
 export interface GroupConfig {

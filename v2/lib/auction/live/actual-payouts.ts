@@ -109,11 +109,19 @@ export function getAliveTeamsForRound(
   const roundIndex = config.rounds.findIndex((r) => r.key === roundKey);
   if (roundIndex < 0) return [];
 
+  // Parallel/bonus rounds (e.g. soccer "win group") are over the whole field —
+  // every sold team is eligible, independent of the advancement ladder.
+  if (config.rounds[roundIndex].parallel) return [...soldTeamIds];
+
   // For the first round, all sold teams are alive
   if (roundIndex === 0) return [...soldTeamIds];
 
-  // For subsequent rounds, a team must have won ALL previous rounds
-  const previousRounds = config.rounds.slice(0, roundIndex).map((r) => r.key);
+  // For subsequent rounds, a team must have won ALL previous LADDER rounds.
+  // Parallel rounds do NOT gate advancement, so they're excluded here.
+  const previousRounds = config.rounds
+    .slice(0, roundIndex)
+    .filter((r) => !r.parallel)
+    .map((r) => r.key);
   const resultMap = buildResultMap(results);
 
   return soldTeamIds.filter((teamId) => {
@@ -150,6 +158,12 @@ export function getTeamStatus(
 
   for (const round of config.rounds) {
     const result = resultMap.get(`${teamId}:${round.key}`);
+    if (round.parallel) {
+      // Parallel bonus (e.g. winGroup): credit if won, but never eliminate or
+      // halt the ladder walk on a loss/pending.
+      if (result === 'won') roundsWon.push(round.key);
+      continue;
+    }
     if (result === 'won') {
       roundsWon.push(round.key);
     } else if (result === 'lost') {
@@ -195,12 +209,26 @@ export function getCompletedRounds(
   config: TournamentConfig
 ): string[] {
   const completed: string[] = [];
+  const resultMap = buildResultMap(results);
 
   for (const round of config.rounds) {
     const aliveTeams = getAliveTeamsForRound(soldTeamIds, results, config, round.key);
+
+    if (round.parallel) {
+      // Parallel/bonus round: completion is independent and NEVER blocks the
+      // ladder. Mark it completed if every eligible team is resolved, then carry on.
+      const resolved =
+        aliveTeams.length > 0 &&
+        aliveTeams.every((teamId) => {
+          const result = resultMap.get(`${teamId}:${round.key}`);
+          return result === 'won' || result === 'lost';
+        });
+      if (resolved) completed.push(round.key);
+      continue;
+    }
+
     if (aliveTeams.length === 0) break;
 
-    const resultMap = buildResultMap(results);
     const allResolved = aliveTeams.every((teamId) => {
       const result = resultMap.get(`${teamId}:${round.key}`);
       return result === 'won' || result === 'lost';
@@ -209,7 +237,7 @@ export function getCompletedRounds(
     if (allResolved) {
       completed.push(round.key);
     } else {
-      break; // Rounds must be sequential
+      break; // Ladder rounds must complete sequentially
     }
   }
 

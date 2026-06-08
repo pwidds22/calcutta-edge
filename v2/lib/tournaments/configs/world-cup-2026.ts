@@ -8,7 +8,7 @@ export const WORLD_CUP_2026_CONFIG: TournamentConfig = {
   // ladder (global markets). teamsAdvancing drives the payout-preset sum math
   // (winGroup = 12 group winners); the per-group devig target is always 1.
   rounds: [
-    { key: 'winGroup', label: 'Win Group', teamsAdvancing: 12, payoutLabel: 'Win Group', gameLabel: 'Group', devigScope: 'group' },
+    { key: 'winGroup', label: 'Win Group', teamsAdvancing: 12, payoutLabel: 'Win Group', gameLabel: 'Group', devigScope: 'group', parallel: true },
     { key: 'r32', label: 'R32', teamsAdvancing: 32, payoutLabel: 'Advance (Round of 32)', gameLabel: 'R32', devigScope: 'global' },
     { key: 'r16', label: 'R16', teamsAdvancing: 16, payoutLabel: 'Reach Round of 16', gameLabel: 'R16', devigScope: 'global' },
     { key: 'qf', label: 'QF', teamsAdvancing: 8, payoutLabel: 'Reach Quarterfinals', gameLabel: 'QF', devigScope: 'global' },
