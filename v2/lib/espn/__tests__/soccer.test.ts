@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseScoreboard, computeGroupTables } from '../soccer';
-import type { SoccerMatch } from '../soccer';
+import type { SoccerMatch, EspnScoreboard } from '../soccer';
 import type { BaseTeam } from '@/lib/tournaments/types';
 
 const baseTeams = [
@@ -12,7 +12,7 @@ const baseTeams = [
 ] as unknown as BaseTeam[];
 
 // Minimal slice of ESPN's real shape (score is a STRING; no group label).
-const espn = {
+const espn: EspnScoreboard = {
   events: [
     {
       date: '2026-06-11T19:00Z',
@@ -62,7 +62,7 @@ describe('parseScoreboard', () => {
   });
 
   it('skips matches whose team names do not resolve, without throwing', () => {
-    const weird = {
+    const weird: EspnScoreboard = {
       events: [
         {
           date: 'x',
