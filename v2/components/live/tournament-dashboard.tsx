@@ -12,6 +12,7 @@ import { Leaderboard } from './leaderboard';
 import { GolfLeaderboard } from './golf-leaderboard';
 import { SettlementMatrix } from './settlement-matrix';
 import { PropsEntry } from './props-entry';
+import { GroupTables } from './group-tables';
 import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5, RefreshCw, Activity } from 'lucide-react';
 
 interface TournamentDashboardProps {
@@ -26,9 +27,11 @@ interface TournamentDashboardProps {
   enabledProps?: EnabledProp[];
   initialPropResults?: PropResult[];
   initialPaymentTracking?: Record<string, boolean>;
+  /** Viewer's auth user id — used to highlight their teams in Group Tables. */
+  currentUserId?: string;
 }
 
-type TabKey = 'summary' | 'bracket' | 'results' | 'props' | 'golf-leaderboard' | 'leaderboard' | 'settlement';
+type TabKey = 'summary' | 'bracket' | 'results' | 'props' | 'golf-leaderboard' | 'group-tables' | 'leaderboard' | 'settlement';
 
 /**
  * Whether the dashboard should show the "Sync Scores" button for this
@@ -56,6 +59,7 @@ export function TournamentDashboard({
   enabledProps = [],
   initialPropResults = [],
   initialPaymentTracking = {},
+  currentUserId,
 }: TournamentDashboardProps) {
   const hasBracket = !!config.bracketDevigConfig;
   const hasProps = enabledProps.length > 0;
@@ -243,6 +247,9 @@ export function TournamentDashboard({
     ...(config.sport === 'golf'
       ? [{ key: 'golf-leaderboard' as TabKey, label: 'Live Leaderboard', icon: Activity }]
       : []),
+    ...(config.sport === 'soccer'
+      ? [{ key: 'group-tables' as TabKey, label: 'Group Tables', icon: Trophy }]
+      : []),
     { key: 'leaderboard', label: 'Standings', icon: BarChart3 },
     { key: 'settlement', label: 'Settlement', icon: DollarSign },
   ];
@@ -360,6 +367,15 @@ export function TournamentDashboard({
           baseTeams={baseTeams}
           config={config}
           payoutRules={payoutRules}
+        />
+      )}
+
+      {activeTab === 'group-tables' && config.sport === 'soccer' && (
+        <GroupTables
+          soldTeams={soldTeams}
+          baseTeams={baseTeams}
+          config={config}
+          currentUserId={currentUserId}
         />
       )}
 

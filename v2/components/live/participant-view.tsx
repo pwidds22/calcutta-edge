@@ -253,6 +253,7 @@ export function ParticipantView({
           initialPaymentTracking={session.payment_tracking ?? {}}
           enabledProps={session.settings?.enabledProps}
           initialPropResults={session.prop_results ?? []}
+          currentUserId={userId}
         />
       ) : (
         <div className="grid grid-cols-12 gap-4">
