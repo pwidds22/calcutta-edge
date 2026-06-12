@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseScoreboard, computeGroupTables, computeGroupResults } from '../soccer';
+import {
+  parseScoreboard,
+  computeGroupTables,
+  computeGroupResults,
+  computeKnockoutResults,
+} from '../soccer';
 import type { SoccerMatch, EspnScoreboard, SyncResultRow } from '../soccer';
 import type { BaseTeam } from '@/lib/tournaments/types';
 
@@ -210,6 +215,43 @@ describe('computeGroupResults', () => {
     // Every team now has exactly one winGroup row and one r32 row.
     expect(rows.filter((r) => r.roundKey === 'winGroup')).toHaveLength(48);
     expect(rows.filter((r) => r.roundKey === 'r32')).toHaveLength(48);
+  });
+});
+
+const ko = (h: number, a: number, stage: string, winner: number | null): SoccerMatch => ({
+  ...m(h, a, 1, 1),
+  stage,
+  winnerTeamId: winner, // shootouts: score level, winner flag decides
+});
+
+describe('computeKnockoutResults', () => {
+  it('maps each knockout stage to the round it decides', () => {
+    const rows = computeKnockoutResults([
+      ko(9, 1, 'round-of-32', 9),
+      ko(9, 13, 'round-of-16', 9),
+      ko(9, 2, 'quarterfinals', 9),
+      ko(9, 3, 'semifinals', 9),
+      ko(9, 10, 'final', 9),
+    ]);
+    expect(row(rows, 9, 'r16')?.result).toBe('won');
+    expect(row(rows, 1, 'r16')?.result).toBe('lost');
+    expect(row(rows, 9, 'qf')?.result).toBe('won');
+    expect(row(rows, 9, 'sf')?.result).toBe('won');
+    expect(row(rows, 9, 'final')?.result).toBe('won');
+    expect(row(rows, 9, 'champion')?.result).toBe('won');
+    expect(row(rows, 10, 'champion')?.result).toBe('lost');
+    expect(rows).toHaveLength(10);
+  });
+
+  it('ignores the 3rd-place match, group-stage, scheduled, and unresolved matches', () => {
+    const rows = computeKnockoutResults([
+      ko(2, 3, '3rd-place-match', 2), // decides nothing
+      { ...m(9, 10, 2, 0), stage: 'group-stage' }, // group play, not knockout
+      { ...ko(9, 1, 'round-of-32', 9), status: 'scheduled' }, // not played yet
+      ko(9, 1, 'round-of-32', null), // anomalous: no winner flag
+      { ...ko(9, 1, 'round-of-32', 9), awayTeamId: null }, // placeholder opponent
+    ]);
+    expect(rows).toEqual([]);
   });
 });
 

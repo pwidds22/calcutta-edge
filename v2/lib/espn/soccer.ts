@@ -216,3 +216,37 @@ export function computeGroupResults(
   }
   return rows;
 }
+
+// Stage slug → the round the WINNER reaches (off-by-one by design).
+// 3rd-place-match decides nothing: both SF losers already hold final:lost.
+const STAGE_DECIDES: Record<string, string> = {
+  'round-of-32': 'r16',
+  'round-of-16': 'qf',
+  quarterfinals: 'sf',
+  semifinals: 'final',
+  final: 'champion',
+};
+
+/**
+ * Winner/loser rows for each FINAL knockout match. Trusts winnerTeamId (ESPN's
+ * winner flag — shootout-safe; scores can be level), never score comparison.
+ * Unknown stages and unresolved matches are skipped, not errors.
+ */
+export function computeKnockoutResults(matches: SoccerMatch[]): SyncResultRow[] {
+  const rows: SyncResultRow[] = [];
+  for (const match of matches) {
+    const roundKey = STAGE_DECIDES[match.stage];
+    if (!roundKey || match.status !== 'final') continue;
+    if (match.homeTeamId == null || match.awayTeamId == null) continue;
+    if (match.winnerTeamId == null) {
+      console.warn(
+        `[soccer] knockout match without winner flag skipped: ${match.homeName} v ${match.awayName} (${match.stage})`
+      );
+      continue;
+    }
+    const loserId = match.winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+    rows.push({ teamId: match.winnerTeamId, roundKey, result: 'won' });
+    rows.push({ teamId: loserId, roundKey, result: 'lost' });
+  }
+  return rows;
+}
