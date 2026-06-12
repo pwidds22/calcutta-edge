@@ -143,8 +143,10 @@ async function writeSessionResults(
     );
     if (error) {
       console.error(`[Soccer Sync] upsert failed team ${row.teamId} ${row.roundKey}:`, error);
+    } else if (status === 201) {
+      inserted++;
     } else {
-      status === 201 ? inserted++ : updated++;
+      updated++;
     }
   }
 
