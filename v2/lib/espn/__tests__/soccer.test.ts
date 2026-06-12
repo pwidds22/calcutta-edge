@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseScoreboard, computeGroupTables } from '../soccer';
-import type { SoccerMatch, EspnScoreboard } from '../soccer';
+import { parseScoreboard, computeGroupTables, computeGroupResults } from '../soccer';
+import type { SoccerMatch, EspnScoreboard, SyncResultRow } from '../soccer';
 import type { BaseTeam } from '@/lib/tournaments/types';
 
 const baseTeams = [
@@ -153,6 +153,63 @@ describe('computeGroupTables stage filter', () => {
     const brazil = tables['C'].find((r) => r.teamId === 9)!;
     expect(brazil.played).toBe(1); // knockout rematch NOT counted
     expect(brazil.gf).toBe(2);
+  });
+});
+
+// Build a full 6-match group from 4 team ids: t[0] beats everyone,
+// t[1] beats t[2],t[3]; t[2] beats t[3]. Clean 1st/2nd/3rd/4th by points.
+// gfBoost inflates the 3rd-place team's goals (for best-thirds ranking tests).
+const fullGroup = (t: [number, number, number, number], gfBoost = 0): SoccerMatch[] => [
+  m(t[0], t[1], 2, 0),
+  m(t[0], t[2], 2, 0),
+  m(t[0], t[3], 2, 0),
+  m(t[1], t[2], 1, 0),
+  m(t[1], t[3], 1, 0),
+  m(t[2], t[3], 1 + gfBoost, 0),
+];
+
+// 48-team field: groups A-L, ids 1-48 in blocks of 4.
+const GROUPS = 'ABCDEFGHIJKL'.split('');
+const fullField = GROUPS.flatMap((g, gi) =>
+  [0, 1, 2, 3].map((i) => ({ id: gi * 4 + i + 1, name: `${g}${i + 1}`, seed: i + 1, group: g }))
+) as unknown as BaseTeam[];
+const groupIds = (gi: number): [number, number, number, number] =>
+  [gi * 4 + 1, gi * 4 + 2, gi * 4 + 3, gi * 4 + 4];
+
+const row = (rows: SyncResultRow[], teamId: number, roundKey: string) =>
+  rows.find((r) => r.teamId === teamId && r.roundKey === roundKey);
+
+describe('computeGroupResults', () => {
+  it('writes nothing for an incomplete group', () => {
+    const matches = fullGroup(groupIds(0)).slice(0, 5); // 5 of 6 played
+    expect(computeGroupResults(matches, fullField)).toEqual([]);
+  });
+
+  it('a complete group yields 4 winGroup rows and 3 decidable r32 rows', () => {
+    const [a1, a2, a3, a4] = groupIds(0);
+    const rows = computeGroupResults(fullGroup(groupIds(0)), fullField);
+    expect(row(rows, a1, 'winGroup')?.result).toBe('won');
+    expect(row(rows, a2, 'winGroup')?.result).toBe('lost');
+    expect(row(rows, a4, 'winGroup')?.result).toBe('lost');
+    expect(row(rows, a1, 'r32')?.result).toBe('won');
+    expect(row(rows, a2, 'r32')?.result).toBe('won');
+    expect(row(rows, a4, 'r32')?.result).toBe('lost');
+    expect(row(rows, a3, 'r32')).toBeUndefined(); // 3rd place waits for best-thirds
+    expect(rows).toHaveLength(7);
+  });
+
+  it('resolves best-8-thirds r32 rows once all 12 groups are complete', () => {
+    // Boost the 3rd-place GF in groups A-H so those 8 thirds outrank I-L's.
+    const matches = GROUPS.flatMap((_, gi) => fullGroup(groupIds(gi), gi < 8 ? 3 : 0));
+    const rows = computeGroupResults(matches, fullField);
+    const thirdOf = (gi: number) => gi * 4 + 3; // t[2] finishes 3rd by construction
+    expect(row(rows, thirdOf(0), 'r32')?.result).toBe('won'); // group A third (boosted)
+    expect(row(rows, thirdOf(7), 'r32')?.result).toBe('won'); // group H third (boosted)
+    expect(row(rows, thirdOf(8), 'r32')?.result).toBe('lost'); // group I third
+    expect(row(rows, thirdOf(11), 'r32')?.result).toBe('lost'); // group L third
+    // Every team now has exactly one winGroup row and one r32 row.
+    expect(rows.filter((r) => r.roundKey === 'winGroup')).toHaveLength(48);
+    expect(rows.filter((r) => r.roundKey === 'r32')).toHaveLength(48);
   });
 });
 

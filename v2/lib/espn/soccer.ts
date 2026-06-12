@@ -166,3 +166,53 @@ export function computeGroupTables(
   }
   return tables;
 }
+
+export interface SyncResultRow {
+  teamId: number;
+  roundKey: string;
+  result: 'won' | 'lost';
+}
+
+/** Matches needed for a group of n teams to be complete: n*(n-1)/2. */
+const matchesForGroupSize = (n: number) => (n * (n - 1)) / 2;
+
+/**
+ * Result rows decidable from group-stage play so far.
+ * Per COMPLETE group (all 6 matches final): 1st → winGroup won (others lost);
+ * 1st+2nd → r32 won; 4th → r32 lost. The twelve 3rd-place teams' r32 rows are
+ * only written once ALL groups are complete (best 8 thirds advance, ranked
+ * points → GD → GF; FIFA's later tiebreakers are a documented simplification).
+ */
+export function computeGroupResults(
+  matches: SoccerMatch[],
+  baseTeams: BaseTeam[]
+): SyncResultRow[] {
+  const tables = computeGroupTables(matches, baseTeams);
+  const groupKeys = Object.keys(tables);
+  const rows: SyncResultRow[] = [];
+  const thirds: GroupTableRow[] = [];
+  let completeGroups = 0;
+
+  for (const g of groupKeys) {
+    const table = tables[g];
+    const played = table.reduce((sum, r) => sum + r.played, 0) / 2; // each match counts twice
+    if (played < matchesForGroupSize(table.length)) continue; // group not finished
+    completeGroups++;
+
+    table.forEach((r, i) => {
+      rows.push({ teamId: r.teamId, roundKey: 'winGroup', result: i === 0 ? 'won' : 'lost' });
+      if (i <= 1) rows.push({ teamId: r.teamId, roundKey: 'r32', result: 'won' });
+      if (i === 3) rows.push({ teamId: r.teamId, roundKey: 'r32', result: 'lost' });
+      if (i === 2) thirds.push(r);
+    });
+  }
+
+  // Best-8-thirds is only decidable with the full field in.
+  if (completeGroups === groupKeys.length && thirds.length > 0) {
+    thirds.sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf);
+    thirds.forEach((r, i) => {
+      rows.push({ teamId: r.teamId, roundKey: 'r32', result: i < 8 ? 'won' : 'lost' });
+    });
+  }
+  return rows;
+}
