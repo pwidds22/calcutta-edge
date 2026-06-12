@@ -16,6 +16,7 @@ const espn: EspnScoreboard = {
   events: [
     {
       date: '2026-06-11T19:00Z',
+      season: { year: 2026, slug: 'group-stage' },
       competitions: [
         {
           status: { type: { name: 'STATUS_FULL_TIME', completed: true } },
@@ -28,6 +29,7 @@ const espn: EspnScoreboard = {
     },
     {
       date: '2026-06-12T19:00Z',
+      season: { year: 2026, slug: 'group-stage' },
       competitions: [
         {
           status: { type: { name: 'STATUS_SCHEDULED', completed: false } },
@@ -94,6 +96,64 @@ const m = (h: number, a: number, hs: number, as: number): SoccerMatch => ({
   status: 'final',
   winnerTeamId: hs > as ? h : as > hs ? a : null,
   date: '',
+  stage: 'group-stage',
+});
+
+describe('stage parsing', () => {
+  it('extracts the stage from event.season.slug', () => {
+    const ko: EspnScoreboard = {
+      events: [
+        {
+          date: '2026-06-29T19:00Z',
+          season: { year: 2026, slug: 'round-of-32' },
+          competitions: [
+            {
+              status: { type: { name: 'STATUS_FULL_TIME', completed: true } },
+              competitors: [
+                { homeAway: 'home', team: { displayName: 'Brazil' }, score: '2', winner: true },
+                { homeAway: 'away', team: { displayName: 'Mexico' }, score: '1', winner: false },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const matches = parseScoreboard(ko, baseTeams);
+    expect(matches[0].stage).toBe('round-of-32');
+  });
+
+  it('defaults stage to group-stage when season is absent', () => {
+    const noSeason: EspnScoreboard = {
+      events: [
+        {
+          date: 'x',
+          competitions: [
+            {
+              status: { type: { name: 'STATUS_SCHEDULED', completed: false } },
+              competitors: [
+                { homeAway: 'home', team: { displayName: 'Brazil' }, score: '0', winner: false },
+                { homeAway: 'away', team: { displayName: 'Morocco' }, score: '0', winner: false },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const matches = parseScoreboard(noSeason, baseTeams);
+    expect(matches[0].stage).toBe('group-stage');
+  });
+});
+
+describe('computeGroupTables stage filter', () => {
+  it('ignores knockout rematches between same-group teams', () => {
+    // Brazil beat Morocco 2-0 in the groups, then meet again in a knockout.
+    const group = { ...m(9, 10, 2, 0), stage: 'group-stage' };
+    const knockout = { ...m(9, 10, 3, 0), stage: 'quarterfinals' };
+    const tables = computeGroupTables([group, knockout], baseTeams);
+    const brazil = tables['C'].find((r) => r.teamId === 9)!;
+    expect(brazil.played).toBe(1); // knockout rematch NOT counted
+    expect(brazil.gf).toBe(2);
+  });
 });
 
 describe('computeGroupTables', () => {

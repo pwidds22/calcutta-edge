@@ -10,6 +10,9 @@ export interface SoccerMatch {
   status: 'scheduled' | 'final';
   winnerTeamId: number | null;
   date: string;
+  /** ESPN event.season.slug: group-stage | round-of-32 | round-of-16 |
+   *  quarterfinals | semifinals | 3rd-place-match | final */
+  stage: string;
 }
 
 export interface GroupTableRow {
@@ -35,6 +38,7 @@ interface EspnCompetitor {
 }
 interface EspnEvent {
   date?: string;
+  season?: { year?: number; slug?: string };
   competitions?: Array<{
     status?: { type?: { name?: string; completed?: boolean } };
     competitors?: EspnCompetitor[];
@@ -89,6 +93,7 @@ export function parseScoreboard(espn: EspnScoreboard, baseTeams: BaseTeam[]): So
       status: completed ? 'final' : 'scheduled',
       winnerTeamId,
       date: event.date ?? '',
+      stage: event.season?.slug ?? 'group-stage',
     });
   }
   return matches;
@@ -121,6 +126,7 @@ export function computeGroupTables(
   }
 
   for (const match of matches) {
+    if (match.stage !== 'group-stage') continue; // knockout rematches must not pollute tables
     if (match.status !== 'final') continue;
     if (match.homeTeamId == null || match.awayTeamId == null) continue;
     if (match.homeScore == null || match.awayScore == null) continue;
