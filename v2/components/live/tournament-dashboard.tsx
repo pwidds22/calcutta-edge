@@ -44,6 +44,9 @@ function supportsManualSync(config: TournamentConfig): boolean {
   if (config.sport === 'golf') {
     return !!(config.liveSyncMatchers && config.liveSyncMatchers.length > 0);
   }
+  if (config.sport === 'soccer') {
+    return true; // /api/soccer/sync is registry-driven; any live soccer tournament qualifies
+  }
   return config.id === 'march_madness_2026';
 }
 
@@ -84,7 +87,12 @@ export function TournamentDashboard({
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   // Determine which sync endpoint to use based on tournament sport
-  const syncEndpoint = config.sport === 'golf' ? '/api/golf/sync' : '/api/espn/sync';
+  const syncEndpoint =
+    config.sport === 'golf'
+      ? '/api/golf/sync'
+      : config.sport === 'soccer'
+        ? '/api/soccer/sync'
+        : '/api/espn/sync';
 
   const handleEspnSync = useCallback(async () => {
     setSyncing(true);

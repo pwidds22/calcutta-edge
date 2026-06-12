@@ -159,5 +159,6 @@ async function writeSessionResults(
       updates: rows.map((r) => ({ teamId: r.teamId, roundKey: r.roundKey, result: r.result })),
     });
   }
-  return { message: `Synced ${rows.length} result rows`, inserted, updated };
+  // `matched` feeds the dashboard's "Synced N games" message (data.matched fallback).
+  return { message: `Synced ${rows.length} result rows`, matched: rows.length, inserted, updated };
 }
