@@ -48,7 +48,22 @@ export interface EspnScoreboard {
   events?: EspnEvent[];
 }
 
-const normalize = (s: string) => s.trim().toLowerCase();
+// Lowercase, trim, and strip diacritics so ESPN's accented spellings join our
+// config names. NFD splits an accented char into base + combining mark; the
+// U+0300–U+036F range (Combining Diacritical Marks) removes the marks.
+// Handles Curaçao → curacao, Türkiye → turkiye.
+const normalize = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+
+// True renames/reorderings ESPN uses that diacritic-stripping alone can't fix.
+// Keyed by NORMALIZED ESPN displayName → normalized config name. Verified against
+// the live fifa.world feed 2026-06-21. (Curaçao is NOT here — diacritic-stripping
+// already resolves it.)
+const ESPN_NAME_ALIASES: Record<string, string> = {
+  'bosnia-herzegovina': 'bosnia and herzegovina',
+  'congo dr': 'dr congo',
+  turkiye: 'turkey',
+};
 
 /**
  * Parse an ESPN soccer scoreboard into matches, resolving team names to our
@@ -59,8 +74,11 @@ const normalize = (s: string) => s.trim().toLowerCase();
 export function parseScoreboard(espn: EspnScoreboard, baseTeams: BaseTeam[]): SoccerMatch[] {
   const idByName = new Map<string, number>();
   for (const t of baseTeams) idByName.set(normalize(t.name), t.id);
-  const resolve = (name: string | undefined): number | null =>
-    name ? idByName.get(normalize(name)) ?? null : null;
+  const resolve = (name: string | undefined): number | null => {
+    if (!name) return null;
+    const key = normalize(name);
+    return idByName.get(ESPN_NAME_ALIASES[key] ?? key) ?? null;
+  };
 
   const matches: SoccerMatch[] = [];
   for (const event of espn.events ?? []) {

@@ -91,6 +91,55 @@ describe('parseScoreboard', () => {
   });
 });
 
+// Teams whose ESPN displayName differs from our config name. Uses CONFIG names.
+const aliasTeams = [
+  { id: 100, name: 'Bosnia and Herzegovina', seed: 3, group: 'B' },
+  { id: 101, name: 'Turkey', seed: 2, group: 'D' },
+  { id: 102, name: 'Curacao', seed: 4, group: 'E' },
+  { id: 103, name: 'DR Congo', seed: 3, group: 'K' },
+  { id: 104, name: 'Qatar', seed: 4, group: 'B' },
+] as unknown as BaseTeam[];
+
+const oneMatch = (homeName: string, awayName: string): EspnScoreboard => ({
+  events: [
+    {
+      date: 'x',
+      season: { year: 2026, slug: 'group-stage' },
+      competitions: [
+        {
+          status: { type: { name: 'STATUS_FULL_TIME', completed: true } },
+          competitors: [
+            { homeAway: 'home', team: { displayName: homeName }, score: '1', winner: true },
+            { homeAway: 'away', team: { displayName: awayName }, score: '0', winner: false },
+          ],
+        },
+      ],
+    },
+  ],
+});
+
+describe('parseScoreboard ESPN name aliases', () => {
+  it.each([
+    ['Bosnia-Herzegovina', 100],
+    ['Türkiye', 101],
+    ['Curaçao', 102],
+    ['Congo DR', 103],
+  ])('resolves ESPN "%s" to the config team id %i', (espnName, expectedId) => {
+    const [match] = parseScoreboard(oneMatch(espnName as string, 'Qatar'), aliasTeams);
+    expect(match.homeTeamId).toBe(expectedId);
+    expect(match.awayTeamId).toBe(104); // Qatar resolves with no alias needed
+  });
+
+  it('counts an aliased team\'s match in its group table (the reported bug)', () => {
+    // ESPN spells it "Bosnia-Herzegovina"; before the alias fix this match was
+    // silently dropped, leaving Bosnia at P0.
+    const matches = parseScoreboard(oneMatch('Bosnia-Herzegovina', 'Qatar'), aliasTeams);
+    const tables = computeGroupTables(matches, aliasTeams);
+    expect(tables['B'].find((r) => r.teamId === 100)!.played).toBe(1);
+    expect(tables['B'].find((r) => r.teamId === 104)!.played).toBe(1);
+  });
+});
+
 const m = (h: number, a: number, hs: number, as: number): SoccerMatch => ({
   homeTeamId: h,
   awayTeamId: a,
