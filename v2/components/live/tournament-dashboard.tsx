@@ -385,6 +385,8 @@ export function TournamentDashboard({
           baseTeams={baseTeams}
           config={config}
           payoutRules={payoutRules}
+          results={results}
+          propResults={propResults}
           currentUserId={currentUserId}
         />
       )}

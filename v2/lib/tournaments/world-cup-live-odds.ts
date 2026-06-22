@@ -103,6 +103,7 @@ async function fetchLiveProbabilities(): Promise<Map<string, ProbsByRound>> {
   };
   const roundMarkets = (await kget('/markets', { series_ticker: 'KXWCROUND', limit: 1000 })).markets ?? [];
   for (const m of roundMarkets) {
+    if (m.status !== 'active') continue; // settled/illiquid markets read priceOf=0 and would overwrite a good static prob
     const round = roundByEvent[m.event_ticker];
     const name = norm(m.yes_sub_title);
     if (round && name && field.has(name)) ensure(name)[round] = priceOf(m);
@@ -126,6 +127,7 @@ async function fetchLiveProbabilities(): Promise<Map<string, ProbsByRound>> {
   }
   const stageMarkets = (await kget('/markets', { series_ticker: 'KXWCSTAGEOFELIM', limit: 1000 })).markets ?? [];
   for (const m of stageMarkets) {
+    if (m.status !== 'active') continue; // settled markets read priceOf=0 → r32=1, which would clobber the static value
     if (m.yes_sub_title !== 'Group Stage') continue;
     const name = eventNation.get(m.event_ticker);
     if (name && field.has(name)) ensure(name).r32 = Math.max(0, Math.min(0.999, 1 - priceOf(m)));

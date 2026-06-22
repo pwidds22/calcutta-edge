@@ -53,6 +53,18 @@ export function calculateSoccerProjectedStandings(
     }
   }
 
+  // Rounds DECIDED for each team (won OR lost). A round is never re-projected once
+  // resolved — including a LOST parallel winGroup, which getTeamStatus.roundsWon omits
+  // (it records only wins). Without this, every non-group-winner would get phantom
+  // winGroup EV projected on top of its actual (zero) winGroup earnings.
+  const decidedByTeam = new Map<number, Set<string>>();
+  for (const r of results) {
+    if (r.result === 'won' || r.result === 'lost') {
+      if (!decidedByTeam.has(r.team_id)) decidedByTeam.set(r.team_id, new Set());
+      decidedByTeam.get(r.team_id)!.add(r.round_key);
+    }
+  }
+
   const playInLosers = results.length ? buildPlayInLoserSet(baseTeams, results, config) : new Set<number>();
   const winnersPerRound = results.length
     ? countWinnersPerRound(soldTeams, results, config, playInLosers)
@@ -80,16 +92,15 @@ export function calculateSoccerProjectedStandings(
       const valuedTeam = valuedById.get(sold.teamId);
       const teamName = base?.name ?? `Team ${sold.teamId}`;
 
-      // Settled earnings + alive/eliminated status from real results.
+      // Settled earnings (won rounds only pay) + alive/eliminated status.
       let roundEarnings = 0;
-      const settledRoundKeys = new Set<string>();
       let status: 'alive' | 'eliminated' | 'champion' = 'alive';
       if (results.length) {
         const ts = getTeamStatus(sold.teamId, results, config, playInLosers);
         roundEarnings = calculateTeamEarnings(ts.roundsWon, actualPot, adjustedPayoutRules);
-        ts.roundsWon.forEach((rk) => settledRoundKeys.add(rk));
         status = ts.status;
       }
+      const decidedRoundKeys = decidedByTeam.get(sold.teamId) ?? new Set<string>();
       const teamProp = propEarningsByTeam.get(sold.teamId) ?? 0;
       const settledEarnings = roundEarnings + teamProp;
       totalSettledEarnings += settledEarnings;
@@ -102,8 +113,8 @@ export function calculateSoccerProjectedStandings(
       let projectedUnsettled = 0;
       if (valuedTeam) {
         for (const round of config.rounds) {
-          if (settledRoundKeys.has(round.key)) continue;
-          if (status === 'eliminated' && !round.parallel) continue;
+          if (decidedRoundKeys.has(round.key)) continue; // resolved (won→settled, lost→0); never re-project
+          if (status === 'eliminated' && !round.parallel) continue; // dead team can't reach future ladder rounds
           projectedUnsettled += (valuedTeam.roundValues[round.key] ?? 0) * actualPot;
         }
       }

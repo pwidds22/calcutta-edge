@@ -3,14 +3,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BaseTeam, TournamentConfig, PayoutRules, RoundKey } from '@/lib/tournaments/types';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
+import type { TournamentResult } from '@/actions/tournament-results';
+import type { PropResult } from '@/lib/tournaments/props';
 import type { GroupTableRow, SoccerMatch } from '@/lib/espn/soccer';
-import { initializeTeams } from '@/lib/calculations/initialize';
+import { calculateSoccerProjectedStandings } from '@/lib/auction/live/soccer-standings';
 
 interface GroupTablesProps {
   soldTeams: SoldTeam[];
   baseTeams: BaseTeam[];
   config: TournamentConfig;
   payoutRules: PayoutRules;
+  results: TournamentResult[];
+  propResults: PropResult[];
   currentUserId?: string;
 }
 
@@ -25,7 +29,7 @@ interface ScoreboardResponse {
  * tagged by its league owner. Tables come from /api/soccer/scoreboard;
  * ownership comes from the session's sold teams.
  */
-export function GroupTables({ soldTeams, baseTeams, config, payoutRules, currentUserId }: GroupTablesProps) {
+export function GroupTables({ soldTeams, baseTeams, config, payoutRules, results, propResults, currentUserId }: GroupTablesProps) {
   const [data, setData] = useState<ScoreboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [liveTeams, setLiveTeams] = useState<BaseTeam[] | null>(null);
@@ -46,10 +50,10 @@ export function GroupTables({ soldTeams, baseTeams, config, payoutRules, current
       .catch(() => {});
   }, []);
 
-  // Per-team fair-value EV (devigged odds × payout rules × actual pot). Overlay
-  // live Kalshi probs onto our base teams when available; static config otherwise.
+  // Per-team blended EV (settled results + live-odds projection for open rounds),
+  // via the same calc the Standings tab uses — so eliminated teams reflect reality
+  // and won/lost rounds aren't re-projected. Overlay live Kalshi probs when present.
   const evByTeam = useMemo(() => {
-    const pot = soldTeams.reduce((sum, t) => sum + t.amount, 0);
     const liveById = liveTeams ? new Map(liveTeams.map((t) => [t.id, t.probabilities])) : null;
     const teams = liveById
       ? baseTeams.map((t) => {
@@ -57,9 +61,13 @@ export function GroupTables({ soldTeams, baseTeams, config, payoutRules, current
           return p ? { ...t, americanOdds: {} as Record<RoundKey, number>, probabilities: p } : t;
         })
       : baseTeams;
-    const valued = initializeTeams(teams, [], payoutRules, pot, config);
-    return new Map(valued.map((t) => [t.id, t.fairValue ?? 0]));
-  }, [soldTeams, baseTeams, payoutRules, config, liveTeams]);
+    const standings = calculateSoccerProjectedStandings(soldTeams, teams, payoutRules, config, results, propResults);
+    const map = new Map<number, number>();
+    for (const entry of standings) {
+      for (const team of entry.teams) map.set(team.teamId, team.blendedEV ?? 0);
+    }
+    return map;
+  }, [soldTeams, baseTeams, payoutRules, config, liveTeams, results, propResults]);
 
   // teamId → owner from sold teams. winnerId is the auth user id (same id
   // space as currentUserId), winnerName is the participant display name.

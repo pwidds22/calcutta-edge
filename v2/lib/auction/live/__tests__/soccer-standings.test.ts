@@ -56,6 +56,17 @@ describe('calculateSoccerProjectedStandings', () => {
     expect(alpha.blendedEV).toBeCloseTo(38.4, 4);
   });
 
+  it('does NOT re-project a decided (LOST) parallel winGroup round', () => {
+    // Alpha lost its group (winGroup='lost') but is still alive (champion open) —
+    // a 3rd-place advancer. winGroup is resolved, so it must not be re-projected.
+    const results = [{ team_id: 1, round_key: 'winGroup', result: 'lost' }] as unknown as TournamentResult[];
+    const entries = calculateSoccerProjectedStandings(sold, baseTeams, payoutRules, config, results, []);
+    const alpha = entries.find((e) => e.participantId === 'u1')!.teams.find((t) => t.teamId === 1)!;
+    // winGroup decided (lost → 0 earned, 0 projected); champion projected = 60 × 0.6 × 0.9 = 32.4
+    expect(alpha.settledEarnings).toBeCloseTo(0, 4);
+    expect(alpha.blendedEV).toBeCloseTo(32.4, 4);
+  });
+
   it('zeroes ladder-round projection for an eliminated team, keeps parallel winGroup', () => {
     // Beta lost the champion (ladder) round → eliminated. winGroup is parallel, still projects.
     const results = [{ team_id: 2, round_key: 'champion', result: 'lost' }] as unknown as TournamentResult[];
