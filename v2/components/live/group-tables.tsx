@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { BaseTeam, TournamentConfig } from '@/lib/tournaments/types';
+import { useEffect, useMemo, useState } from 'react';
+import type { BaseTeam, TournamentConfig, PayoutRules, RoundKey } from '@/lib/tournaments/types';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { GroupTableRow, SoccerMatch } from '@/lib/espn/soccer';
+import { initializeTeams } from '@/lib/calculations/initialize';
 
 interface GroupTablesProps {
   soldTeams: SoldTeam[];
   baseTeams: BaseTeam[];
   config: TournamentConfig;
+  payoutRules: PayoutRules;
   currentUserId?: string;
 }
 
@@ -23,9 +25,10 @@ interface ScoreboardResponse {
  * tagged by its league owner. Tables come from /api/soccer/scoreboard;
  * ownership comes from the session's sold teams.
  */
-export function GroupTables({ soldTeams, currentUserId }: GroupTablesProps) {
+export function GroupTables({ soldTeams, baseTeams, config, payoutRules, currentUserId }: GroupTablesProps) {
   const [data, setData] = useState<ScoreboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liveTeams, setLiveTeams] = useState<BaseTeam[] | null>(null);
 
   useEffect(() => {
     fetch('/api/soccer/scoreboard')
@@ -33,6 +36,30 @@ export function GroupTables({ soldTeams, currentUserId }: GroupTablesProps) {
       .then((d) => (d.error ? setError(d.error) : setData(d)))
       .catch((e) => setError(String(e)));
   }, []);
+
+  useEffect(() => {
+    fetch('/api/worldcup/ev')
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.teams)) setLiveTeams(d.teams as BaseTeam[]);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Per-team fair-value EV (devigged odds × payout rules × actual pot). Overlay
+  // live Kalshi probs onto our base teams when available; static config otherwise.
+  const evByTeam = useMemo(() => {
+    const pot = soldTeams.reduce((sum, t) => sum + t.amount, 0);
+    const liveById = liveTeams ? new Map(liveTeams.map((t) => [t.id, t.probabilities])) : null;
+    const teams = liveById
+      ? baseTeams.map((t) => {
+          const p = liveById.get(t.id);
+          return p ? { ...t, americanOdds: {} as Record<RoundKey, number>, probabilities: p } : t;
+        })
+      : baseTeams;
+    const valued = initializeTeams(teams, [], payoutRules, pot, config);
+    return new Map(valued.map((t) => [t.id, t.fairValue ?? 0]));
+  }, [soldTeams, baseTeams, payoutRules, config, liveTeams]);
 
   // teamId → owner from sold teams. winnerId is the auth user id (same id
   // space as currentUserId), winnerName is the participant display name.
@@ -72,11 +99,13 @@ export function GroupTables({ soldTeams, currentUserId }: GroupTablesProps) {
                   <th className="px-1 text-right font-medium">P</th>
                   <th className="px-1 text-right font-medium">GD</th>
                   <th className="px-1 text-right font-medium">Pts</th>
+                  <th className="px-1 text-right font-medium">EV</th>
                 </tr>
               </thead>
               <tbody>
                 {data.groups[g].map((row, i) => {
                   const owner = ownerByTeam.get(row.teamId);
+                  const ev = evByTeam.get(row.teamId);
                   return (
                     <tr
                       key={row.teamId}
@@ -93,6 +122,9 @@ export function GroupTables({ soldTeams, currentUserId }: GroupTablesProps) {
                         {row.gd > 0 ? `+${row.gd}` : row.gd}
                       </td>
                       <td className="px-1 text-right font-semibold tabular-nums">{row.points}</td>
+                      <td className="px-1 text-right tabular-nums text-white/50">
+                        {ev !== undefined && ev > 0 ? `$${ev.toFixed(0)}` : '—'}
+                      </td>
                     </tr>
                   );
                 })}

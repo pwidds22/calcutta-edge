@@ -13,6 +13,7 @@ import { GolfLeaderboard } from './golf-leaderboard';
 import { SettlementMatrix } from './settlement-matrix';
 import { PropsEntry } from './props-entry';
 import { GroupTables } from './group-tables';
+import { SoccerStandings } from './soccer-standings';
 import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5, RefreshCw, Activity } from 'lucide-react';
 
 interface TournamentDashboardProps {
@@ -383,11 +384,24 @@ export function TournamentDashboard({
           soldTeams={soldTeams}
           baseTeams={baseTeams}
           config={config}
+          payoutRules={payoutRules}
           currentUserId={currentUserId}
         />
       )}
 
-      {activeTab === 'leaderboard' && (
+      {activeTab === 'leaderboard' && config.sport === 'soccer' && (
+        <SoccerStandings
+          soldTeams={soldTeams}
+          baseTeams={baseTeams}
+          config={config}
+          payoutRules={payoutRules}
+          results={results}
+          propResults={propResults}
+          currentUserId={currentUserId}
+        />
+      )}
+
+      {activeTab === 'leaderboard' && config.sport !== 'soccer' && (
         <Leaderboard
           soldTeams={soldTeams}
           baseTeams={baseTeams}
