@@ -165,3 +165,30 @@ export async function getWorldCupLiveTeams(staticTeams: BaseTeam[]): Promise<Bas
     return staticTeams;
   }
 }
+
+/**
+ * Like getWorldCupLiveTeams but merges live probabilities PER ROUND: a team keeps
+ * its static config probability for any round the live feed is missing (e.g. a
+ * settled market that went inactive mid-tournament). Used for LIVE in-tournament EV
+ * — settled rounds are handled by actual results anyway, so only the still-open
+ * future rounds need fresh odds, and the strict all-7-rounds guard in
+ * getWorldCupLiveTeams would wrongly drop an alive team to fully-stale odds once any
+ * of its earlier-round markets settled. Falls back to static teams on any error.
+ */
+export async function getWorldCupLiveTeamsTolerant(staticTeams: BaseTeam[]): Promise<BaseTeam[]> {
+  try {
+    const live = await fetchLiveProbabilities();
+    if (live.size === 0) return staticTeams;
+    return staticTeams.map((t) => {
+      const p = live.get(norm(t.name));
+      if (!p) return t;
+      const probabilities = { ...(t.probabilities ?? {}) } as Record<RoundKey, number>;
+      for (const r of ROUNDS) {
+        if (typeof p[r] === 'number') probabilities[r] = p[r] as number;
+      }
+      return { ...t, americanOdds: {} as Record<RoundKey, number>, probabilities };
+    });
+  } catch {
+    return staticTeams;
+  }
+}
