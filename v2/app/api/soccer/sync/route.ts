@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
 import { listSyncEligibleTournaments, getTournament } from '@/lib/tournaments/registry';
-import { parseScoreboard, computeGroupResults, computeKnockoutResults } from '@/lib/espn/soccer';
+import {
+  parseScoreboard,
+  computeGroupResults,
+  computeKnockoutResults,
+  computeGroupProps,
+} from '@/lib/espn/soccer';
 import type { SyncResultRow } from '@/lib/espn/soccer';
 import { fetchScoreboardWindow } from '@/lib/espn/soccer-client';
+import { dedupeBy } from '@/lib/auction/winning-bids';
+
+type GroupProps = { worstGroupDiff: number | null; bestGroupDiff: number | null };
+type TournamentEntry = NonNullable<ReturnType<typeof getTournament>>;
 
 /**
  * POST /api/soccer/sync — ESPN World Cup results → tournament_results.
@@ -50,7 +59,8 @@ export async function POST(req: NextRequest) {
   const rows = await computeTournamentRows(session.tournament_id);
   if ('error' in rows) return NextResponse.json(rows, { status: 502 });
   const result = await writeSessionResults(supabase, session.id, rows.rows);
-  return NextResponse.json(result);
+  const props = await writeSessionProps(supabase, session.id, rows.groupProps, tournament);
+  return NextResponse.json({ ...result, ...props });
 }
 
 // Vercel Cron uses GET by default.
@@ -60,10 +70,10 @@ export async function GET(req: NextRequest) {
   return await syncAllSoccerSessions(createAdminClient());
 }
 
-/** Fetch ESPN once per tournament and compute the full decidable row set. */
+/** Fetch ESPN once per tournament and compute the full decidable row set + group props. */
 async function computeTournamentRows(
   tournamentId: string
-): Promise<{ rows: SyncResultRow[] } | { error: string }> {
+): Promise<{ rows: SyncResultRow[]; groupProps: GroupProps } | { error: string }> {
   const tournament = getTournament(tournamentId);
   if (!tournament) return { error: `Unknown tournament ${tournamentId}` };
   try {
@@ -75,10 +85,80 @@ async function computeTournamentRows(
       ...computeGroupResults(matches, tournament.teams),
       ...computeKnockoutResults(matches),
     ];
-    return { rows };
+    const groupProps = computeGroupProps(matches, tournament.teams);
+    return { rows, groupProps };
   } catch (err) {
     return { error: `ESPN fetch failed: ${err}` };
   }
+}
+
+/**
+ * Auto-grade group-stage props (worstGroupDiff / bestGroupDiff) once the group
+ * stage is complete. Each goes to whoever owns the min/max-GD nation. Only grades
+ * props ENABLED in the session; idempotent (skips a prop already in prop_results,
+ * so it never clobbers a manual entry or re-grades on the next sync). topScoringTeam
+ * is tournament-wide and is NOT graded here.
+ */
+async function writeSessionProps(
+  supabase: ReturnType<typeof createAdminClient>,
+  sessionId: string,
+  groupProps: GroupProps,
+  tournament: TournamentEntry
+): Promise<{ propsGraded: number }> {
+  const candidates = [
+    { key: 'worstGroupDiff', teamId: groupProps.worstGroupDiff },
+    { key: 'bestGroupDiff', teamId: groupProps.bestGroupDiff },
+  ].filter((c) => c.teamId != null);
+  if (candidates.length === 0) return { propsGraded: 0 };
+
+  const { data: session } = await supabase
+    .from('auction_sessions')
+    .select('settings, prop_results')
+    .eq('id', sessionId)
+    .single();
+  if (!session) return { propsGraded: 0 };
+
+  const enabled = ((session.settings as { enabledProps?: Array<{ key: string; label: string; percentage: number }> } | null)?.enabledProps) ?? [];
+  const propResults = Array.isArray(session.prop_results) ? [...session.prop_results] : [];
+  const gradedKeys = new Set(propResults.map((r: { key: string }) => r.key));
+
+  // Team → owner (deduped winning bids).
+  const { data: rawBids } = await supabase
+    .from('auction_bids')
+    .select('team_id, bidder_id, created_at')
+    .eq('session_id', sessionId)
+    .eq('is_winning_bid', true)
+    .order('created_at', { ascending: true });
+  const ownerByTeam = new Map<number, string>();
+  for (const b of dedupeBy(rawBids ?? [], (x) => x.team_id)) ownerByTeam.set(b.team_id, b.bidder_id);
+
+  const added: Array<Record<string, unknown>> = [];
+  for (const c of candidates) {
+    const cfg = enabled.find((e) => e.key === c.key);
+    if (!cfg) continue; // prop not enabled in this league
+    if (gradedKeys.has(c.key)) continue; // already graded — idempotent
+    const ownerId = ownerByTeam.get(c.teamId as number);
+    if (!ownerId) continue; // nation unsold — no winner to award
+    const teamName = tournament.teams.find((t) => t.id === c.teamId)?.name ?? `Team ${c.teamId}`;
+    const entry = {
+      key: c.key,
+      label: cfg.label,
+      winnerParticipantId: ownerId,
+      winnerTeamId: c.teamId as number,
+      winners: [{ participantId: ownerId, teamId: c.teamId as number }],
+      metadata: teamName,
+      payoutPercentage: cfg.percentage,
+    };
+    propResults.push(entry);
+    added.push(entry);
+  }
+  if (added.length === 0) return { propsGraded: 0 };
+
+  await supabase.from('auction_sessions').update({ prop_results: propResults }).eq('id', sessionId);
+  for (const entry of added) {
+    await broadcastToChannel(`auction:${sessionId}`, 'PROP_RESULT_UPDATED', entry);
+  }
+  return { propsGraded: added.length };
 }
 
 async function syncAllSoccerSessions(supabase: ReturnType<typeof createAdminClient>) {
@@ -114,7 +194,8 @@ async function syncAllSoccerSessions(supabase: ReturnType<typeof createAdminClie
 
     for (const session of sessions ?? []) {
       const result = await writeSessionResults(supabase, session.id, rows.rows);
-      summaries.push({ tournamentId: tournament.config.id, sessionId: session.id, ...result });
+      const props = await writeSessionProps(supabase, session.id, rows.groupProps, tournament);
+      summaries.push({ tournamentId: tournament.config.id, sessionId: session.id, ...result, ...props });
     }
   }
   return NextResponse.json({ message: `Synced ${summaries.length} sessions`, results: summaries });
