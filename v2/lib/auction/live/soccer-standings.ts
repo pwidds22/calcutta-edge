@@ -73,6 +73,46 @@ export function calculateSoccerProjectedStandings(
     ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config)
     : payoutRules;
 
+  // Team status (alive / eliminated / champion), computed once and reused.
+  const statusByTeam = new Map<number, 'alive' | 'eliminated' | 'champion'>();
+  const roundsWonByTeam = new Map<number, string[]>();
+  if (results.length) {
+    for (const s of soldTeams) {
+      const ts = getTeamStatus(s.teamId, results, config, playInLosers);
+      statusByTeam.set(s.teamId, ts.status);
+      roundsWonByTeam.set(s.teamId, ts.roundsWon);
+    }
+  }
+  const statusOf = (teamId: number) => statusByTeam.get(teamId) ?? 'alive';
+
+  // Per-round normalization so the projection CONSERVES the pot (per-person nets
+  // sum to zero). Among the teams that will project a round (alive + round not yet
+  // decided for them), their devigged odds should sum to the round's remaining
+  // slots — e.g. exactly 16 of the 32 group-stage survivors reach R16. Two reasons
+  // the raw odds fall short: the devig only strips vig (never scales up), and
+  // eliminated teams keep stale future-round probability mass that gets discarded
+  // (they project 0). Scale each round's projected odds to its remaining target =
+  // teamsAdvancing − (teams that already WON it).
+  const roundOddsSum: Record<string, number> = {};
+  for (const round of config.rounds) roundOddsSum[round.key] = 0;
+  for (const s of soldTeams) {
+    const valuedTeam = valuedById.get(s.teamId);
+    if (!valuedTeam) continue;
+    const decided = decidedByTeam.get(s.teamId);
+    const status = statusOf(s.teamId);
+    for (const round of config.rounds) {
+      if (decided?.has(round.key)) continue;
+      if (status === 'eliminated' && !round.parallel) continue;
+      roundOddsSum[round.key] += valuedTeam.odds[round.key] ?? 0;
+    }
+  }
+  const roundScale: Record<string, number> = {};
+  for (const round of config.rounds) {
+    const remainingSlots = Math.max(0, round.teamsAdvancing - (winnersPerRound.get(round.key) ?? 0));
+    const sum = roundOddsSum[round.key];
+    roundScale[round.key] = sum > 1e-9 ? remainingSlots / sum : 1;
+  }
+
   const byParticipant = new Map<string, { name: string; teams: SoldTeam[] }>();
   for (const s of soldTeams) {
     if (!byParticipant.has(s.winnerId)) byParticipant.set(s.winnerId, { name: s.winnerName, teams: [] });
@@ -92,14 +132,11 @@ export function calculateSoccerProjectedStandings(
       const valuedTeam = valuedById.get(sold.teamId);
       const teamName = base?.name ?? `Team ${sold.teamId}`;
 
-      // Settled earnings (won rounds only pay) + alive/eliminated status.
-      let roundEarnings = 0;
-      let status: 'alive' | 'eliminated' | 'champion' = 'alive';
-      if (results.length) {
-        const ts = getTeamStatus(sold.teamId, results, config, playInLosers);
-        roundEarnings = calculateTeamEarnings(ts.roundsWon, actualPot, adjustedPayoutRules);
-        status = ts.status;
-      }
+      // Settled earnings (won rounds only pay) + alive/eliminated status (precomputed).
+      const status = statusOf(sold.teamId);
+      const roundEarnings = results.length
+        ? calculateTeamEarnings(roundsWonByTeam.get(sold.teamId) ?? [], actualPot, adjustedPayoutRules)
+        : 0;
       const decidedRoundKeys = decidedByTeam.get(sold.teamId) ?? new Set<string>();
       const teamProp = propEarningsByTeam.get(sold.teamId) ?? 0;
       const settledEarnings = roundEarnings + teamProp;
@@ -115,7 +152,9 @@ export function calculateSoccerProjectedStandings(
         for (const round of config.rounds) {
           if (decidedRoundKeys.has(round.key)) continue; // resolved (won→settled, lost→0); never re-project
           if (status === 'eliminated' && !round.parallel) continue; // dead team can't reach future ladder rounds
-          projectedUnsettled += (valuedTeam.roundValues[round.key] ?? 0) * actualPot;
+          // roundValues[k] = odds[k] × payoutPct/100; scale normalizes the round to
+          // its remaining slots so the projection conserves the pot.
+          projectedUnsettled += (valuedTeam.roundValues[round.key] ?? 0) * actualPot * roundScale[round.key];
         }
       }
       const blendedEV = settledEarnings + projectedUnsettled;

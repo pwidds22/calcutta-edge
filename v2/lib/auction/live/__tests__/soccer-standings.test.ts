@@ -67,6 +67,34 @@ describe('calculateSoccerProjectedStandings', () => {
     expect(alpha.blendedEV).toBeCloseTo(32.4, 4);
   });
 
+  it('normalizes under-summing odds so the projection conserves the pot (nets sum to 0)', () => {
+    // champion-only config, probs sum to 0.6 (< target 1) — the devig only strips vig,
+    // never scales up, so without per-round normalization the projection would lose 40%.
+    const consConfig = {
+      id: 'cons',
+      sport: 'soccer',
+      devigStrategy: 'global',
+      rounds: [
+        { key: 'champion', label: 'C', teamsAdvancing: 1, payoutLabel: 'C', gameLabel: 'C', devigScope: 'global' },
+      ],
+      groups: [{ key: 'A', label: 'Group A' }],
+    } as unknown as TournamentConfig;
+    const consTeams = [
+      { id: 1, name: 'A', seed: 1, group: 'A', americanOdds: {}, probabilities: { champion: 0.3 } },
+      { id: 2, name: 'B', seed: 2, group: 'A', americanOdds: {}, probabilities: { champion: 0.3 } },
+    ] as unknown as BaseTeam[];
+    const consPayout = { champion: 100 } as unknown as PayoutRules;
+    const consSold: SoldTeam[] = [
+      { teamId: 1, winnerId: 'u1', winnerName: 'P', amount: 50 },
+      { teamId: 2, winnerId: 'u2', winnerName: 'Q', amount: 50 },
+    ];
+    const entries = calculateSoccerProjectedStandings(consSold, consTeams, consPayout, consConfig, [], []);
+    const totalBlended = entries.reduce((s, e) => s + e.blendedEarnings, 0);
+    const totalNet = entries.reduce((s, e) => s + e.projectedPL, 0);
+    expect(totalBlended).toBeCloseTo(100, 4); // = pot, not 60
+    expect(totalNet).toBeCloseTo(0, 4); // zero-sum
+  });
+
   it('zeroes ladder-round projection for an eliminated team, keeps parallel winGroup', () => {
     // Beta lost the champion (ladder) round → eliminated. winGroup is parallel, still projects.
     const results = [{ team_id: 2, round_key: 'champion', result: 'lost' }] as unknown as TournamentResult[];
