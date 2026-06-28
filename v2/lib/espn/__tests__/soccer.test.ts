@@ -4,6 +4,7 @@ import {
   computeGroupTables,
   computeGroupResults,
   computeKnockoutResults,
+  computeGroupProps,
 } from '../soccer';
 import type { SoccerMatch, EspnScoreboard, SyncResultRow } from '../soccer';
 import type { BaseTeam } from '@/lib/tournaments/types';
@@ -232,6 +233,24 @@ const groupIds = (gi: number): [number, number, number, number] =>
 
 const row = (rows: SyncResultRow[], teamId: number, roundKey: string) =>
   rows.find((r) => r.teamId === teamId && r.roundKey === roundKey);
+
+describe('computeGroupProps', () => {
+  it('returns nulls until ALL groups are complete', () => {
+    const matches = GROUPS.flatMap((_, gi) => fullGroup(groupIds(gi))).slice(0, -1); // last match missing
+    expect(computeGroupProps(matches, fullField)).toEqual({ worstGroupDiff: null, bestGroupDiff: null });
+  });
+
+  it('picks the global min-GD team as worstGroupDiff and max-GD as bestGroupDiff', () => {
+    // In fullGroup, t[3] loses every game (worst in its group) and t[0] wins every game
+    // (best). Boost group A's 4th-place loss margin so A's t[3] is the GLOBAL worst.
+    const matches = GROUPS.flatMap((_, gi) => fullGroup(groupIds(gi), gi === 0 ? 5 : 0));
+    const props = computeGroupProps(matches, fullField);
+    expect(props.worstGroupDiff).toBe(groupIds(0)[3]); // group A's 4th team (GD -9)
+    // best is one of the unbeaten group winners (GD +6); just assert it's a valid winner id.
+    const winnerIds = GROUPS.map((_, gi) => groupIds(gi)[0]);
+    expect(winnerIds).toContain(props.bestGroupDiff);
+  });
+});
 
 describe('computeGroupResults', () => {
   it('writes nothing for an incomplete group', () => {

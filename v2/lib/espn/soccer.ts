@@ -235,6 +235,40 @@ export function computeGroupResults(
   return rows;
 }
 
+/**
+ * Group-stage prop winners, computed from the FINAL group tables. Only returns a
+ * result once EVERY group is complete (so goal differential is settled across the
+ * whole field). worstGroupDiff = the nation with the lowest GD (Wooden Spoon),
+ * bestGroupDiff = the highest GD. Ties break by goals-for (fewer is worse / more is
+ * better). topScoringTeam is NOT computed here — it spans the whole tournament, so
+ * it's graded at the end, not at group completion.
+ */
+export function computeGroupProps(
+  matches: SoccerMatch[],
+  baseTeams: BaseTeam[]
+): { worstGroupDiff: number | null; bestGroupDiff: number | null } {
+  const tables = computeGroupTables(matches, baseTeams);
+  const groupKeys = Object.keys(tables);
+  if (groupKeys.length === 0) return { worstGroupDiff: null, bestGroupDiff: null };
+
+  for (const g of groupKeys) {
+    const table = tables[g];
+    const played = table.reduce((sum, r) => sum + r.played, 0) / 2; // each match counts twice
+    if (played < (table.length * (table.length - 1)) / 2) {
+      return { worstGroupDiff: null, bestGroupDiff: null }; // a group is unfinished
+    }
+  }
+
+  const rows = groupKeys.flatMap((g) => tables[g]);
+  let worst = rows[0];
+  let best = rows[0];
+  for (const r of rows) {
+    if (r.gd < worst.gd || (r.gd === worst.gd && r.gf < worst.gf)) worst = r;
+    if (r.gd > best.gd || (r.gd === best.gd && r.gf > best.gf)) best = r;
+  }
+  return { worstGroupDiff: worst.teamId, bestGroupDiff: best.teamId };
+}
+
 // Stage slug → the round the WINNER reaches (off-by-one by design).
 // 3rd-place-match decides nothing: both SF losers already hold final:lost.
 const STAGE_DECIDES: Record<string, string> = {
