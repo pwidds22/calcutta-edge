@@ -8,6 +8,7 @@ import { getTournament, isHostable } from '@/lib/tournaments/registry';
 import { getUnbundledTeams } from '@/lib/tournaments/bundles';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { SessionSettings } from '@/lib/auction/live/types';
+import { dedupeBy } from '@/lib/auction/winning-bids';
 
 /**
  * Parse team_order from DB (text[]) back to (number | string)[].
@@ -214,13 +215,15 @@ export async function getSessionState(sessionId: string) {
     .eq('session_id', sessionId)
     .order('joined_at', { ascending: true });
 
-  // Load winning bids (sold teams)
-  const { data: winningBids } = await supabase
+  // Load winning bids (sold teams). Dedupe by team — a team is won once, but the
+  // settling UPDATE can stamp two rows winning (see lib/auction/winning-bids.ts).
+  const { data: rawWinningBids } = await supabase
     .from('auction_bids')
     .select('team_id, bidder_id, amount, created_at')
     .eq('session_id', sessionId)
     .eq('is_winning_bid', true)
     .order('created_at', { ascending: true });
+  const winningBids = dedupeBy(rawWinningBids ?? [], (b) => b.team_id);
 
   // Load current team's bid history
   const currentOrderItem = session.team_order?.[session.current_team_idx];

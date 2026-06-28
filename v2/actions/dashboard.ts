@@ -10,6 +10,7 @@ import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { PropResult } from '@/lib/tournaments/props';
 import { getPropWinners } from '@/lib/tournaments/props';
+import { dedupeBy } from '@/lib/auction/winning-bids';
 import { normalizeName } from '@/lib/datagolf/ev';
 import { fetchInPlay, fetchPreTournament, formatPlayerName } from '@/lib/datagolf/client';
 import type { DataGolfInPlayPlayer } from '@/lib/datagolf/client';
@@ -145,9 +146,11 @@ export async function getDashboardData(): Promise<DashboardData> {
     .eq('is_winning_bid', true)
     .in('session_id', sessionIds);
 
-  // Group bids by session
+  // Group bids by session. Dedupe per (session, team) — a team is won once, but the
+  // settling UPDATE can stamp two rows winning (see lib/auction/winning-bids.ts),
+  // which would otherwise double-count spend, pot, and P&L here.
   const bidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
-  for (const bid of winningBids ?? []) {
+  for (const bid of dedupeBy(winningBids ?? [], (b) => `${b.session_id}:${b.team_id}`)) {
     const list = bidsBySession.get(bid.session_id) ?? [];
     list.push({ team_id: bid.team_id, amount: Number(bid.amount) });
     bidsBySession.set(bid.session_id, list);
@@ -162,7 +165,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const potBySession = new Map<string, number>();
   const allBidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
-  for (const bid of allWinningBids ?? []) {
+  for (const bid of dedupeBy(allWinningBids ?? [], (b) => `${b.session_id}:${b.team_id}`)) {
     potBySession.set(bid.session_id, (potBySession.get(bid.session_id) ?? 0) + Number(bid.amount));
     const list = allBidsBySession.get(bid.session_id) ?? [];
     list.push({ team_id: bid.team_id, amount: Number(bid.amount) });
