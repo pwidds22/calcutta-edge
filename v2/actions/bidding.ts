@@ -19,6 +19,51 @@ function parseTeamOrder(raw: unknown): (number | string)[] {
   });
 }
 
+/**
+ * Mark exactly ONE bid as the winning bid for a team, after clearing any prior
+ * winner for that team. Idempotent: settling the same team twice (e.g. a stray
+ * re-close, or a re-auction) ends with exactly one winning row, never two.
+ *
+ * Replaces the old `update(is_winning_bid: true).eq(session,team,bidder,amount)`
+ * which marked EVERY matching row — so if the team was settled twice, two bid
+ * rows got flagged winning and the team was double-counted in pot/settlement/EV
+ * (caught 2026-06-22: a WC owner showed "Ivory Coast" twice).
+ */
+async function markSingleTeamWinner(
+  admin: ReturnType<typeof createAdminClient>,
+  sessionId: string,
+  teamId: number,
+  winnerId: string,
+  winAmount: number
+): Promise<void> {
+  // Clear any existing winner for this team (handles a re-settle).
+  await admin
+    .from('auction_bids')
+    .update({ is_winning_bid: false })
+    .eq('session_id', sessionId)
+    .eq('team_id', teamId)
+    .eq('is_winning_bid', true);
+
+  // Mark the single most-recent matching bid as the winner.
+  const { data: bid } = await admin
+    .from('auction_bids')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('team_id', teamId)
+    .eq('bidder_id', winnerId)
+    .eq('amount', winAmount)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (bid) {
+    await admin
+      .from('auction_bids')
+      .update({ is_winning_bid: true })
+      .eq('id', bid.id);
+  }
+}
+
 function channelName(sessionId: string) {
   return `auction:${sessionId}`;
 }
@@ -467,14 +512,8 @@ export async function sellTeam(sessionId: string) {
   } else {
     const teamId = currentOrderItem as number;
 
-    // 1. Mark winning bid
-    await admin
-      .from('auction_bids')
-      .update({ is_winning_bid: true })
-      .eq('session_id', sessionId)
-      .eq('team_id', teamId)
-      .eq('bidder_id', winnerId)
-      .eq('amount', winAmount);
+    // 1. Mark winning bid (idempotent, single-row — see markSingleTeamWinner)
+    await markSingleTeamWinner(admin, sessionId, teamId, winnerId, winAmount);
 
     // 3. Auto-sync: update paid participants' auction_data
     await syncAuctionData(
@@ -990,14 +1029,21 @@ export async function autoAdvance(sessionId: string, opts?: { manual?: boolean }
     const winnerId = session.current_highest_bidder_id!;
     const winAmount = session.current_highest_bid;
 
-    // Mark winning bid
-    await admin
-      .from('auction_bids')
-      .update({ is_winning_bid: true })
-      .eq('session_id', sessionId)
-      .eq('team_id', teamId)
-      .eq('bidder_id', winnerId)
-      .eq('amount', winAmount);
+    // Mark winning bid. Single teams use the idempotent single-row helper (the
+    // duplicate-winning-bid fix). The bundle first-team mark is left as-is because
+    // its amount is rewritten to the split price just below, so a helper that
+    // re-looks-up by the original amount would misbehave on a re-settle.
+    if (isBundle) {
+      await admin
+        .from('auction_bids')
+        .update({ is_winning_bid: true })
+        .eq('session_id', sessionId)
+        .eq('team_id', teamId)
+        .eq('bidder_id', winnerId)
+        .eq('amount', winAmount);
+    } else {
+      await markSingleTeamWinner(admin, sessionId, teamId, winnerId, winAmount);
+    }
 
     // Get winner name
     const { data: winnerParticipant } = await admin
