@@ -14,7 +14,7 @@ import type { PropResult } from '@/lib/tournaments/props';
 import { getPropWinners } from '@/lib/tournaments/props';
 import { formatPlayerName } from '@/lib/datagolf/client';
 import { normalizeName } from '@/lib/datagolf/ev';
-import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from './actual-payouts';
+import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies, getCompletedRounds } from './actual-payouts';
 import type { TournamentConfig } from '@/lib/tournaments/types';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -135,12 +135,18 @@ export function calculateProjectedStandings(
     ? buildPlayInLoserSet(baseTeams, results, config)
     : new Set<number>();
 
-  // Adjust payout rules for ties (more winners than teamsAdvancing)
+  // Adjust payout rules for ties (more winners than teamsAdvancing) — but only for
+  // COMPLETED rounds. Golf tiers resolve atomically (cut, then final standings), so
+  // this is a no-op today; the gate is defensive so a partially-entered round can't
+  // hand its whole budget to the few decided winners (the soccer R16 over-credit bug).
   const winnersPerRound = (config && results && results.length > 0)
     ? countWinnersPerRound(soldTeams, results, config, playInLosers)
     : new Map<string, number>();
+  const completedRounds = (config && results && results.length > 0)
+    ? new Set(getCompletedRounds(soldTeams.map((s) => s.teamId), results, config))
+    : new Set<string>();
   const adjustedPayoutRules = (config && winnersPerRound.size > 0)
-    ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config)
+    ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config, completedRounds)
     : payoutRules;
 
   // Group sold teams by participant

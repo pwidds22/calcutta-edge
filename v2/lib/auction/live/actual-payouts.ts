@@ -389,14 +389,25 @@ export function calculateLeaderboard(
  *
  * This ensures POT === DISTRIBUTED when all tiers have at least one winner.
  * For unsettled rounds (no winners yet), pct stays unchanged.
+ *
+ * `onlyRounds` (optional): restrict redistribution to these round keys — pass the
+ * COMPLETED rounds for a live/in-progress view. This matters for elimination ladders
+ * (soccer): mid-round, redistributing a tier's whole budget among the handful of
+ * already-decided winners massively over-credits them (a single R32 winner would get
+ * the entire 16-slot R16 budget), while the still-pending slots are ALSO covered by
+ * the projection — double-counting the pot. Gating on completion settles decided
+ * winners at the base per-slot rate and leaves pending slots to the projection.
+ * Omitted (golf final settlement) → adjust every round, preserving existing behavior.
  */
 export function adjustPayoutRulesForTies(
   payoutRules: PayoutRules,
   winnersPerRound: Map<string, number>,
-  config: TournamentConfig
+  config: TournamentConfig,
+  onlyRounds?: Set<string>
 ): PayoutRules {
   const adjusted = { ...payoutRules };
   for (const round of config.rounds) {
+    if (onlyRounds && !onlyRounds.has(round.key)) continue;
     const actualWinners = winnersPerRound.get(round.key) ?? 0;
     const expected = round.teamsAdvancing;
     if (actualWinners > 0 && expected > 0) {

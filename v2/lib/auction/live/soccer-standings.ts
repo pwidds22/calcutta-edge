@@ -22,6 +22,7 @@ import {
   buildPlayInLoserSet,
   countWinnersPerRound,
   adjustPayoutRulesForTies,
+  getCompletedRounds,
 } from './actual-payouts';
 import type { ProjectedEntry, ProjectedTeam } from './projected-standings';
 
@@ -69,8 +70,16 @@ export function calculateSoccerProjectedStandings(
   const winnersPerRound = results.length
     ? countWinnersPerRound(soldTeams, results, config, playInLosers)
     : new Map<string, number>();
+  // Only redistribute a round's budget among its winners once the round is COMPLETE.
+  // Mid-round, the tie adjustment would hand the few already-decided winners the whole
+  // tier budget (a lone R32 winner → the entire 16-slot R16 budget), while the pending
+  // slots are ALSO covered by the roundScale projection below — double-counting the pot.
+  // Completed rounds settle normally; in-progress rounds pay base pct and project the rest.
+  const completedRounds = results.length
+    ? new Set(getCompletedRounds(soldTeams.map((s) => s.teamId), results, config))
+    : new Set<string>();
   const adjustedPayoutRules = winnersPerRound.size
-    ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config)
+    ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config, completedRounds)
     : payoutRules;
 
   // Team status (alive / eliminated / champion), computed once and reused.

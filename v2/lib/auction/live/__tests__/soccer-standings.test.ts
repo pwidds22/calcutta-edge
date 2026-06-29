@@ -95,6 +95,51 @@ describe('calculateSoccerProjectedStandings', () => {
     expect(totalNet).toBeCloseTo(0, 4); // zero-sum
   });
 
+  it('does NOT inflate a mid-round winner — the tie adjustment must wait for round completion', () => {
+    // Reproduces the Canada bug: a multi-slot ladder round (reach, teamsAdvancing=2)
+    // where only ONE of the two eventual winners has been decided. The tie adjustment
+    // must NOT hand that single winner the whole round budget — the remaining slot is
+    // still pending and is covered by the projection. Pot must stay conserved.
+    const midConfig = {
+      id: 'mid',
+      sport: 'soccer',
+      devigStrategy: 'global',
+      rounds: [
+        { key: 'reach', label: 'R', teamsAdvancing: 2, payoutLabel: 'R', gameLabel: 'R', devigScope: 'global' },
+        { key: 'champion', label: 'C', teamsAdvancing: 1, payoutLabel: 'C', gameLabel: 'C', devigScope: 'global' },
+      ],
+      groups: [{ key: 'A', label: 'Group A' }],
+    } as unknown as TournamentConfig;
+    // 4 teams: reach probs sum to 2 (= target), champion probs sum to 1 (= target) → devig no-op.
+    const midTeams = [
+      { id: 1, name: 'T1', seed: 1, group: 'A', americanOdds: {}, probabilities: { reach: 0.5, champion: 0.25 } },
+      { id: 2, name: 'T2', seed: 2, group: 'A', americanOdds: {}, probabilities: { reach: 0.5, champion: 0.25 } },
+      { id: 3, name: 'T3', seed: 3, group: 'A', americanOdds: {}, probabilities: { reach: 0.5, champion: 0.25 } },
+      { id: 4, name: 'T4', seed: 4, group: 'A', americanOdds: {}, probabilities: { reach: 0.5, champion: 0.25 } },
+    ] as unknown as BaseTeam[];
+    const midPayout = { reach: 25, champion: 50 } as unknown as PayoutRules; // 25×2 + 50×1 = 100
+    const midSold: SoldTeam[] = [
+      { teamId: 1, winnerId: 'u1', winnerName: 'A', amount: 25 },
+      { teamId: 2, winnerId: 'u2', winnerName: 'B', amount: 25 },
+      { teamId: 3, winnerId: 'u3', winnerName: 'C', amount: 25 },
+      { teamId: 4, winnerId: 'u4', winnerName: 'D', amount: 25 },
+    ]; // pot = 100
+    // Only team 1 has won 'reach' so far (1 of the 2 slots decided).
+    const results = [{ team_id: 1, round_key: 'reach', result: 'won' }] as unknown as TournamentResult[];
+    const entries = calculateSoccerProjectedStandings(midSold, midTeams, midPayout, midConfig, results, []);
+
+    const totalBlended = entries.reduce((s, e) => s + e.blendedEarnings, 0);
+    const totalNet = entries.reduce((s, e) => s + e.projectedPL, 0);
+    expect(totalBlended).toBeCloseTo(100, 4); // pot conserved — NOT 125
+    expect(totalNet).toBeCloseTo(0, 4); // zero-sum
+
+    // Team 1 settles its won round at the BASE rate (one slot = 25% × 100 = 25),
+    // not the whole 2-slot budget. + projected champion (0.25 × 50% × 100 = 12.5) = 37.5.
+    const t1 = entries.find((e) => e.participantId === 'u1')!.teams.find((t) => t.teamId === 1)!;
+    expect(t1.settledEarnings).toBeCloseTo(25, 4);
+    expect(t1.blendedEV).toBeCloseTo(37.5, 4);
+  });
+
   it('zeroes ladder-round projection for an eliminated team, keeps parallel winGroup', () => {
     // Beta lost the champion (ladder) round → eliminated. winGroup is parallel, still projects.
     const results = [{ team_id: 2, round_key: 'champion', result: 'lost' }] as unknown as TournamentResult[];
