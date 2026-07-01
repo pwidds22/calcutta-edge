@@ -69,6 +69,50 @@ describe('parseScoreboard', () => {
     expect(sched.winnerTeamId).toBeNull();
   });
 
+  it('parses an in-play match: status=in, live scores, no winner yet', () => {
+    // Mirrors the real feed (Belgium v Senegal, STATUS_SECOND_HALF, state 'in').
+    const live: EspnScoreboard = {
+      events: [
+        {
+          date: '2026-07-01T20:00Z',
+          season: { year: 2026, slug: 'round-of-32' },
+          competitions: [
+            {
+              status: { type: { name: 'STATUS_SECOND_HALF', completed: false, state: 'in' } },
+              competitors: [
+                { homeAway: 'home', team: { displayName: 'Brazil' }, score: '0', winner: false },
+                { homeAway: 'away', team: { displayName: 'Morocco' }, score: '2', winner: false },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const [m] = parseScoreboard(live, baseTeams);
+    expect(m.status).toBe('in');
+    expect(m.homeScore).toBe(0);
+    expect(m.awayScore).toBe(2);
+    expect(m.winnerTeamId).toBeNull(); // winner stays completed-only
+  });
+
+  it('an in-play match does NOT count toward group tables', () => {
+    const live: SoccerMatch = {
+      homeTeamId: 9,
+      awayTeamId: 10,
+      homeName: 'Brazil',
+      awayName: 'Morocco',
+      homeScore: 3,
+      awayScore: 0,
+      status: 'in',
+      winnerTeamId: null,
+      date: '2026-06-12T19:00Z',
+      stage: 'group-stage',
+    };
+    const groups = computeGroupTables([live], baseTeams);
+    const brazil = groups['C'].find((r) => r.teamId === 9)!;
+    expect(brazil.played).toBe(0); // only 'final' matches count
+  });
+
   it('skips matches whose team names do not resolve, without throwing', () => {
     const weird: EspnScoreboard = {
       events: [

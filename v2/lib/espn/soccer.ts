@@ -7,7 +7,9 @@ export interface SoccerMatch {
   awayName: string;
   homeScore: number | null;
   awayScore: number | null;
-  status: 'scheduled' | 'final';
+  /** 'in' = currently being played (live scores populated, no winner yet).
+   *  All settlement/table consumers gate on 'final', so 'in' is display-only. */
+  status: 'scheduled' | 'in' | 'final';
   winnerTeamId: number | null;
   date: string;
   /** ESPN event.season.slug: group-stage | round-of-32 | round-of-16 |
@@ -40,7 +42,7 @@ interface EspnEvent {
   date?: string;
   season?: { year?: number; slug?: string };
   competitions?: Array<{
-    status?: { type?: { name?: string; completed?: boolean } };
+    status?: { type?: { name?: string; completed?: boolean; state?: string } };
     competitors?: EspnCompetitor[];
   }>;
 }
@@ -89,10 +91,13 @@ export function parseScoreboard(espn: EspnScoreboard, baseTeams: BaseTeam[]): So
     if (!home || !away) continue;
 
     const completed = comp.status?.type?.completed === true;
+    // ESPN state: 'pre' | 'in' | 'post'. In-play matches carry live scores but
+    // no winner; winnerTeamId stays completed-only (shootout-safe convention).
+    const inPlay = !completed && comp.status?.type?.state === 'in';
     const homeId = resolve(home.team?.displayName);
     const awayId = resolve(away.team?.displayName);
-    const homeScore = completed ? Number(home.score) : null;
-    const awayScore = completed ? Number(away.score) : null;
+    const homeScore = (completed || inPlay) && home.score != null ? Number(home.score) : null;
+    const awayScore = (completed || inPlay) && away.score != null ? Number(away.score) : null;
     const winnerTeamId = !completed
       ? null
       : home.winner
@@ -108,7 +113,7 @@ export function parseScoreboard(espn: EspnScoreboard, baseTeams: BaseTeam[]): So
       awayName: away.team?.displayName ?? '',
       homeScore,
       awayScore,
-      status: completed ? 'final' : 'scheduled',
+      status: completed ? 'final' : inPlay ? 'in' : 'scheduled',
       winnerTeamId,
       date: event.date ?? '',
       stage: event.season?.slug ?? 'group-stage',
