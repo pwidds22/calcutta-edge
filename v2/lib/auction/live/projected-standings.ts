@@ -30,6 +30,9 @@ export interface ProjectedTeam {
   blendedEV: number | null; // settled + projected for unsettled rounds
   winProb: number | null;
   propEarnings: number; // prop earnings attributed to this specific team
+  /** Elimination status — set by the soccer calc; golf leaves it undefined (its
+   *  Leaderboard derives status separately via TeamResult). */
+  status?: 'alive' | 'eliminated' | 'champion';
 }
 
 export interface ProjectedEntry {

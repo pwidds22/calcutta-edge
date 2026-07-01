@@ -257,7 +257,7 @@ export function TournamentDashboard({
       ? [{ key: 'golf-leaderboard' as TabKey, label: 'Live Leaderboard', icon: Activity }]
       : []),
     ...(config.sport === 'soccer'
-      ? [{ key: 'group-tables' as TabKey, label: 'Group Tables', icon: Trophy }]
+      ? [{ key: 'group-tables' as TabKey, label: 'Bracket & Groups', icon: Trophy }]
       : []),
     { key: 'leaderboard', label: 'Standings', icon: BarChart3 },
     { key: 'settlement', label: 'Settlement', icon: DollarSign },

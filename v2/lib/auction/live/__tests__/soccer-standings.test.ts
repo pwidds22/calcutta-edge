@@ -140,6 +140,22 @@ describe('calculateSoccerProjectedStandings', () => {
     expect(t1.blendedEV).toBeCloseTo(37.5, 4);
   });
 
+  it('exposes team status on ProjectedTeam (alive / eliminated / champion)', () => {
+    // No results → everyone alive (status defaults).
+    const noResults = calculateSoccerProjectedStandings(sold, baseTeams, payoutRules, config, [], []);
+    for (const t of noResults[0].teams) expect(t.status).toBe('alive');
+
+    // Beta lost the champion (ladder) round → eliminated; Alpha won it → champion.
+    const results = [
+      { team_id: 1, round_key: 'champion', result: 'won' },
+      { team_id: 2, round_key: 'champion', result: 'lost' },
+    ] as unknown as TournamentResult[];
+    const entries = calculateSoccerProjectedStandings(sold, baseTeams, payoutRules, config, results, []);
+    const pat = entries.find((e) => e.participantId === 'u1')!;
+    expect(pat.teams.find((t) => t.teamId === 1)!.status).toBe('champion');
+    expect(pat.teams.find((t) => t.teamId === 2)!.status).toBe('eliminated');
+  });
+
   it('zeroes ladder-round projection for an eliminated team, keeps parallel winGroup', () => {
     // Beta lost the champion (ladder) round → eliminated. winGroup is parallel, still projects.
     const results = [{ team_id: 2, round_key: 'champion', result: 'lost' }] as unknown as TournamentResult[];

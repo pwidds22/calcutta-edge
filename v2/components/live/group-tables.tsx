@@ -7,6 +7,7 @@ import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
 import type { GroupTableRow, SoccerMatch } from '@/lib/espn/soccer';
 import { calculateSoccerProjectedStandings } from '@/lib/auction/live/soccer-standings';
+import { KnockoutBracket } from './knockout-bracket';
 
 interface GroupTablesProps {
   soldTeams: SoldTeam[];
@@ -22,6 +23,7 @@ interface ScoreboardResponse {
   groups: Record<string, GroupTableRow[]>;
   recentMatches: SoccerMatch[];
   fixtures: SoccerMatch[];
+  knockoutMatches?: SoccerMatch[];
 }
 
 /**
@@ -92,8 +94,16 @@ export function GroupTables({ soldTeams, baseTeams, config, payoutRules, results
 
   const groupKeys = Object.keys(data.groups).sort();
 
+  // Show the bracket once at least one knockout slot has a RESOLVED team —
+  // ESPN publishes all-placeholder knockout fixtures during the group stage,
+  // and an all-TBD bracket is noise.
+  const knockoutMatches = data.knockoutMatches ?? [];
+  const knockoutStarted = knockoutMatches.some((m) => m.homeTeamId !== null || m.awayTeamId !== null);
+
   return (
     <div className="space-y-4">
+      {knockoutStarted && <KnockoutBracket matches={knockoutMatches} ownerByTeam={ownerByTeam} />}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {groupKeys.map((g) => (
           <div key={g} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">

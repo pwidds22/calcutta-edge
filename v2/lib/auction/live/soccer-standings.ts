@@ -182,6 +182,7 @@ export function calculateSoccerProjectedStandings(
         blendedEV,
         winProb: valuedTeam?.odds['champion'] ?? null,
         propEarnings: teamProp,
+        status,
       });
     }
 

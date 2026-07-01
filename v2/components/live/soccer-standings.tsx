@@ -6,7 +6,7 @@ import type { BaseTeam, TournamentConfig, PayoutRules, RoundKey } from '@/lib/to
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
 import { calculateSoccerProjectedStandings } from '@/lib/auction/live/soccer-standings';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Crown } from 'lucide-react';
 
 interface SoccerStandingsProps {
   soldTeams: SoldTeam[];
@@ -89,6 +89,8 @@ export function SoccerStandings({
         const isOpen = expanded === entry.participantId;
         const pl = entry.projectedPL;
         const plColor = pl > 0.005 ? 'text-emerald-400' : pl < -0.005 ? 'text-red-400' : 'text-white/40';
+        // Teams still in the tournament (status defaults to alive pre-results).
+        const aliveCount = entry.teams.filter((t) => (t.status ?? 'alive') !== 'eliminated').length;
 
         return (
           <div key={entry.participantId}>
@@ -107,7 +109,11 @@ export function SoccerStandings({
                       {entry.participantName}
                     </p>
                     <p className="text-[10px] text-white/30">
-                      {entry.teamsOwned} team{entry.teamsOwned !== 1 ? 's' : ''} · spent {money(entry.totalSpent)}
+                      {entry.teamsOwned} team{entry.teamsOwned !== 1 ? 's' : ''} ·{' '}
+                      <span className={aliveCount > 0 ? 'text-emerald-400/70' : 'text-red-400/70'}>
+                        {aliveCount} of {entry.teamsOwned} alive
+                      </span>{' '}
+                      · spent {money(entry.totalSpent)}
                     </p>
                   </div>
                 </div>
@@ -122,16 +128,26 @@ export function SoccerStandings({
               <div className="mt-1 space-y-0.5 rounded-lg border border-white/[0.04] bg-white/[0.01] px-4 py-2">
                 {entry.teams.map((team) => {
                   const teamPL = (team.blendedEV ?? 0) - team.purchasePrice;
+                  // Eliminated teams are "tapped out" — dim the row so their number
+                  // reads as final, not still projecting. Alive rows stay bright.
+                  const isOut = team.status === 'eliminated';
+                  const isChamp = team.status === 'champion';
                   return (
                     <div key={team.teamId} className="flex items-center justify-between py-0.5 text-xs">
-                      <span className="truncate text-white/60">
-                        {team.group ? <span className="text-white/30">({team.group}) </span> : null}
-                        {team.teamName}
+                      <span className={`flex min-w-0 items-center truncate ${isOut ? 'text-white/30' : isChamp ? 'text-amber-300' : 'text-white/60'}`}>
+                        {isChamp && <Crown className="mr-1 size-3 shrink-0 text-amber-400" />}
+                        {team.group ? <span className={isOut ? 'text-white/20' : 'text-white/30'}>({team.group})&nbsp;</span> : null}
+                        <span className="truncate">{team.teamName}</span>
+                        {isOut && (
+                          <span className="ml-1.5 shrink-0 rounded bg-red-500/10 px-1 py-px text-[9px] font-semibold tracking-wide text-red-400">
+                            OUT
+                          </span>
+                        )}
                       </span>
                       <span className="flex items-center gap-2 tabular-nums">
-                        <span className="text-white/30">paid {money(team.purchasePrice)}</span>
-                        <span className="text-white/70">{money(team.blendedEV ?? 0)}</span>
-                        <span className={teamPL >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}>{signed(teamPL)}</span>
+                        <span className={isOut ? 'text-white/20' : 'text-white/30'}>paid {money(team.purchasePrice)}</span>
+                        <span className={isOut ? 'text-white/40' : 'text-white/70'}>{money(team.blendedEV ?? 0)}</span>
+                        <span className={`${teamPL >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'} ${isOut ? 'opacity-60' : ''}`}>{signed(teamPL)}</span>
                       </span>
                     </div>
                   );
