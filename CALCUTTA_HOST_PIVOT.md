@@ -40,6 +40,7 @@ The free-host funnel works; the paid handoff does not. The pivot moves the prima
 | Existing 39 leagues | Permanently free via a hardcoded `created_at` cutover |
 | Custom Calcuttas | "Any sport or event — from **$74.99**", mailto, not a pricing column |
 | Launch event | NFL season 2026-27 |
+| Payout customization | Presets are starting points — hosts can override **every** value, same as any other event |
 | Priority | **NFL draft path working > paywall.** The paywall may land after Aug 27 |
 | Rebrand | Deferred |
 
@@ -203,7 +204,19 @@ A 3-14 team bought for $20 outearns a 9-8 team bought for $125. That is the mech
 
 **Super Bowl Heavy** — `regularSeasonWins` 0.0625 (17.00), `divisionWinner` 2.00 × 8, best/worst 3 + 3, `playoffBerth` 0.75 × 14, `reachDivisional` 1.50 × 8, `reachConfChamp` 2.50 × 4, `reachSuperBowl` 4.75 × 2, `superBowl` 19.00. Total 100.00. Regular season 39%.
 
-### 4.5 Odds
+### 4.5 Custom payout entry — presets are a starting point, not a menu
+
+Hosts must be able to override every value on NFL exactly as they can on every other event. The machinery already exists: `create-session-form.tsx:623-650` renders a per-round input, `payoutMode: 'custom'` is wired, and props are editable in the Prop Bets section. Three changes make it correct for the per-win round.
+
+1. **Totals must use `payoutUnits`.** Line 159 computes `(activeRules[r.key] ?? 0) * r.teamsAdvancing`. With `regularSeasonWins` at `teamsAdvancing: 32` and `payoutUnits: 272`, the form would score 28% of the pot as 3.3% and show the host a false shortfall in amber. Change to `r.payoutUnits ?? r.teamsAdvancing`, and make the same fix in the helper text at line 646.
+2. **Enter the per-win value in dollars, not percent.** `0.1029%` is not a number a host can reason about. For a `flatRate` round, render a dollar input derived from the pot size already entered on the form — "$4.12 per win, at a $4,000 pot" — and store the percentage. Percent stays the source of truth so payouts still scale with the *actual* pot rather than the estimate.
+3. **`step={0.01}` is too coarse** for a per-win percentage: 0.10 versus 0.11 swings the regular-season budget by 2.7 points. Use a finer step on `flatRate` rounds, or drive the field entirely from the dollar input.
+
+Unit nouns also need to vary per round — the helper text should read "272 wins = 28.0%" for the per-win round but "8 teams = 16.0%" for division winners. That needs a `unitLabel` on `RoundConfig`, since `teamLabel` is per-tournament.
+
+Everything else about customization is unchanged: hosts pick a preset, edit any field, and the running total validates against 100% as it does today.
+
+### 4.6 Odds
 
 Kalshi, public and unauthenticated. **Do not add Kalshi keys to Vercel.**
 
@@ -221,7 +234,7 @@ Traps:
 - `fetch-nfl-odds.mjs` writes **pre-normalized `probabilities`** (scaling up as well as down), which is how we avoid the "devig never scales up" pot leak without touching shared devig code.
 - Resolve the `-27` event suffix dynamically. Never reassign team `id` between runs — bundles reference creation-time ids.
 
-### 4.6 Settlement
+### 4.7 Settlement
 
 ESPN `site.web.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026&level=3`. The `site.api...` host returns a stub, exactly like the dead soccer standings endpoint. Add a test asserting 32 entries so a silent shape regression fails loudly.
 
@@ -233,7 +246,7 @@ Completeness gating: for each parallel round the sync must write an explicit `wo
 
 `adjustPayoutRulesForTies` must receive `getCompletedRounds()` as `onlyRounds`. A season pool sits in the partial state constantly — division titles clinch one at a time across Weeks 15-18.
 
-### 4.7 Other config work
+### 4.8 Other config work
 
 `liveSyncMatchers`, `strategyPrice`, **`stripePaymentLinkEnvKey`** (NFL currently falls back to the March Madness Payment Link and shows "All 64 teams" copy on a 32-team event — a must-fix now that the strategy tool stays paid), `previewTeamCount: 4`, `FEATURES_BY_SPORT.nfl`, NFL bundling branch (bundle by value, not by group — the bracket fallback currently bundles the AFC West as "longshots"), `supportsManualSync` and `syncEndpoint` NFL branches.
 
@@ -258,6 +271,8 @@ Not in scope: rebrand, participant caps, admin UI for tournaments, retiring `pro
 
 - Wild card (berth won, `divisionWinner` lost) still reaches `superBowl`.
 - All three presets sum to 100% within 0.5% using `payoutUnits ?? teamsAdvancing`.
+- The create form's running total uses `payoutUnits` — a config containing a `flatRate` round reads 100%, not 75%.
+- A host-entered custom rule set round-trips: dollars-per-win in, percentage stored, same dollars back out.
 - `calculateTeamEarnings` with no counts argument is byte-identical for golf and World Cup.
 - `result_count` of 0.5 for a tie; 272 total units conserve the pot.
 - Best/worst record auto-grade emits **all** tied teams.
