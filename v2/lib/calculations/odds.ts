@@ -42,12 +42,18 @@ export function impliedProbabilityToAmericanOdds(probability: number): number {
  *   For golf makeCut (50 advance): targetSum = 50.
  *   For NCAA R32 matchups (1 of 2 advances): targetSum = 1.
  *   Defaults to 1 for backward compatibility with bracket devigging.
+ * @param allowValuesAboveOne - Field-scoped rounds store expected COUNTS (e.g. 11.2
+ *   expected wins), which must not be clamped to 1. Every probability round — including
+ *   every other multi-slot round (golf's makeCut/top20/top10/top5, World Cup's r32/r16/
+ *   qf/sf/final) — keeps the clamp. Defaults to false so existing callers are unaffected;
+ *   only the field-scoped loop in `devigByGroup` opts in.
  */
 function devigGroup(
   teams: Team[],
   round: RoundKey,
   capRound?: RoundKey,
-  targetSum: number = 1
+  targetSum: number = 1,
+  allowValuesAboveOne = false
 ): void {
   const overround = teams.reduce(
     (sum, t) => sum + t.rawImpliedProbabilities[round],
@@ -62,9 +68,7 @@ function devigGroup(
 
   for (const team of teams) {
     const scaled = team.rawImpliedProbabilities[round] * scale;
-    // Cap at 1 only for probability-based rounds (targetSum ≤ 1). Count-based
-    // rounds (e.g., field-scoped per-win) can have individual values > 1.
-    team.odds[round] = targetSum <= 1 ? Math.min(1, scaled) : scaled;
+    team.odds[round] = allowValuesAboveOne ? scaled : Math.min(1, scaled);
     if (capRound) {
       team.odds[round] = Math.min(team.odds[round], team.odds[capRound]);
     }
@@ -179,7 +183,7 @@ function devigByGroup(teams: Team[], config: TournamentConfig): void {
   // target is the total number of units in the round, not a team count.
   for (const round of config.rounds) {
     if (round.devigScope !== 'field') continue;
-    devigGroup(teams, round.key, undefined, round.payoutUnits ?? round.teamsAdvancing);
+    devigGroup(teams, round.key, undefined, round.payoutUnits ?? round.teamsAdvancing, true);
   }
 
   // Global-scoped rounds: nested knockout ladder across the whole field. Each round

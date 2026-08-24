@@ -39,3 +39,30 @@ describe('field-scoped devig', () => {
     expect(total).toBeCloseTo(1, 5);
   });
 });
+
+// Regression: a multi-slot PROBABILITY round (targetSum > 1, e.g. golf's makeCut/top20
+// or World Cup's r32/r16) must still clamp an individual team's devigged value to 1.
+// `devigGroup` used to infer "count-based" from `targetSum > 1`, which silently removed
+// the clamp from every multi-slot probability round in every live tournament. The real
+// signal is `devigScope === 'field'`, not the target sum — this test pins the clamp for
+// every OTHER scope (here: default/global) even when targetSum is well above 1.
+const globalConfig = {
+  devigStrategy: 'global',
+  groups: [{ key: 'A', label: 'A' }],
+  rounds: [
+    { key: 'top20', label: 'T20', payoutLabel: 'Top 20', teamsAdvancing: 20 },
+  ],
+} as unknown as TournamentConfig;
+
+const mkGlobalTeam = (id: number, top20: number): Team =>
+  ({ id, name: `T${id}`, group: 'A', seed: id, rawImpliedProbabilities: { top20 }, odds: {} }) as unknown as Team;
+
+describe('probability rounds keep the 1.0 clamp regardless of targetSum', () => {
+  it('clamps a dominant team to 1 even on a multi-slot round (targetSum=20)', () => {
+    // Raw probabilities sum to ~25 (> targetSum=20), so devigGroup scales down by
+    // ~0.8x — team 1's scaled value (~20) still far exceeds 1 and must clamp to 1.
+    const teams = [mkGlobalTeam(1, 25), mkGlobalTeam(2, 0.001), mkGlobalTeam(3, 0.001)];
+    devigRoundOdds(teams, globalConfig);
+    expect(teams[0].odds.top20).toBe(1);
+  });
+});
