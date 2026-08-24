@@ -61,7 +61,10 @@ function devigGroup(
   const scale = overround > targetSum ? targetSum / overround : 1;
 
   for (const team of teams) {
-    team.odds[round] = Math.min(1, team.rawImpliedProbabilities[round] * scale);
+    const scaled = team.rawImpliedProbabilities[round] * scale;
+    // Cap at 1 only for probability-based rounds (targetSum ≤ 1). Count-based
+    // rounds (e.g., field-scoped per-win) can have individual values > 1.
+    team.odds[round] = targetSum <= 1 ? Math.min(1, scaled) : scaled;
     if (capRound) {
       team.odds[round] = Math.min(team.odds[round], team.odds[capRound]);
     }
@@ -169,6 +172,14 @@ function devigByGroup(teams: Team[], config: TournamentConfig): void {
       const groupTeams = teams.filter((t) => t.group === group.key);
       devigGroup(groupTeams, round.key, undefined, 1);
     }
+  }
+
+  // Field-scoped rounds: normalize across the whole field to `payoutUnits`, with no
+  // ladder cap. The stored value is an expected COUNT (e.g. expected wins), so the
+  // target is the total number of units in the round, not a team count.
+  for (const round of config.rounds) {
+    if (round.devigScope !== 'field') continue;
+    devigGroup(teams, round.key, undefined, round.payoutUnits ?? round.teamsAdvancing);
   }
 
   // Global-scoped rounds: nested knockout ladder across the whole field. Each round

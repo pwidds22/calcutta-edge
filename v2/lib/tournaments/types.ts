@@ -31,17 +31,27 @@ export interface RoundConfig {
   /** How this round is devigged under the `'group'` strategy.
    *  - 'global' (default): normalize across the whole field to `teamsAdvancing`,
    *    capped at the previous global round (a nested knockout ladder).
-   *  - 'group': normalize WITHIN each group to sum→1 (e.g., "win your group" —
-   *    exactly one winner per group). Group-scoped rounds sit OUTSIDE the ladder
-   *    cap chain, since winning a group is not a prerequisite for advancing.
+   *  - 'group':  normalize WITHIN each group to sum→1 (e.g. "win your group").
+   *  - 'field':  normalize across the whole field to `payoutUnits`, with NO ladder
+   *    cap. For flat per-unit rounds (e.g. NFL per-win), where the stored value is
+   *    an expected COUNT (expected wins), not a probability.
    *  Ignored by the 'bracket' / 'global' / 'none' strategies. */
-  devigScope?: 'group' | 'global';
+  devigScope?: 'group' | 'global' | 'field';
   /** A "parallel" round is a standalone bonus, NOT a rung in the advancement
    *  ladder. It is credited when won but never gates advancement, eliminates a
-   *  team, or blocks completion tracking. Soccer's "win your group" is the only
-   *  consumer: a nation can advance (r32) without winning its group, so winGroup
-   *  must not sit in the sequential elimination walk. Defaults to false. */
+   *  team, or blocks completion tracking. Defaults to false. */
   parallel?: boolean;
+  /** Number of payout units in this round, when that isn't one-per-advancing-team.
+   *  The round's budget is `pct × (payoutUnits ?? teamsAdvancing)`. NFL's per-win
+   *  round has 272 units (272 regular-season games = 272 wins) across 32 teams. */
+  payoutUnits?: number;
+  /** This round pays a flat rate per unit and must NEVER be redistributed by
+   *  `adjustPayoutRulesForTies` — a per-win rate is fixed, not a tier split among
+   *  however many teams happened to qualify. Defaults to false. */
+  flatRate?: boolean;
+  /** Noun for the payout editor's helper text ("272 wins = 28.0%"). Falls back to
+   *  the tournament's `teamLabel`. */
+  unitLabel?: string;
 }
 
 export interface GroupConfig {
