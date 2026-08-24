@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import type { PayoutRules } from '@/lib/calculations/types';
+import { roundBudget } from '@/lib/tournaments/payout-presets';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const propDescriptions: Record<string, string> = {
@@ -30,7 +31,7 @@ export function PayoutRulesEditor() {
   const propBets = config?.propBets ?? [];
 
   const totalPercent = rounds.reduce(
-    (sum, r) => sum + (draft[r.key] ?? 0) * r.teamsAdvancing,
+    (sum, r) => sum + roundBudget(r, draft[r.key] ?? 0),
     0
   ) + propBets.reduce((sum, p) => sum + (draft[p.key] ?? 0), 0);
 
@@ -68,7 +69,10 @@ export function PayoutRulesEditor() {
           <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
             {rounds.map((round) => (
               <div key={round.key}>
-                <Label className="text-xs">{round.payoutLabel} ({round.teamsAdvancing} {config?.teamLabel?.toLowerCase() ?? 'team'}s)</Label>
+                <Label className="text-xs">
+                  {round.payoutLabel} ({round.payoutUnits ?? round.teamsAdvancing}{' '}
+                  {round.unitLabel ?? config?.teamLabel?.toLowerCase() ?? 'team'}s)
+                </Label>
                 <div className="relative mt-1">
                   <Input
                     type="number"
@@ -84,7 +88,7 @@ export function PayoutRulesEditor() {
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Total: {((draft[round.key] ?? 0) * round.teamsAdvancing).toFixed(1)}%
+                  Total: {roundBudget(round, draft[round.key] ?? 0).toFixed(1)}%
                 </p>
               </div>
             ))}

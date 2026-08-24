@@ -8,7 +8,7 @@ import {
   BID_INCREMENT_PRESETS,
   type BidIncrementPreset,
 } from '@/lib/auction/live/types';
-import { getPayoutPresets } from '@/lib/tournaments/payout-presets';
+import { getPayoutPresets, roundBudget } from '@/lib/tournaments/payout-presets';
 import {
   X,
   Timer,
@@ -96,7 +96,7 @@ export function EditSettingsModal({
 
   const activeRules = getActiveRules();
   const totalPercent =
-    rounds.reduce((sum, r) => sum + (activeRules[r.key] ?? 0) * r.teamsAdvancing, 0) +
+    rounds.reduce((sum, r) => sum + roundBudget(r, activeRules[r.key] ?? 0), 0) +
     propBets.reduce((sum, p) => sum + (activeRules[p.key] ?? 0), 0);
 
   const handlePresetSelect = (mode: PayoutMode) => {
@@ -265,7 +265,9 @@ export function EditSettingsModal({
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">%</span>
                       </div>
                       <p className="mt-0.5 text-[10px] text-white/20">
-                        {round.teamsAdvancing} teams = {((customRules[round.key] ?? 0) * round.teamsAdvancing).toFixed(1)}%
+                        {round.payoutUnits ?? round.teamsAdvancing}{' '}
+                        {round.unitLabel ?? config.teamLabel?.toLowerCase() ?? 'team'}s ={' '}
+                        {roundBudget(round, customRules[round.key] ?? 0).toFixed(1)}%
                       </p>
                     </div>
                   ))}

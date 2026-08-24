@@ -10,7 +10,7 @@ import {
   type BidIncrementPreset,
   type SessionSettings,
 } from '@/lib/auction/live/types';
-import { getPayoutPresets, roundBudget, type PayoutPreset } from '@/lib/tournaments/payout-presets';
+import { getPayoutPresets, roundBudget, dollarsToRate, rateToDollars, type PayoutPreset } from '@/lib/tournaments/payout-presets';
 import { getBundlePresets, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
 import { getTournament } from '@/lib/tournaments/registry';
 import { getStandardProps, type EnabledProp } from '@/lib/tournaments/props';
@@ -78,6 +78,12 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const [payoutMode, setPayoutMode] = useState<PayoutMode>('balanced');
   const [customRules, setCustomRules] = useState<PayoutRules>({});
   const [showCustomEditor, setShowCustomEditor] = useState(false);
+  // The custom-rule field (dollar or percent) currently focused, holding exactly
+  // what the host has typed so far. A controlled numeric field whose displayed
+  // value is derived (parseFloat -> round-trip) clobbers an in-progress decimal
+  // point on every re-render — this decouples the display from that derivation
+  // while the host is actively editing. Only one field can be focused at a time.
+  const [editingRound, setEditingRound] = useState<{ key: string; text: string } | null>(null);
 
   // Prop bets — which standard props are enabled + custom props
   const [enabledPropKeys, setEnabledPropKeys] = useState<Set<string>>(new Set());
@@ -633,7 +639,14 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                   // derive the rate; percent stays the stored source of truth so
                   // payouts still scale with the ACTUAL pot, not this estimate.
                   const isFlat = round.flatRate === true;
-                  const dollars = isFlat ? (pot * rate) / 100 : 0;
+                  const dollars = isFlat ? rateToDollars(rate, pot) : 0;
+                  // Without a usable pot there's nothing to derive dollars from —
+                  // disable the field instead of silently resolving every keystroke
+                  // to 0% and wiping out whatever rate was already stored.
+                  const potUnusable = isFlat && pot <= 0;
+                  const formattedValue = isFlat ? dollars.toFixed(2) : String(rate);
+                  const displayValue =
+                    editingRound && editingRound.key === round.key ? editingRound.text : formattedValue;
                   return (
                     <div key={round.key}>
                       <label className="block text-[10px] text-white/40 mb-0.5">
@@ -644,31 +657,44 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">$</span>
                         )}
                         <input
-                          type="number"
-                          min={0}
-                          max={isFlat ? undefined : 100}
-                          step={0.01}
-                          value={isFlat ? Number(dollars.toFixed(2)) : rate}
+                          type="text"
+                          inputMode="decimal"
+                          disabled={potUnusable}
+                          value={displayValue}
+                          onFocus={() => setEditingRound({ key: round.key, text: formattedValue })}
+                          onBlur={() => setEditingRound(null)}
                           onChange={(e) => {
+                            const text = e.target.value;
+                            // Allow only what a decimal amount can look like while typing.
+                            if (!/^\d*\.?\d*$/.test(text)) return;
+                            setEditingRound({ key: round.key, text });
+
                             if (isFlat) {
-                              const d = Number(e.target.value) || 0;
-                              const pct = pot > 0 ? (d / pot) * 100 : 0;
+                              const d = parseFloat(text) || 0;
+                              const pct = dollarsToRate(d, pot);
+                              if (pct === null) return; // pot is 0 — don't overwrite the stored rate
                               handleCustomRuleChange(round.key, String(pct));
                             } else {
-                              handleCustomRuleChange(round.key, e.target.value);
+                              handleCustomRuleChange(round.key, text);
                             }
                           }}
-                          className={`h-8 w-full rounded border border-white/10 bg-white/[0.04] ${isFlat ? 'pl-5 pr-2' : 'px-2 pr-6'} text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none`}
+                          className={`h-8 w-full rounded border border-white/10 bg-white/[0.04] ${isFlat ? 'pl-5 pr-2' : 'px-2 pr-6'} text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40`}
                         />
                         {!isFlat && (
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">%</span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-[10px] text-white/20">
-                        {isFlat
-                          ? `per ${unitNoun} × ${units} = ${roundBudget(round, rate).toFixed(1)}%`
-                          : `${units} ${unitNoun}s = ${roundBudget(round, rate).toFixed(1)}%`}
-                      </p>
+                      {potUnusable ? (
+                        <p className="mt-0.5 text-[10px] text-amber-400/70">
+                          Enter a pot size above to set this in dollars.
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-[10px] text-white/20">
+                          {isFlat
+                            ? `per ${unitNoun} × ${units} = ${roundBudget(round, rate).toFixed(1)}%`
+                            : `${units} ${unitNoun}s = ${roundBudget(round, rate).toFixed(1)}%`}
+                        </p>
+                      )}
                     </div>
                   );
                 })}

@@ -361,3 +361,26 @@ export function getPayoutPresets(tournamentId: string): Record<string, PayoutPre
 export function roundBudget(round: RoundConfig, rate: number): number {
   return rate * (round.payoutUnits ?? round.teamsAdvancing);
 }
+
+/**
+ * Convert a flat per-unit dollar amount (what a host types for a flat-rate round,
+ * e.g. NFL's "$ per win") into the percent-of-pot rate that's actually stored.
+ * Returns `null` when the pot isn't usable (<=0) — there's no sane percentage to
+ * derive in that case, and the caller MUST NOT fall back to 0: that would silently
+ * overwrite/discard whatever rate was already stored every time the host so much
+ * as touches the field while the pot size is being retyped.
+ */
+export function dollarsToRate(dollars: number, pot: number): number | null {
+  if (pot <= 0) return null;
+  return (dollars / pot) * 100;
+}
+
+/**
+ * Convert a stored percent-of-pot rate back into a flat per-unit dollar amount
+ * for display. The inverse of `dollarsToRate` — kept as its own function (rather
+ * than re-derived ad hoc at each call site) so the two stay a true round trip.
+ */
+export function rateToDollars(rate: number, pot: number): number {
+  if (pot <= 0) return 0;
+  return (pot * rate) / 100;
+}
