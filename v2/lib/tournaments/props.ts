@@ -172,6 +172,31 @@ export const WORLD_CUP_PROPS: PropDefinition[] = [
 ];
 
 /**
+ * Standard props for NFL season Calcuttas.
+ * Best/worst record are the two attested NFL Calcutta side bets, and both are
+ * auto-gradeable from the same ESPN standings call the per-win round needs.
+ * Record ties are COMMON in the NFL (several teams routinely share the worst
+ * record), so any auto-grader must emit every tied team — PropResult.winners[]
+ * splits the payout evenly.
+ */
+export const NFL_PROPS: PropDefinition[] = [
+  {
+    key: 'bestRecord',
+    label: 'Best Record in the NFL',
+    description: 'Team with the most regular-season wins (ties split the payout)',
+    defaultPercentage: 3,
+    autoCalculated: true,
+  },
+  {
+    key: 'worstRecord',
+    label: 'Worst Record in the NFL',
+    description: 'Team with the fewest regular-season wins — makes a bad team worth owning (ties split the payout)',
+    defaultPercentage: 3,
+    autoCalculated: true,
+  },
+];
+
+/**
  * Get standard prop definitions for a tournament.
  */
 export function getStandardProps(tournamentId: string): PropDefinition[] {
@@ -183,6 +208,9 @@ export function getStandardProps(tournamentId: string): PropDefinition[] {
   }
   if (tournamentId.startsWith('masters') || tournamentId.includes('golf') || tournamentId.includes('open') || tournamentId.includes('pga')) {
     return GOLF_PROPS;
+  }
+  if (tournamentId.startsWith('nfl')) {
+    return NFL_PROPS;
   }
   return [];
 }
