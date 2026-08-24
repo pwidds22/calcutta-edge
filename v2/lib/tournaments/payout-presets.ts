@@ -1,4 +1,4 @@
-import type { PayoutRules } from './types';
+import type { PayoutRules, RoundConfig } from './types';
 
 export interface PayoutPreset {
   label: string;
@@ -350,4 +350,14 @@ const PRESET_MAP: Record<string, Record<string, PayoutPreset>> = {
  */
 export function getPayoutPresets(tournamentId: string): Record<string, PayoutPreset> {
   return PRESET_MAP[tournamentId] ?? MARCH_MADNESS_PAYOUT_PRESETS;
+}
+
+/**
+ * A round's share of the pot: the per-unit rate times the number of units.
+ * Most rounds pay once per advancing team; a flat-rate round (NFL per-win) pays
+ * once per unit. Every place that totals payouts must use this — the preset test,
+ * the create-session form, and tie adjustment — or they drift apart silently.
+ */
+export function roundBudget(round: RoundConfig, rate: number): number {
+  return rate * (round.payoutUnits ?? round.teamsAdvancing);
 }

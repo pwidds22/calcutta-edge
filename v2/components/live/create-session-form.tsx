@@ -10,7 +10,7 @@ import {
   type BidIncrementPreset,
   type SessionSettings,
 } from '@/lib/auction/live/types';
-import { getPayoutPresets, type PayoutPreset } from '@/lib/tournaments/payout-presets';
+import { getPayoutPresets, roundBudget, type PayoutPreset } from '@/lib/tournaments/payout-presets';
 import { getBundlePresets, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
 import { getTournament } from '@/lib/tournaments/registry';
 import { getStandardProps, type EnabledProp } from '@/lib/tournaments/props';
@@ -156,7 +156,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   // Props are tracked solely via enabledPropTotal (from the Prop Bets section).
   // Don't also count prop keys from activeRules to avoid double-counting.
   const totalPercent = rounds.reduce(
-    (sum, r) => sum + (activeRules[r.key] ?? 0) * r.teamsAdvancing,
+    (sum, r) => sum + roundBudget(r, activeRules[r.key] ?? 0),
     0
   ) + enabledPropTotal;
 
@@ -623,30 +623,55 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
           {showCustomEditor && (
             <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
-                {rounds.map((round) => (
-                  <div key={round.key}>
-                    <label className="block text-[10px] text-white/40 mb-0.5">
-                      {round.payoutLabel}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.01}
-                        value={customRules[round.key] ?? 0}
-                        onChange={(e) => handleCustomRuleChange(round.key, e.target.value)}
-                        className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 pr-6 text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none"
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
-                        %
-                      </span>
+                {rounds.map((round) => {
+                  const rate = customRules[round.key] ?? 0;
+                  const units = round.payoutUnits ?? round.teamsAdvancing;
+                  const unitNoun = round.unitLabel ?? selectedTournament?.teamLabel?.toLowerCase() ?? 'team';
+                  const pot = Number(potSize) || 0;
+                  // A flat-rate round's percentage is tiny (0.1029% per win) and
+                  // meaningless to type. Let the host enter dollars instead and
+                  // derive the rate; percent stays the stored source of truth so
+                  // payouts still scale with the ACTUAL pot, not this estimate.
+                  const isFlat = round.flatRate === true;
+                  const dollars = isFlat ? (pot * rate) / 100 : 0;
+                  return (
+                    <div key={round.key}>
+                      <label className="block text-[10px] text-white/40 mb-0.5">
+                        {round.payoutLabel}
+                      </label>
+                      <div className="relative">
+                        {isFlat && (
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">$</span>
+                        )}
+                        <input
+                          type="number"
+                          min={0}
+                          max={isFlat ? undefined : 100}
+                          step={0.01}
+                          value={isFlat ? Number(dollars.toFixed(2)) : rate}
+                          onChange={(e) => {
+                            if (isFlat) {
+                              const d = Number(e.target.value) || 0;
+                              const pct = pot > 0 ? (d / pot) * 100 : 0;
+                              handleCustomRuleChange(round.key, String(pct));
+                            } else {
+                              handleCustomRuleChange(round.key, e.target.value);
+                            }
+                          }}
+                          className={`h-8 w-full rounded border border-white/10 bg-white/[0.04] ${isFlat ? 'pl-5 pr-2' : 'px-2 pr-6'} text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none`}
+                        />
+                        {!isFlat && (
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/30">%</span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-[10px] text-white/20">
+                        {isFlat
+                          ? `per ${unitNoun} × ${units} = ${roundBudget(round, rate).toFixed(1)}%`
+                          : `${units} ${unitNoun}s = ${roundBudget(round, rate).toFixed(1)}%`}
+                      </p>
                     </div>
-                    <p className="mt-0.5 text-[10px] text-white/20">
-                      {round.teamsAdvancing} {selectedTournament?.teamLabel?.toLowerCase() ?? 'team'}s = {((customRules[round.key] ?? 0) * round.teamsAdvancing).toFixed(1)}%
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Props are configured in the Prop Bets section below */}
