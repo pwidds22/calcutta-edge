@@ -187,6 +187,7 @@ export function ParticipantView({
             settings={session.settings}
             teamCount={activeTeamOrder.length}
             rounds={config.rounds}
+            config={config}
           />
           <TeamQueue
             sessionId={session.id}
