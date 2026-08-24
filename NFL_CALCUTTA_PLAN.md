@@ -839,7 +839,7 @@ Replace the `rounds.map(...)` body inside the custom editor (`:626-649`) with:
                           type="number"
                           min={0}
                           max={isFlat ? undefined : 100}
-                          step={isFlat ? 0.01 : 0.01}
+                          step={0.01}
                           value={isFlat ? Number(dollars.toFixed(2)) : rate}
                           onChange={(e) => {
                             if (isFlat) {
