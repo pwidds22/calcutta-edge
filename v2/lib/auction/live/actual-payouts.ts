@@ -142,30 +142,45 @@ export function getTeamStatus(
   results: TournamentResult[],
   config: TournamentConfig,
   playInLosers?: Set<number>
-): { status: 'alive' | 'eliminated' | 'champion'; roundsWon: string[]; eliminatedInRound: string | null } {
+): {
+  status: 'alive' | 'eliminated' | 'champion';
+  roundsWon: string[];
+  eliminatedInRound: string | null;
+  roundCounts: Record<string, number>;
+} {
   // Play-in losers are eliminated in the first round even without explicit results
   if (playInLosers?.has(teamId)) {
     return {
       status: 'eliminated',
       roundsWon: [],
       eliminatedInRound: config.rounds[0]?.key ?? null,
+      roundCounts: {},
     };
   }
 
   const resultMap = buildResultMap(results);
+  const countMap = buildCountMap(results);
   const roundsWon: string[] = [];
+  const roundCounts: Record<string, number> = {};
   let eliminatedInRound: string | null = null;
+
+  // Credit a round as won and record its unit count (defaulting to 1 — a
+  // team with no result_count won the round outright, not a fraction of it).
+  const credit = (key: string) => {
+    roundsWon.push(key);
+    roundCounts[key] = countMap.get(`${teamId}:${key}`) ?? 1;
+  };
 
   for (const round of config.rounds) {
     const result = resultMap.get(`${teamId}:${round.key}`);
     if (round.parallel) {
       // Parallel bonus (e.g. winGroup): credit if won, but never eliminate or
       // halt the ladder walk on a loss/pending.
-      if (result === 'won') roundsWon.push(round.key);
+      if (result === 'won') credit(round.key);
       continue;
     }
     if (result === 'won') {
-      roundsWon.push(round.key);
+      credit(round.key);
     } else if (result === 'lost') {
       eliminatedInRound = round.key;
       break;
@@ -182,21 +197,30 @@ export function getTeamStatus(
     status: isChampion ? 'champion' : eliminatedInRound ? 'eliminated' : 'alive',
     roundsWon,
     eliminatedInRound,
+    roundCounts,
   };
 }
 
 /**
  * Calculate actual earnings for a team based on results entered so far.
  * Each round the team won earns: actualPot * (payoutRules[roundKey] / 100)
+ *
+ * `roundCounts` is optional and only matters for flat-rate per-unit rounds
+ * (e.g. NFL regular-season wins, where the round pays once per win rather
+ * than once for the round). Omitting it — golf and World Cup both call this
+ * without a 4th argument — defaults every round to 1 unit, reproducing the
+ * exact pre-existing behavior.
  */
 export function calculateTeamEarnings(
   roundsWon: string[],
   actualPot: number,
-  payoutRules: PayoutRules
+  payoutRules: PayoutRules,
+  roundCounts?: Record<string, number>
 ): number {
   return roundsWon.reduce((total, roundKey) => {
     const pct = payoutRules[roundKey] ?? 0;
-    return total + actualPot * (pct / 100);
+    const units = roundCounts?.[roundKey] ?? 1;
+    return total + actualPot * (pct / 100) * units;
   }, 0);
 }
 
@@ -282,7 +306,10 @@ export function calculateLeaderboard(
   const playInLosers = buildPlayInLoserSet(baseTeams, results, config);
 
   // Precompute all team statuses + count winners per round for tie adjustment
-  const teamStatusCache = new Map<number, { status: 'alive' | 'eliminated' | 'champion'; roundsWon: string[]; eliminatedInRound: string | null }>();
+  const teamStatusCache = new Map<
+    number,
+    { status: 'alive' | 'eliminated' | 'champion'; roundsWon: string[]; eliminatedInRound: string | null; roundCounts: Record<string, number> }
+  >();
   const winnersPerRound = countWinnersPerRound(soldTeams, results, config, playInLosers);
   for (const sold of soldTeams) {
     teamStatusCache.set(sold.teamId, getTeamStatus(sold.teamId, results, config, playInLosers));
@@ -311,8 +338,8 @@ export function calculateLeaderboard(
 
     for (const sold of teams) {
       const base = teamMap.get(sold.teamId);
-      const { status, roundsWon, eliminatedInRound } = teamStatusCache.get(sold.teamId)!;
-      const earnings = calculateTeamEarnings(roundsWon, actualPot, adjustedPayoutRules);
+      const { status, roundsWon, eliminatedInRound, roundCounts } = teamStatusCache.get(sold.teamId)!;
+      const earnings = calculateTeamEarnings(roundsWon, actualPot, adjustedPayoutRules, roundCounts);
       totalEarned += earnings;
 
       if (status === 'alive' || status === 'champion') teamsAlive++;
@@ -398,6 +425,13 @@ export function calculateLeaderboard(
  * the projection — double-counting the pot. Gating on completion settles decided
  * winners at the base per-slot rate and leaves pending slots to the projection.
  * Omitted (golf final settlement) → adjust every round, preserving existing behavior.
+ *
+ * `round.flatRate` rounds (e.g. NFL wins) are skipped entirely: their rate is a
+ * fixed per-unit price set by the host, not a tier budget to redistribute — treating
+ * it as one would multiply every team's payout by (expected winners / actual winners)
+ * on top of the per-unit multiplication already done in calculateTeamEarnings.
+ * For non-flat rounds with `payoutUnits` set, that count (not `teamsAdvancing`) is
+ * the expected budget denominator — see Task 1's RoundConfig for why the two differ.
  */
 export function adjustPayoutRulesForTies(
   payoutRules: PayoutRules,
@@ -407,9 +441,12 @@ export function adjustPayoutRulesForTies(
 ): PayoutRules {
   const adjusted = { ...payoutRules };
   for (const round of config.rounds) {
+    // A flat per-unit rate is fixed — it is not a tier budget split among
+    // whoever qualified, so redistributing it would inflate every payout.
+    if (round.flatRate) continue;
     if (onlyRounds && !onlyRounds.has(round.key)) continue;
     const actualWinners = winnersPerRound.get(round.key) ?? 0;
-    const expected = round.teamsAdvancing;
+    const expected = round.payoutUnits ?? round.teamsAdvancing;
     if (actualWinners > 0 && expected > 0) {
       const pct = payoutRules[round.key] ?? 0;
       adjusted[round.key] = (pct * expected) / actualWinners;
@@ -443,6 +480,22 @@ function buildResultMap(results: TournamentResult[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const r of results) {
     map.set(`${r.team_id}:${r.round_key}`, r.result);
+  }
+  return map;
+}
+
+/**
+ * Map team:round -> result_count, for rounds that pay per unit (e.g. NFL
+ * regular-season wins). Only populated when a row actually has a count —
+ * golf/World Cup rows never set result_count, so this map stays empty for them
+ * and getTeamStatus's `?? 1` default reproduces the old one-per-round behavior.
+ */
+function buildCountMap(results: TournamentResult[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const r of results) {
+    if (r.result_count !== undefined && r.result_count !== null) {
+      map.set(`${r.team_id}:${r.round_key}`, Number(r.result_count));
+    }
   }
   return map;
 }

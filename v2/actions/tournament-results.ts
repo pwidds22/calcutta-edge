@@ -8,6 +8,8 @@ export interface TournamentResult {
   team_id: number;
   round_key: string;
   result: 'won' | 'lost' | 'pending';
+  /** Units won, for flat-rate rounds. NULL/undefined means 1. */
+  result_count?: number | null;
 }
 
 /**
@@ -22,7 +24,7 @@ export async function getTournamentResults(sessionId: string) {
 
   const { data, error } = await supabase
     .from('tournament_results')
-    .select('team_id, round_key, result')
+    .select('team_id, round_key, result, result_count')
     .eq('session_id', sessionId);
 
   if (error) return { error: error.message };
