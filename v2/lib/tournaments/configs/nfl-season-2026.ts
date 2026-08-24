@@ -5,10 +5,24 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
   name: 'NFL Season 2026-27',
   sport: 'nfl',
   rounds: [
-    { key: 'playoffBerth', label: 'Playoff', teamsAdvancing: 14, payoutLabel: 'Make Playoffs', gameLabel: 'Season' },
-    { key: 'divisionWinner', label: 'DivWin', teamsAdvancing: 8, payoutLabel: 'Win Division', gameLabel: 'Season' },
-    { key: 'conferenceChamp', label: 'ConfW', teamsAdvancing: 2, payoutLabel: 'Win Conference', gameLabel: 'Conf Champ' },
-    { key: 'superBowl', label: 'SB', teamsAdvancing: 1, payoutLabel: 'Win Super Bowl', gameLabel: 'Super Bowl' },
+    // ── Parallel bonuses. MUST come first: getCompletedRounds() stops at the
+    //    first unresolved LADDER round, so anything after it is never evaluated.
+    { key: 'regularSeasonWins', label: 'Wins', payoutLabel: 'Each Regular-Season Win', gameLabel: 'Season',
+      teamsAdvancing: 32, payoutUnits: 272, parallel: true, flatRate: true, devigScope: 'field', unitLabel: 'win' },
+    { key: 'divisionWinner', label: 'Div', payoutLabel: 'Win Division', gameLabel: 'Season',
+      teamsAdvancing: 8, parallel: true, devigScope: 'group' },
+    // ── Strictly nested "reach" ladder. Each rung is a true subset of the one
+    //    above it, so a first-round bye still counts as reaching the divisional.
+    { key: 'playoffBerth', label: 'Playoff', payoutLabel: 'Make Playoffs', gameLabel: 'Season',
+      teamsAdvancing: 14, devigScope: 'global' },
+    { key: 'reachDivisional', label: 'Div Rd', payoutLabel: 'Reach Divisional Round', gameLabel: 'Wild Card',
+      teamsAdvancing: 8, devigScope: 'global' },
+    { key: 'reachConfChamp', label: 'Conf Ch', payoutLabel: 'Reach Conference Championship', gameLabel: 'Divisional',
+      teamsAdvancing: 4, devigScope: 'global' },
+    { key: 'reachSuperBowl', label: 'SB', payoutLabel: 'Reach Super Bowl', gameLabel: 'Conf Champ',
+      teamsAdvancing: 2, devigScope: 'global' },
+    { key: 'superBowl', label: 'Champ', payoutLabel: 'Win Super Bowl', gameLabel: 'Super Bowl',
+      teamsAdvancing: 1, devigScope: 'global' },
   ],
   groups: [
     { key: 'AFC_East', label: 'AFC East' },
@@ -20,27 +34,39 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
     { key: 'NFC_South', label: 'NFC South' },
     { key: 'NFC_West', label: 'NFC West' },
   ],
-  devigStrategy: 'global',
+  // 'group' (not 'global'): divisionWinner normalizes within its division and sits
+  // outside the cap chain; the reach-ladder is the capped monotone chain; the
+  // per-win round is field-scoped. A 'global' strategy would clamp
+  // P(make playoffs) <= P(12+ wins), which is nonsense.
+  devigStrategy: 'group',
   defaultPayoutRules: {
-    playoffBerth: 1.00,
-    divisionWinner: 2.00,
-    conferenceChamp: 7.50,
-    superBowl: 55.00,
-    mvp: 0.0,
-    mostWins: 0.0,
+    regularSeasonWins: 0.1029,
+    divisionWinner: 2.0,
+    playoffBerth: 0.75,
+    reachDivisional: 1.5,
+    reachConfChamp: 2.5,
+    reachSuperBowl: 3.75,
+    superBowl: 10.0,
+    bestRecord: 3.0,
+    worstRecord: 3.0,
   },
-  defaultPotSize: 10000,
+  defaultPotSize: 4000,
   propBets: [
-    { key: 'mvp', label: 'Regular Season MVP' },
-    { key: 'mostWins', label: 'Best Record' },
+    { key: 'bestRecord', label: 'Best Record in the NFL' },
+    { key: 'worstRecord', label: 'Worst Record in the NFL' },
   ],
   badge: 'NFL 2026-27',
   teamLabel: 'Team',
   groupLabel: 'Division',
   startDate: '2026-09-10',
-  endDate: '2027-02-07',
-  hostingOpensAt: '2026-08-27',
-  isActive: false,
+  // Super Bowl LXI — Sunday 2027-02-14, SoFi Stadium. Verified 2026-08-16.
+  endDate: '2027-02-14',
+  hostingOpensAt: '2026-08-20',
+  isActive: true,
+  strategyPrice: 1499,
+  stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_NFL',
+  liveSyncMatchers: ['nfl', 'nfl season'],
+  previewTeamCount: 4,
 };
 
 /**

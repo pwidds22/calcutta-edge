@@ -6,7 +6,7 @@ import { listTournamentsWithTeams } from '../registry';
  * Every payout preset must sum to exactly 100% (within ±0.5% tolerance to allow
  * for clean per-golfer rates that don't divide perfectly into the tier shares).
  *
- * Sum formula: sum over rounds of (rate × teamsAdvancing) + sum of prop rates.
+ * Sum formula: sum over rounds of (rate × (payoutUnits ?? teamsAdvancing)) + sum of prop rates.
  *
  * Why this matters: the create-session form's "Total payout" indicator turns
  * amber when the sum diverges from 100%. A preset that doesn't sum to 100%
@@ -28,10 +28,12 @@ describe('payout presets sum to 100%', () => {
 
       for (const [presetName, preset] of Object.entries(presets)) {
         it(`${presetName} preset sums to 100%`, () => {
-          // Round portion: each round's per-team-rate × teamsAdvancing.
+          // Round portion: each round's per-unit rate × its unit count. Most rounds
+          // pay once per advancing team; a flatRate round (NFL per-win) pays once
+          // per unit, so `payoutUnits` is the multiplier.
           const roundTotal = config.rounds.reduce((sum, round) => {
             const rate = preset.rules[round.key] ?? 0;
-            return sum + rate * round.teamsAdvancing;
+            return sum + rate * (round.payoutUnits ?? round.teamsAdvancing);
           }, 0);
 
           // Prop portion: rates are absolute percentages of the pot (no

@@ -225,44 +225,58 @@ export const KENTUCKY_DERBY_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
 };
 
 /**
- * NFL: playoffBerth×14 + divisionWinner×8 + conferenceChamp×2 + superBowl×1 = 100%
+ * NFL season Calcutta. Budget = rate × (payoutUnits ?? teamsAdvancing).
+ * The per-win round has 272 units (272 regular-season games), so its budget is
+ * rate × 272. Props are absolute percentages.
+ *
+ * Balanced splits the pot 50/50 between the regular season and the playoffs;
+ * every playoff rung pays less per team than the 10% champion award.
  */
 export const NFL_SEASON_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
   balanced: {
     label: 'Balanced',
-    description: 'Reward milestones from playoffs to Super Bowl',
+    description: 'Half the pot on the regular season, half on the playoffs',
     rules: {
-      playoffBerth: 1.00,      // ×14 = 14%
-      divisionWinner: 2.00,    // ×8  = 16%
-      conferenceChamp: 7.50,   // ×2  = 15%
-      superBowl: 55.00,        // ×1  = 55%
-      mvp: 0,
-      mostWins: 0,
-    },
+      regularSeasonWins: 0.1029, // ×272 = 27.99%
+      divisionWinner: 2.0,       // ×8   = 16%
+      playoffBerth: 0.75,        // ×14  = 10.5%
+      reachDivisional: 1.5,      // ×8   = 12%
+      reachConfChamp: 2.5,       // ×4   = 10%
+      reachSuperBowl: 3.75,      // ×2   = 7.5%
+      superBowl: 10.0,           // ×1   = 10%
+      bestRecord: 3.0,
+      worstRecord: 3.0,
+    },                           // total = 99.99%
+  },
+  everyWeek: {
+    label: 'Every Week Counts',
+    description: 'Most of the pot paid out win by win across the season',
+    rules: {
+      regularSeasonWins: 0.1471, // ×272 = 40.01%
+      divisionWinner: 2.0,       // ×8   = 16%
+      playoffBerth: 0.75,        // ×14  = 10.5%
+      reachDivisional: 1.25,     // ×8   = 10%
+      reachConfChamp: 1.75,      // ×4   = 7%
+      reachSuperBowl: 2.25,      // ×2   = 4.5%
+      superBowl: 6.0,            // ×1   = 6%
+      bestRecord: 3.0,
+      worstRecord: 3.0,
+    },                           // total = 100.01%
   },
   topHeavy: {
     label: 'Super Bowl Heavy',
     description: 'Most of the pot goes to the champion',
     rules: {
-      playoffBerth: 0.50,      // ×14 = 7%
-      divisionWinner: 1.00,    // ×8  = 8%
-      conferenceChamp: 5.00,   // ×2  = 10%
-      superBowl: 75.00,        // ×1  = 75%
-      mvp: 0,
-      mostWins: 0,
-    },
-  },
-  withProps: {
-    label: 'With Awards',
-    description: '75% milestone payouts, 25% for MVP + Best Record',
-    rules: {
-      playoffBerth: 0.75,      // ×14 = 10.5%
-      divisionWinner: 1.50,    // ×8  = 12%
-      conferenceChamp: 5.00,   // ×2  = 10%
-      superBowl: 42.50,        // ×1  = 42.5%
-      mvp: 15.00,
-      mostWins: 10.00,
-    },
+      regularSeasonWins: 0.0625, // ×272 = 17%
+      divisionWinner: 2.0,       // ×8   = 16%
+      playoffBerth: 0.75,        // ×14  = 10.5%
+      reachDivisional: 1.5,      // ×8   = 12%
+      reachConfChamp: 2.5,       // ×4   = 10%
+      reachSuperBowl: 4.75,      // ×2   = 9.5%
+      superBowl: 19.0,           // ×1   = 19%
+      bestRecord: 3.0,
+      worstRecord: 3.0,
+    },                           // total = 100%
   },
 };
 
