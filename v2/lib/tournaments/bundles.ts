@@ -74,10 +74,20 @@ const SOCCER_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: 
   },
 };
 
+/** NFL-specific bundle presets — groups the weakest teams by global power rank. */
+const NFL_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: string }> = {
+  none: { label: 'No Bundling', description: 'All 32 teams sold individually' },
+  light: { label: 'Light Bundling', description: 'Weakest 8 teams sold in pairs (28 items)' },
+  standard: { label: 'Standard Bundling', description: 'Weakest 12 teams sold in trios (24 items)' },
+  heavy: { label: 'Heavy Bundling', description: 'Weakest 16 teams sold in fours (20 items)' },
+  custom: { label: 'Custom', description: 'Define your own team groupings' },
+};
+
 /** Get bundle preset metadata based on sport type */
 export function getBundlePresets(sport?: string): Record<BundlePreset, { label: string; description: string }> {
   if (sport === 'golf') return GOLF_BUNDLE_PRESETS;
   if (sport === 'soccer') return SOCCER_BUNDLE_PRESETS;
+  if (sport === 'nfl') return NFL_BUNDLE_PRESETS;
   return BRACKET_BUNDLE_PRESETS;
 }
 
@@ -269,6 +279,34 @@ function bundleSoccer(
   return bundles;
 }
 
+// ─── NFL Bundling ───────────────────────────────────────────────────
+
+/**
+ * NFL bundling: group the weakest N teams by rank into fixed-size lots.
+ * Rank by `seed`, which for the NFL IS a true global 1-32 power rank (unlike
+ * soccer, where seed is only within-group position).
+ */
+function bundleNfl(teams: BaseTeam[], weakestCount: number, groupSize: number): TeamBundle[] {
+  const ranked = [...teams].sort((a, b) => a.seed - b.seed);
+  const weakest = ranked.slice(-weakestCount);
+  const bundles: TeamBundle[] = [];
+  for (let i = 0; i < weakest.length; i += groupSize) {
+    const chunk = weakest.slice(i, i + groupSize);
+    if (chunk.length < 2) {
+      // Never emit a one-team "bundle" — fold the straggler into the last lot.
+      if (bundles.length > 0) bundles[bundles.length - 1].teamIds.push(...chunk.map((t) => t.id));
+      continue;
+    }
+    bundles.push({
+      id: `nfl-bundle-${chunk[0].id}`,
+      // NOTE: the field is `name`, not `label` — see TeamBundle in types.ts:135.
+      name: chunk.map((t) => t.name).join(' / '),
+      teamIds: chunk.map((t) => t.id),
+    });
+  }
+  return bundles;
+}
+
 // ─── Main Generator ─────────────────────────────────────────────────
 
 /**
@@ -315,6 +353,18 @@ export function generateBundles(
         return bundleSoccer(teams, config, 1); // whole group
       case 'custom':
         return []; // manual builder handles custom bundles
+    }
+  }
+
+  // NFL-specific bundling: seed is a true global power rank (unlike soccer's
+  // within-group seed), so bundle the weakest N teams by rank into fixed lots.
+  if (config.sport === 'nfl') {
+    switch (preset) {
+      case 'none': return [];
+      case 'light': return bundleNfl(teams, 8, 2);
+      case 'standard': return bundleNfl(teams, 12, 3);
+      case 'heavy': return bundleNfl(teams, 16, 4);
+      case 'custom': return [];
     }
   }
 
@@ -389,6 +439,10 @@ export function deriveBundleLabel(
 
   if (bundle.id.startsWith('playin-')) {
     return `${members[0].group} ${members[0].seed}-seed (${members.map((t) => t.name).join(' / ')})`;
+  }
+
+  if (bundle.id.startsWith('nfl-bundle-')) {
+    return members.map((t) => t.name).join(' / ');
   }
 
   // region-*, seedline-*, custom-* don't embed member names — preserve as-is.
