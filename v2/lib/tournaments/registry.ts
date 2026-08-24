@@ -99,9 +99,18 @@ export function matchesTournamentEvent(eventName: string, config: TournamentConf
   return config.liveSyncMatchers.some((m) => lower.includes(m.toLowerCase()));
 }
 
-/** List only tournaments whose hosting window is open */
-export function listHostableTournaments(): TournamentConfig[] {
-  return listTournaments().filter(isHostable);
+/**
+ * Tournaments a host can actually create a league for right now.
+ *
+ * `isHostable()` only asks "has hosting opened?" and has no upper bound, so every
+ * finished event stays selectable forever — on 2026-08-09 a new user created a
+ * league for a major that had ended in May. Phase is the correct gate.
+ */
+export function listHostableTournaments(now: Date = new Date()): TournamentConfig[] {
+  return listTournaments().filter((c) => {
+    const phase = getTournamentPhase(c, now);
+    return phase === 'hostable' || phase === 'live';
+  });
 }
 
 // ─── Phase-Aware Helpers ────────────────────────────────────────

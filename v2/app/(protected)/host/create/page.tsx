@@ -1,4 +1,4 @@
-import { listTournaments } from '@/lib/tournaments/registry';
+import { listHostableTournaments } from '@/lib/tournaments/registry';
 import { CreateSessionForm } from '@/components/live/create-session-form';
 
 interface CreateSessionPageProps {
@@ -6,7 +6,7 @@ interface CreateSessionPageProps {
 }
 
 export default async function CreateSessionPage({ searchParams }: CreateSessionPageProps) {
-  const tournaments = listTournaments();
+  const tournaments = listHostableTournaments();
   const params = await searchParams;
   const initialTournamentId = params.tournament ?? undefined;
 

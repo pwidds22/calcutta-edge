@@ -41,11 +41,12 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use initialTournamentId from URL if provided (and hostable), otherwise first hostable active tournament
+  // Use initialTournamentId from URL if provided, otherwise the first tournament.
+  // `tournaments` is already filtered to hostable/live phases by the caller
+  // (listHostableTournaments) — isActive must not participate here, it's the
+  // legacy flag that let a finished PGA Championship be selected by default.
   const defaultTournament =
-    (initialTournamentId && tournaments.find((t) => t.id === initialTournamentId && isHostable(t))) ||
-    tournaments.find((t) => t.isActive && isHostable(t)) ||
-    tournaments.find((t) => isHostable(t)) ||
+    (initialTournamentId && tournaments.find((t) => t.id === initialTournamentId)) ||
     tournaments[0];
 
   const [name, setName] = useState('');
@@ -265,6 +266,18 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const presetEntries: [PayoutMode, PayoutPreset][] = Object.entries(presets).map(
     ([key, preset]) => [key as PayoutMode, preset]
   );
+
+  if (tournaments.length === 0) {
+    return (
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-6 text-center">
+        <h2 className="text-lg font-medium text-white">No events open for hosting right now</h2>
+        <p className="mt-2 text-sm text-white/50">
+          We open hosting a couple of weeks before each event. Check back soon — or email
+          us and we&apos;ll build a custom Calcutta for any sport or event, from $74.99.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
