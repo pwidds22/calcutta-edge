@@ -28,6 +28,12 @@ const FEATURES_BY_SPORT: Record<string, string[]> = {
     'Live strategy overlay during auctions',
     'Auto-save to your account',
   ],
+  nfl: [
+    'All 32 teams with fair-value pricing',
+    'Live Kalshi-derived win totals and playoff odds',
+    'Per-win payout modeling for season-long pools',
+    'Bid tracker and budget planner for auction night',
+  ],
 }
 
 const DEFAULT_FEATURES = FEATURES_BY_SPORT.basketball
