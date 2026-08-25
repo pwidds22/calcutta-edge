@@ -71,48 +71,60 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
 
 /**
  * All 32 NFL teams for the 2026-27 season Calcutta.
- * Odds are placeholders — will be updated when preseason odds drop (~August 2026).
- * Seeded by rough power ranking; odds represent futures for each payout tier.
+ *
+ * Probabilities are REAL Kalshi prediction-market prices (mid of yes_bid/yes_ask),
+ * pre-normalized to each round's target so the runtime devig passes them through
+ * unchanged. `americanOdds` is intentionally empty — odds.ts only honours
+ * `probabilities` when no American odds are present.
+ *
+ * Generated: 2026-08-25 from Kalshi series KXNFLWINS-27 (expected wins),
+ * KXNFL{AFC,NFC}{EAST,NORTH,SOUTH,WEST}-27 (division), KXNFLPLAYOFF-27 (berth),
+ * KXNFLSTAGEOFELIM-27 (divisional / conf-championship rungs),
+ * KXNFL{AFC,NFC}CHAMP-27 (Super Bowl appearance) and KXSB-27 (Super Bowl win).
+ * Re-run: node scripts/fetch-nfl-odds.mjs   (no credentials — Kalshi reads are public)
+ *
+ * `id`, `seed`, `group` and the ordering below are preserved across re-runs — live
+ * sessions' bundles reference ids by value. Don't reorder entries by hand.
  */
 export const NFL_SEASON_2026_TEAMS: BaseTeam[] = [
   // AFC East
-  { id: 1, name: 'Buffalo Bills', seed: 1, group: 'AFC_East', americanOdds: { playoffBerth: -400, divisionWinner: -200, conferenceChamp: +300, superBowl: +600 } },
-  { id: 2, name: 'Miami Dolphins', seed: 2, group: 'AFC_East', americanOdds: { playoffBerth: +100, divisionWinner: +250, conferenceChamp: +1200, superBowl: +2500 } },
-  { id: 3, name: 'New York Jets', seed: 3, group: 'AFC_East', americanOdds: { playoffBerth: +150, divisionWinner: +400, conferenceChamp: +1800, superBowl: +4000 } },
-  { id: 4, name: 'New England Patriots', seed: 4, group: 'AFC_East', americanOdds: { playoffBerth: +500, divisionWinner: +1200, conferenceChamp: +5000, superBowl: +10000 } },
+  { id: 1, name: 'Buffalo Bills', seed: 1, group: 'AFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 10.5145, divisionWinner: 0.5495, playoffBerth: 0.7315, reachDivisional: 0.4215, reachConfChamp: 0.1866, reachSuperBowl: 0.1436, superBowl: 0.0714 } },
+  { id: 2, name: 'Miami Dolphins', seed: 2, group: 'AFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 4.3079, divisionWinner: 0.0248, playoffBerth: 0.0727, reachDivisional: 0.0727, reachConfChamp: 0.0684, reachSuperBowl: 0.005, superBowl: 0.0048 } },
+  { id: 3, name: 'New York Jets', seed: 3, group: 'AFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 5.8546, divisionWinner: 0.0347, playoffBerth: 0.1163, reachDivisional: 0.1163, reachConfChamp: 0.074, reachSuperBowl: 0.005, superBowl: 0.0048 } },
+  { id: 4, name: 'New England Patriots', seed: 4, group: 'AFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 9.8602, divisionWinner: 0.3911, playoffBerth: 0.6104, reachDivisional: 0.3219, reachConfChamp: 0.1449, reachSuperBowl: 0.0941, superBowl: 0.0429 } },
   // AFC North
-  { id: 5, name: 'Baltimore Ravens', seed: 5, group: 'AFC_North', americanOdds: { playoffBerth: -350, divisionWinner: -150, conferenceChamp: +350, superBowl: +700 } },
-  { id: 6, name: 'Cincinnati Bengals', seed: 6, group: 'AFC_North', americanOdds: { playoffBerth: +110, divisionWinner: +300, conferenceChamp: +1400, superBowl: +3000 } },
-  { id: 7, name: 'Pittsburgh Steelers', seed: 7, group: 'AFC_North', americanOdds: { playoffBerth: +130, divisionWinner: +350, conferenceChamp: +1600, superBowl: +3500 } },
-  { id: 8, name: 'Cleveland Browns', seed: 8, group: 'AFC_North', americanOdds: { playoffBerth: +400, divisionWinner: +1000, conferenceChamp: +4000, superBowl: +8000 } },
+  { id: 5, name: 'Baltimore Ravens', seed: 5, group: 'AFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 10.3857, divisionWinner: 0.4527, playoffBerth: 0.7073, reachDivisional: 0.4053, reachConfChamp: 0.2133, reachSuperBowl: 0.1238, superBowl: 0.0619 } },
+  { id: 6, name: 'Cincinnati Bengals', seed: 6, group: 'AFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 10.1725, divisionWinner: 0.3333, playoffBerth: 0.6201, reachDivisional: 0.3308, reachConfChamp: 0.1557, reachSuperBowl: 0.0842, superBowl: 0.0429 } },
+  { id: 7, name: 'Pittsburgh Steelers', seed: 7, group: 'AFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 8.3284, divisionWinner: 0.1791, playoffBerth: 0.3585, reachDivisional: 0.2039, reachConfChamp: 0.0963, reachSuperBowl: 0.0248, superBowl: 0.0143 } },
+  { id: 8, name: 'Cleveland Browns', seed: 8, group: 'AFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 5.458, divisionWinner: 0.0348, playoffBerth: 0.1453, reachDivisional: 0.1145, reachConfChamp: 0.0669, reachSuperBowl: 0.005, superBowl: 0.0048 } },
   // AFC South
-  { id: 9, name: 'Houston Texans', seed: 9, group: 'AFC_South', americanOdds: { playoffBerth: -300, divisionWinner: -180, conferenceChamp: +500, superBowl: +1000 } },
-  { id: 10, name: 'Indianapolis Colts', seed: 10, group: 'AFC_South', americanOdds: { playoffBerth: +140, divisionWinner: +350, conferenceChamp: +1800, superBowl: +4000 } },
-  { id: 11, name: 'Jacksonville Jaguars', seed: 11, group: 'AFC_South', americanOdds: { playoffBerth: +300, divisionWinner: +700, conferenceChamp: +3000, superBowl: +6000 } },
-  { id: 12, name: 'Tennessee Titans', seed: 12, group: 'AFC_South', americanOdds: { playoffBerth: +500, divisionWinner: +1200, conferenceChamp: +5000, superBowl: +10000 } },
+  { id: 9, name: 'Houston Texans', seed: 9, group: 'AFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 10.1923, divisionWinner: 0.4505, playoffBerth: 0.6298, reachDivisional: 0.369, reachConfChamp: 0.1765, reachSuperBowl: 0.0941, superBowl: 0.0429 } },
+  { id: 10, name: 'Indianapolis Colts', seed: 10, group: 'AFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 7.8574, divisionWinner: 0.1832, playoffBerth: 0.3536, reachDivisional: 0.1773, reachConfChamp: 0.0933, reachSuperBowl: 0.0248, superBowl: 0.0143 } },
+  { id: 11, name: 'Jacksonville Jaguars', seed: 11, group: 'AFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 9.1463, divisionWinner: 0.2822, playoffBerth: 0.5038, reachDivisional: 0.2754, reachConfChamp: 0.1281, reachSuperBowl: 0.0644, superBowl: 0.0238 } },
+  { id: 12, name: 'Tennessee Titans', seed: 12, group: 'AFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 6.162, divisionWinner: 0.0842, playoffBerth: 0.1889, reachDivisional: 0.1424, reachConfChamp: 0.0756, reachSuperBowl: 0.0149, superBowl: 0.0048 } },
   // AFC West
-  { id: 13, name: 'Kansas City Chiefs', seed: 13, group: 'AFC_West', americanOdds: { playoffBerth: -500, divisionWinner: -250, conferenceChamp: +200, superBowl: +400 } },
-  { id: 14, name: 'Los Angeles Chargers', seed: 14, group: 'AFC_West', americanOdds: { playoffBerth: +100, divisionWinner: +300, conferenceChamp: +1200, superBowl: +2500 } },
-  { id: 15, name: 'Denver Broncos', seed: 15, group: 'AFC_West', americanOdds: { playoffBerth: +200, divisionWinner: +500, conferenceChamp: +2000, superBowl: +4500 } },
-  { id: 16, name: 'Las Vegas Raiders', seed: 16, group: 'AFC_West', americanOdds: { playoffBerth: +600, divisionWinner: +1500, conferenceChamp: +6000, superBowl: +12000 } },
+  { id: 13, name: 'Kansas City Chiefs', seed: 13, group: 'AFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 9.8701, divisionWinner: 0.3286, playoffBerth: 0.6249, reachDivisional: 0.3642, reachConfChamp: 0.1736, reachSuperBowl: 0.1139, superBowl: 0.0524 } },
+  { id: 14, name: 'Los Angeles Chargers', seed: 14, group: 'AFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 9.8255, divisionWinner: 0.3095, playoffBerth: 0.5716, reachDivisional: 0.3249, reachConfChamp: 0.1551, reachSuperBowl: 0.104, superBowl: 0.0429 } },
+  { id: 15, name: 'Denver Broncos', seed: 15, group: 'AFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 9.7164, divisionWinner: 0.3095, playoffBerth: 0.5765, reachDivisional: 0.3435, reachConfChamp: 0.1678, reachSuperBowl: 0.0842, superBowl: 0.0429 } },
+  { id: 16, name: 'Las Vegas Raiders', seed: 16, group: 'AFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 6.2116, divisionWinner: 0.0524, playoffBerth: 0.1308, reachDivisional: 0.101, reachConfChamp: 0.0511, reachSuperBowl: 0.0149, superBowl: 0.0048 } },
   // NFC East
-  { id: 17, name: 'Philadelphia Eagles', seed: 17, group: 'NFC_East', americanOdds: { playoffBerth: -350, divisionWinner: -180, conferenceChamp: +300, superBowl: +600 } },
-  { id: 18, name: 'Washington Commanders', seed: 18, group: 'NFC_East', americanOdds: { playoffBerth: +120, divisionWinner: +350, conferenceChamp: +1500, superBowl: +3000 } },
-  { id: 19, name: 'Dallas Cowboys', seed: 19, group: 'NFC_East', americanOdds: { playoffBerth: +200, divisionWinner: +500, conferenceChamp: +2000, superBowl: +4500 } },
-  { id: 20, name: 'New York Giants', seed: 20, group: 'NFC_East', americanOdds: { playoffBerth: +600, divisionWinner: +1500, conferenceChamp: +6000, superBowl: +15000 } },
+  { id: 17, name: 'Philadelphia Eagles', seed: 17, group: 'NFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 9.9891, divisionWinner: 0.3839, playoffBerth: 0.6055, reachDivisional: 0.3245, reachConfChamp: 0.1515, reachSuperBowl: 0.0927, superBowl: 0.0429 } },
+  { id: 18, name: 'Washington Commanders', seed: 18, group: 'NFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 7.1931, divisionWinner: 0.1374, playoffBerth: 0.2664, reachDivisional: 0.1522, reachConfChamp: 0.0822, reachSuperBowl: 0.0244, superBowl: 0.0143 } },
+  { id: 19, name: 'Dallas Cowboys', seed: 19, group: 'NFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 9.6817, divisionWinner: 0.3412, playoffBerth: 0.528, reachDivisional: 0.307, reachConfChamp: 0.1568, reachSuperBowl: 0.0829, superBowl: 0.0429 } },
+  { id: 20, name: 'New York Giants', seed: 20, group: 'NFC_East', americanOdds: {}, probabilities: { regularSeasonWins: 7.3319, divisionWinner: 0.1374, playoffBerth: 0.2761, reachDivisional: 0.1513, reachConfChamp: 0.0796, reachSuperBowl: 0.0244, superBowl: 0.0143 } },
   // NFC North
-  { id: 21, name: 'Detroit Lions', seed: 21, group: 'NFC_North', americanOdds: { playoffBerth: -400, divisionWinner: -200, conferenceChamp: +250, superBowl: +500 } },
-  { id: 22, name: 'Green Bay Packers', seed: 22, group: 'NFC_North', americanOdds: { playoffBerth: +100, divisionWinner: +280, conferenceChamp: +1200, superBowl: +2500 } },
-  { id: 23, name: 'Minnesota Vikings', seed: 23, group: 'NFC_North', americanOdds: { playoffBerth: +120, divisionWinner: +320, conferenceChamp: +1400, superBowl: +3000 } },
-  { id: 24, name: 'Chicago Bears', seed: 24, group: 'NFC_North', americanOdds: { playoffBerth: +350, divisionWinner: +800, conferenceChamp: +3500, superBowl: +7000 } },
+  { id: 21, name: 'Detroit Lions', seed: 21, group: 'NFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 10.4699, divisionWinner: 0.3301, playoffBerth: 0.6346, reachDivisional: 0.3271, reachConfChamp: 0.1545, reachSuperBowl: 0.0829, superBowl: 0.0333 } },
+  { id: 22, name: 'Green Bay Packers', seed: 22, group: 'NFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 9.4685, divisionWinner: 0.2632, playoffBerth: 0.5377, reachDivisional: 0.2917, reachConfChamp: 0.1437, reachSuperBowl: 0.0732, superBowl: 0.0333 } },
+  { id: 23, name: 'Minnesota Vikings', seed: 23, group: 'NFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 8.9331, divisionWinner: 0.1722, playoffBerth: 0.4021, reachDivisional: 0.2314, reachConfChamp: 0.1101, reachSuperBowl: 0.0341, superBowl: 0.0143 } },
+  { id: 24, name: 'Chicago Bears', seed: 24, group: 'NFC_North', americanOdds: {}, probabilities: { regularSeasonWins: 9.4041, divisionWinner: 0.2344, playoffBerth: 0.4941, reachDivisional: 0.2096, reachConfChamp: 0.1034, reachSuperBowl: 0.0732, superBowl: 0.0333 } },
   // NFC South
-  { id: 25, name: 'Tampa Bay Buccaneers', seed: 25, group: 'NFC_South', americanOdds: { playoffBerth: -150, divisionWinner: +100, conferenceChamp: +1000, superBowl: +2000 } },
-  { id: 26, name: 'Atlanta Falcons', seed: 26, group: 'NFC_South', americanOdds: { playoffBerth: +150, divisionWinner: +350, conferenceChamp: +1800, superBowl: +4000 } },
-  { id: 27, name: 'New Orleans Saints', seed: 27, group: 'NFC_South', americanOdds: { playoffBerth: +300, divisionWinner: +600, conferenceChamp: +2500, superBowl: +5000 } },
-  { id: 28, name: 'Carolina Panthers', seed: 28, group: 'NFC_South', americanOdds: { playoffBerth: +600, divisionWinner: +1500, conferenceChamp: +6000, superBowl: +12000 } },
+  { id: 25, name: 'Tampa Bay Buccaneers', seed: 25, group: 'NFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 8.3036, divisionWinner: 0.3088, playoffBerth: 0.4069, reachDivisional: 0.2089, reachConfChamp: 0.0933, reachSuperBowl: 0.0341, superBowl: 0.0143 } },
+  { id: 26, name: 'Atlanta Falcons', seed: 26, group: 'NFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 6.504, divisionWinner: 0.1814, playoffBerth: 0.2664, reachDivisional: 0.1153, reachConfChamp: 0.0593, reachSuperBowl: 0.0146, superBowl: 0.0048 } },
+  { id: 27, name: 'New Orleans Saints', seed: 27, group: 'NFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 7.7979, divisionWinner: 0.2892, playoffBerth: 0.3343, reachDivisional: 0.1724, reachConfChamp: 0.0836, reachSuperBowl: 0.0146, superBowl: 0.0048 } },
+  { id: 28, name: 'Carolina Panthers', seed: 28, group: 'NFC_South', americanOdds: {}, probabilities: { regularSeasonWins: 7.1832, divisionWinner: 0.2206, playoffBerth: 0.3052, reachDivisional: 0.1355, reachConfChamp: 0.052, reachSuperBowl: 0.0146, superBowl: 0.0048 } },
   // NFC West
-  { id: 29, name: 'San Francisco 49ers', seed: 29, group: 'NFC_West', americanOdds: { playoffBerth: -250, divisionWinner: -120, conferenceChamp: +400, superBowl: +800 } },
-  { id: 30, name: 'Los Angeles Rams', seed: 30, group: 'NFC_West', americanOdds: { playoffBerth: +130, divisionWinner: +300, conferenceChamp: +1400, superBowl: +3000 } },
-  { id: 31, name: 'Seattle Seahawks', seed: 31, group: 'NFC_West', americanOdds: { playoffBerth: +200, divisionWinner: +500, conferenceChamp: +2000, superBowl: +4500 } },
-  { id: 32, name: 'Arizona Cardinals', seed: 32, group: 'NFC_West', americanOdds: { playoffBerth: +400, divisionWinner: +1000, conferenceChamp: +4000, superBowl: +8000 } },
+  { id: 29, name: 'San Francisco 49ers', seed: 29, group: 'NFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 9.4983, divisionWinner: 0.2092, playoffBerth: 0.5329, reachDivisional: 0.3182, reachConfChamp: 0.1325, reachSuperBowl: 0.0829, superBowl: 0.0429 } },
+  { id: 30, name: 'Los Angeles Rams', seed: 30, group: 'NFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 11.5011, divisionWinner: 0.4847, playoffBerth: 0.7606, reachDivisional: 0.5335, reachConfChamp: 0.325, reachSuperBowl: 0.2244, superBowl: 0.1476 } },
+  { id: 31, name: 'Seattle Seahawks', seed: 31, group: 'NFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 10.6881, divisionWinner: 0.2908, playoffBerth: 0.654, reachDivisional: 0.3835, reachConfChamp: 0.1922, reachSuperBowl: 0.122, superBowl: 0.0714 } },
+  { id: 32, name: 'Arizona Cardinals', seed: 32, group: 'NFC_West', americanOdds: {}, probabilities: { regularSeasonWins: 4.189, divisionWinner: 0.0153, playoffBerth: 0.0533, reachDivisional: 0.0533, reachConfChamp: 0.0533, reachSuperBowl: 0.0049, superBowl: 0.0048 } },
 ];
