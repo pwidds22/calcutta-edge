@@ -74,7 +74,7 @@ const SOCCER_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: 
   },
 };
 
-/** NFL-specific bundle presets — groups the weakest teams by global power rank. */
+/** NFL-specific bundle presets — groups the weakest teams by market value (expected wins). */
 const NFL_BUNDLE_PRESETS: Record<BundlePreset, { label: string; description: string }> = {
   none: { label: 'No Bundling', description: 'All 32 teams sold individually' },
   light: { label: 'Light Bundling', description: 'Weakest 8 teams sold in pairs (28 items)' },
@@ -282,13 +282,24 @@ function bundleSoccer(
 // ─── NFL Bundling ───────────────────────────────────────────────────
 
 /**
- * NFL bundling: group the weakest N teams by rank into fixed-size lots.
- * Rank by `seed`, which for the NFL IS a true global 1-32 power rank (unlike
- * soccer, where seed is only within-group position).
+ * NFL bundling: group the weakest N teams by market value into fixed-size lots.
+ *
+ * `seed` is NOT a global power rank — it's assigned division by division
+ * (AFC East = 1-4, AFC North = 5-8, … NFC West = 29-32), strongest to weakest
+ * WITHIN each division only. Sorting by seed to find "the weakest teams" pulls
+ * in whichever divisions happen to occupy the highest seed numbers (NFC South +
+ * NFC West), regardless of actual strength — the same trap documented in
+ * CLAUDE.md for soccer's within-group seed.
+ *
+ * Rank instead by `probabilities.regularSeasonWins` (Kalshi-derived expected
+ * regular-season wins, ~4-12, distinct per team) — the densest true strength
+ * signal available. Falls back to `seed` for any team/config missing that
+ * probability, so this stays safe if a future config lacks the data.
  */
 function bundleNfl(teams: BaseTeam[], weakestCount: number, groupSize: number): TeamBundle[] {
-  const ranked = [...teams].sort((a, b) => a.seed - b.seed);
-  const weakest = ranked.slice(-weakestCount);
+  const rankValue = (t: BaseTeam) => t.probabilities?.regularSeasonWins ?? t.seed;
+  const ranked = [...teams].sort((a, b) => rankValue(a) - rankValue(b));
+  const weakest = ranked.slice(0, weakestCount);
   const bundles: TeamBundle[] = [];
   for (let i = 0; i < weakest.length; i += groupSize) {
     const chunk = weakest.slice(i, i + groupSize);
@@ -356,8 +367,9 @@ export function generateBundles(
     }
   }
 
-  // NFL-specific bundling: seed is a true global power rank (unlike soccer's
-  // within-group seed), so bundle the weakest N teams by rank into fixed lots.
+  // NFL-specific bundling: seed is division-positional, not a strength rank
+  // (same trap as soccer's within-group seed), so bundle the weakest N teams
+  // by market value (expected regular-season wins) into fixed-size lots.
   if (config.sport === 'nfl') {
     switch (preset) {
       case 'none': return [];

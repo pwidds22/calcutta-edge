@@ -12,12 +12,37 @@ describe('NFL bundling', () => {
     expect(generateBundles('none', NFL_SEASON_2026_TEAMS, NFL_SEASON_2026_CONFIG)).toEqual([]);
   });
 
-  it('bundles the WEAKEST teams, never a division', () => {
+  it('bundles the weakest teams by expected wins, never a full division', () => {
     const bundles = generateBundles('light', NFL_SEASON_2026_TEAMS, NFL_SEASON_2026_CONFIG);
     const bundled = bundles.flatMap((b) => b.teamIds);
-    // The strongest team by seed must never be bundled.
-    const best = [...NFL_SEASON_2026_TEAMS].sort((a, b) => a.seed - b.seed)[0];
+
+    // The strongest team by expected regular-season wins must never be bundled.
+    // (`seed` is division-positional, not a strength rank — see CLAUDE.md.)
+    const best = [...NFL_SEASON_2026_TEAMS].sort(
+      (a, b) => (b.probabilities?.regularSeasonWins ?? 0) - (a.probabilities?.regularSeasonWins ?? 0)
+    )[0];
     expect(bundled).not.toContain(best.id);
+
+    // No complete division (all 4 members) should ever land in the bundled set —
+    // that's the defect: seeds 25-32 = NFC South + NFC West in their entirety.
+    const bundledSet = new Set(bundled);
+    const byGroup = new Map<string, number>();
+    for (const team of NFL_SEASON_2026_TEAMS) {
+      if (bundledSet.has(team.id)) {
+        byGroup.set(team.group, (byGroup.get(team.group) ?? 0) + 1);
+      }
+    }
+    for (const count of byGroup.values()) {
+      expect(count).toBeLessThan(4);
+    }
+
+    // San Francisco (seed 29) and Seattle (seed 31) are strong teams the old
+    // seed-based bundling wrongly swept into the "weakest 8" bucket.
+    const niners = NFL_SEASON_2026_TEAMS.find((t) => t.name === 'San Francisco 49ers')!;
+    const seahawks = NFL_SEASON_2026_TEAMS.find((t) => t.name === 'Seattle Seahawks')!;
+    expect(bundled).not.toContain(niners.id);
+    expect(bundled).not.toContain(seahawks.id);
+
     expect(bundled).toHaveLength(8);
   });
 
