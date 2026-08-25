@@ -28,7 +28,9 @@
  * put Arizona at 6% to win the Super Bowl while the dedicated (and tight, 1c-wide) KXSB
  * market quotes it 0.00/0.01. So each rung is sourced from the most liquid market that
  * prices it directly; STAGEOFELIM is used only for the two rungs nothing else prices.
- * Those two rungs remain the weakest numbers in the file — see the cap chain below.
+ * Those two rungs remain the weakest numbers in the file. Their six legs are POWER-devigged
+ * (see powerDevig) so the floor-pinned tail is not carried through at full share, and the cap
+ * chain below keeps the ladder nested.
  *
  * Usage (no credentials — Kalshi market reads are public):
  *   node scripts/fetch-nfl-odds.mjs --dry     # print the table, write nothing
@@ -186,6 +188,44 @@ function capNormalize(raw, caps, target, label) {
   return { out, clamped };
 }
 
+/**
+ * Power devig: solve for the exponent k with Sum (leg_i)^k = target, then return leg_i^k.
+ *
+ * Proportional devig (leg / Sum) scales every leg by the SAME factor, so it preserves the
+ * share of a leg that is quoted only at the market maker's minimum ask. A bad team's
+ * six-leg stage-of-elimination book carries ~12% overround and its four tail legs are all
+ * pinned at that ~7c floor, so a proportional devig hands the tail its full floor share
+ * — which is how a 5%-to-make-the-playoffs team ended up asserting
+ * P(conference championship | playoffs) = 100% once the cap chain pinned it to the berth.
+ *
+ * The power transform is the standard favourite-longshot correction: it takes
+ * proportionally more out of the longshots and leaves a liquid, near-fair leg essentially
+ * untouched. It uses only the quotes already fetched — no new source, no interpolation.
+ *
+ * f(k) = Sum leg_i^k is non-increasing in k for legs in [0,1], so bisect (the same
+ * technique as capNormalize). k > 1 tightens an overround book; k < 1 lifts an underround
+ * one, so this never silently leaves a round short.
+ */
+function powerDevig(values, target, label) {
+  const vals = values.filter((v) => v > 0);
+  if (!vals.length) fail(`${label}: every leg priced at 0 — cannot devig.`);
+  if (vals.some((v) => v >= 1)) fail(`${label}: a leg is priced at or above 1.00 — refusing to devig.`);
+  if (vals.length < target) fail(`${label}: only ${vals.length} priced leg(s) for target ${target}.`);
+  const f = (k) => vals.reduce((acc, v) => acc + Math.pow(v, k), 0);
+  let hi = 1;
+  while (f(hi) > target) {
+    hi *= 2;
+    if (hi > 1e6) fail(`${label}: no exponent brings the legs down to ${target}.`);
+  }
+  let lo = 0;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) > target) lo = mid; else hi = mid;
+  }
+  const k = (lo + hi) / 2;
+  return { probs: values.map((v) => (v > 0 ? Math.pow(v, k) : 0)), k };
+}
+
 function fail(msg) {
   console.error(`\n✗ ${msg}`);
   process.exit(1);
@@ -244,6 +284,7 @@ async function main() {
     // just quote width unless the HARDER strike's bid clears the easier strike's ask, in
     // which case the ladder is genuinely mispriced (or mislabeled) and we must not guess.
     const raw = {};
+    const clampMag = {};
     let clamps = 0;
     for (const a of ABBRS) {
       const l = ladders[a];
@@ -252,6 +293,7 @@ async function main() {
       let prev = Infinity;
       let prevStrike = null;
       let ev = 0;
+      let lost = 0;
       for (const k of strikes) {
         const q = l[k];
         if (prevStrike !== null && q.bid > l[prevStrike].ask + 0.01) {
@@ -259,16 +301,40 @@ async function main() {
             `${prevStrike}+ asks ${l[prevStrike].ask.toFixed(2)} but ${k}+ bids ${q.bid.toFixed(2)}.`);
         }
         const v = Math.min(q.mid, prev);
-        if (v < q.mid - 1e-12) clamps++;
+        if (v < q.mid - 1e-12) { clamps++; lost += q.mid - v; }
         prev = v;
         prevStrike = k;
         ev += v;
       }
       raw[a] = ev;
+      clampMag[a] = lost;
     }
     const rawSum = Object.values(raw).reduce((x, y) => x + y, 0);
-    console.log(`  regularSeasonWins  17 strikes x 32 teams; ${clamps} tail reads clamped; ` +
-      `raw league total ${rawSum.toFixed(2)} -> ${WINS_TARGET}`);
+    const clampTotal = Object.values(clampMag).reduce((x, y) => x + y, 0);
+    const [worstTeam, worstMag] = Object.entries(clampMag).sort((x, y) => y[1] - x[1])[0];
+    console.log(`  regularSeasonWins  17 strikes x 32 teams; ${clamps} tail reads clamped for ` +
+      `${clampTotal.toFixed(2)} wins (${((100 * clampTotal) / rawSum).toFixed(2)}% of the league, ` +
+      `worst ${worstTeam} ${worstMag.toFixed(2)}); raw league total ${rawSum.toFixed(2)} -> ${WINS_TARGET}`);
+
+    // Budget the clamp. The running minimum only ever LOWERS a read, so a large total is
+    // not a harmless quote-width artifact — it is a systematically deflated ladder, and
+    // the normalization to 272 below would silently spread one team's loss across the
+    // other 31. Neither the 17-strike count above nor the 2-15 expected-wins band at the
+    // end would notice a team deflated from 9.0 wins to 4.0, so bound it here.
+    const CLAMP_LEAGUE_FRACTION = 0.02;
+    const CLAMP_TEAM_MAX = 1.0;
+    if (clampTotal > CLAMP_LEAGUE_FRACTION * rawSum) {
+      fail(`KXNFLWINS: running-minimum clamps removed ${clampTotal.toFixed(2)} wins across ` +
+        `${clamps} reads — ${((100 * clampTotal) / rawSum).toFixed(2)}% of the ${rawSum.toFixed(2)} raw ` +
+        `league total, over the ${(100 * CLAMP_LEAGUE_FRACTION).toFixed(0)}% budget. The wins ladders are ` +
+        `too stale or illiquid to trust; refusing to write.`);
+    }
+    if (worstMag > CLAMP_TEAM_MAX) {
+      fail(`KXNFLWINS ${worstTeam} (${KALSHI_ABBR[worstTeam]}): running-minimum clamps removed ` +
+        `${worstMag.toFixed(2)} expected wins from this one team, over the ${CLAMP_TEAM_MAX.toFixed(2)}-win ` +
+        `budget (league total clamped ${clampTotal.toFixed(2)}). Its strike ladder is inverted well beyond ` +
+        `quote width; refusing to write.`);
+    }
     const norm = normalize(raw, WINS_TARGET);
     for (const a of ABBRS) P[a].regularSeasonWins = norm[a];
   }
@@ -352,8 +418,10 @@ async function main() {
 
   // 7) reachDivisional / reachConfChamp — the only two rungs Kalshi prices nowhere else.
   //    Each team's 6 stage-of-elimination legs are mutually exclusive and exhaustive
-  //    (Kalshi flags the event mutually_exclusive), so normalize them to 1 per team to
-  //    strip that team's vig, then read off the tails.
+  //    (Kalshi flags the event mutually_exclusive), so devig them to 1 per team, then read
+  //    off the tails. POWER devig, not proportional — see powerDevig() for why: a bad
+  //    team's four tail legs are all pinned at the maker's ~7c ask floor, and a
+  //    proportional devig carries that floor's share straight through.
   {
     const ms = (await activeMarkets('KXNFLSTAGEOFELIM')).filter((m) => m.ticker.startsWith(`KXNFLSTAGEOFELIM-${SUF}`));
     const legs = {};
@@ -373,10 +441,17 @@ async function main() {
       if (missing.length) fail(`KXNFLSTAGEOFELIM ${a} (${KALSHI_ABBR[a]}): missing legs ${missing.join(', ')}.`);
       const sum = SOE_LEGS.reduce((s, k) => s + l[k], 0);
       if (sum <= 0) fail(`KXNFLSTAGEOFELIM ${a} (${KALSHI_ABBR[a]}): all six legs priced at 0.`);
-      const n = Object.fromEntries(SOE_LEGS.map((k) => [k, l[k] / sum]));
+      const { probs, k } = powerDevig(SOE_LEGS.map((leg) => l[leg]), 1,
+        `KXNFLSTAGEOFELIM ${a} (${KALSHI_ABBR[a]})`);
+      const n = Object.fromEntries(SOE_LEGS.map((leg, i) => [leg, probs[i]]));
       rawDiv[a] = n.DIV + n.CONF + n.FL + n.FW;  // = 1 - P(REG) - P(WC)
       rawConf[a] = n.CONF + n.FL + n.FW;
+      P[a]._soeVig = sum;
+      P[a]._soeK = k;
     }
+    const ks = ABBRS.map((a) => P[a]._soeK);
+    console.log(`  STAGEOFELIM devig  power exponent k in [${Math.min(...ks).toFixed(3)}, ` +
+      `${Math.max(...ks).toFixed(3)}] across 32 teams (k = 1 would be a fair book)`);
     console.log(`  reachDivisional    STAGEOFELIM tail sum ${Object.values(rawDiv).reduce((x, y) => x + y, 0).toFixed(3)} -> 8`);
     console.log(`  reachConfChamp     STAGEOFELIM tail sum ${Object.values(rawConf).reduce((x, y) => x + y, 0).toFixed(3)} -> 4`);
     for (const a of ABBRS) { P[a]._rawDiv = rawDiv[a]; P[a]._rawConf = rawConf[a]; }
@@ -409,14 +484,15 @@ async function main() {
   const p4 = (x) => Number((x ?? 0).toFixed(4));
   const ordered = [...ABBRS].sort((a, b) => P[b].superBowl - P[a].superBowl);
 
-  console.log('\n  team                    div   wins  divWin  berth  divRd  confCh  SBapp  SBwin');
+  console.log('\n  team                    div   wins  divWin  berth  divRd  confCh  SBapp  SBwin  SOEvig   SOEk');
   for (const a of ordered) {
     const p = P[a];
     console.log(
       `  ${KALSHI_ABBR[a].padEnd(22)} ${p._group.padEnd(9)} ` +
       `${p.regularSeasonWins.toFixed(2).padStart(5)} ` +
       [p.divisionWinner, p.playoffBerth, p.reachDivisional, p.reachConfChamp, p.reachSuperBowl, p.superBowl]
-        .map((v) => v.toFixed(3).padStart(6)).join(' ')
+        .map((v) => v.toFixed(3).padStart(6)).join(' ') +
+      ` ${p._soeVig.toFixed(3).padStart(6)} ${p._soeK.toFixed(3).padStart(6)}`
     );
   }
 
@@ -441,6 +517,15 @@ async function main() {
       if (p4(P[a][cur]) > p4(P[a][prev]) + 1e-9) {
         fail(`${KALSHI_ABBR[a]}: ${cur} ${p4(P[a][cur])} > ${prev} ${p4(P[a][prev])} after normalization.`);
       }
+    }
+    // P(reach the conference championship | make the playoffs) = 100% is impossible: a
+    // playoff team still has to win one or two games to get there. Equality here is the
+    // signature of an unpriced tail surviving the devig and then being pinned to the berth
+    // by the cap chain — exactly what the proportional devig used to produce. Refuse it.
+    if (p4(P[a].playoffBerth) - p4(P[a].reachConfChamp) < 1e-4) {
+      fail(`${KALSHI_ABBR[a]}: reachConfChamp ${p4(P[a].reachConfChamp)} equals playoffBerth ` +
+        `${p4(P[a].playoffBerth)} — that asserts P(conference championship | playoffs) = 100%. ` +
+        `The stage-of-elimination tail is not priced well enough to write.`);
     }
     if (p4(P[a].divisionWinner) > p4(P[a].playoffBerth) + 1e-9) {
       console.warn(`  ! ${KALSHI_ABBR[a]}: divisionWinner ${p4(P[a].divisionWinner)} > playoffBerth ${p4(P[a].playoffBerth)}`);
