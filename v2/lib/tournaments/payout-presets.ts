@@ -355,8 +355,12 @@ export function getPayoutPresets(tournamentId: string): Record<string, PayoutPre
 /**
  * A round's share of the pot: the per-unit rate times the number of units.
  * Most rounds pay once per advancing team; a flat-rate round (NFL per-win) pays
- * once per unit. Every place that totals payouts must use this — the preset test,
- * the create-session form, and tie adjustment — or they drift apart silently.
+ * once per unit. Used by the create-session form, edit-settings modal,
+ * payout-rules editor, and session-rules card to total/display payouts.
+ * NOT used everywhere, though — the preset test (`payout-presets.test.ts`) and
+ * tie adjustment (`actual-payouts.ts`'s `adjustPayoutRulesForTies`) each inline
+ * this same `rate * (payoutUnits ?? teamsAdvancing)` expression independently.
+ * If this formula ever changes, update those call sites by hand too.
  */
 export function roundBudget(round: RoundConfig, rate: number): number {
   return rate * (round.payoutUnits ?? round.teamsAdvancing);

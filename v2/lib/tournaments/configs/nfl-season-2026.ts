@@ -66,6 +66,12 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
   strategyPrice: 1499,
   stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_NFL',
   liveSyncMatchers: ['nfl', 'nfl season'],
+  // `seed` is division-positional (Bills 1 ... Cardinals 32, in division order),
+  // NOT a strength rank — the strongest team (LA Rams) is seed 30. Same
+  // treatment as World Cup's within-group seed: sort/preview by value instead.
+  defaultSort: 'valuePercentage',
+  defaultSortDirection: 'desc',
+  showSeedColumn: false,
   previewTeamCount: 4,
 };
 

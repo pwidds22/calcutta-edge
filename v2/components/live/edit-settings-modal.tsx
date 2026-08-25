@@ -257,7 +257,10 @@ export function EditSettingsModal({
                           type="number"
                           min={0}
                           max={100}
-                          step={0.01}
+                          // A flatRate round's rate is a tiny per-unit price (NFL's
+                          // per-win rate is 0.1029%) — the default 0.01 step makes
+                          // the spinner snap to 0.10/0.11, a 2.7pp swing in budget.
+                          step={round.flatRate ? 0.0001 : 0.01}
                           value={customRules[round.key] ?? 0}
                           onChange={(e) => handleCustomRuleChange(round.key, e.target.value)}
                           className="h-8 w-full rounded border border-white/10 bg-white/[0.04] px-2 pr-6 text-right text-xs text-white focus:border-emerald-500/50 focus:outline-none"

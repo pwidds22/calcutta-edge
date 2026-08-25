@@ -78,7 +78,10 @@ export function PayoutRulesEditor() {
                     type="number"
                     min={0}
                     max={100}
-                    step={0.01}
+                    // A flatRate round's rate is a tiny per-unit price (NFL's
+                    // per-win rate is 0.1029%) — the default 0.01 step makes
+                    // the spinner snap to 0.10/0.11, a 2.7pp swing in budget.
+                    step={round.flatRate ? 0.0001 : 0.01}
                     value={draft[round.key] ?? 0}
                     onChange={(e) => handleChange(round.key, e.target.value)}
                     className="pr-7 text-right text-sm"

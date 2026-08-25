@@ -52,4 +52,19 @@ describe('NFL bundling', () => {
       for (const b of bundles) expect(b.teamIds.length).toBeGreaterThanOrEqual(2);
     }
   });
+
+  it('throws instead of silently falling back to seed when a team has no regularSeasonWins probability', () => {
+    // `seed` is division-positional, not a strength rank — falling back to it
+    // would silently bundle the STRONGEST teams as if they were the weakest.
+    // A missing probability must be a loud failure, not a silent bad bundle.
+    const teamsMissingOdds = NFL_SEASON_2026_TEAMS.map((t, i) => {
+      if (i !== 0) return t;
+      const probs = { ...t.probabilities };
+      delete probs.regularSeasonWins;
+      return { ...t, probabilities: probs };
+    });
+    expect(() =>
+      generateBundles('light', teamsMissingOdds, NFL_SEASON_2026_CONFIG)
+    ).toThrow(/regularSeasonWins/);
+  });
 });

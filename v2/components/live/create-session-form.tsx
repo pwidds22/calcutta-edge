@@ -13,7 +13,7 @@ import {
 import { getPayoutPresets, roundBudget, dollarsToRate, rateToDollars, type PayoutPreset } from '@/lib/tournaments/payout-presets';
 import { getBundlePresets, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
 import { getTournament } from '@/lib/tournaments/registry';
-import { getStandardProps, type EnabledProp } from '@/lib/tournaments/props';
+import { getStandardProps, syncPropsFromRules, type EnabledProp } from '@/lib/tournaments/props';
 import { ArrowLeft, Gavel, Timer, DollarSign, Trophy, ChevronDown, ChevronUp, Zap, Lock, Layers, Dice5, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 
@@ -48,6 +48,17 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const defaultTournament =
     (initialTournamentId && tournaments.find((t) => t.id === initialTournamentId)) ||
     tournaments[0];
+
+  // Which standard props a tournament's "balanced" preset enables by default —
+  // used both to seed prop state below AND to re-sync it whenever the host
+  // switches tournaments (a preset's enabled props aren't the same across
+  // sports; NFL's Balanced preset enables bestRecord/worstRecord at 3% each,
+  // most other sports' Balanced presets enable none).
+  const getBalancedPropSync = (tournament: TournamentConfig | undefined) => {
+    if (!tournament) return { enabledKeys: new Set<string>(), percentages: {} as Record<string, number> };
+    const balancedRules = getPayoutPresets(tournament.id).balanced?.rules ?? {};
+    return syncPropsFromRules(balancedRules, getStandardProps(tournament.id));
+  };
 
   const [name, setName] = useState('');
   const [tournamentId, setTournamentId] = useState(defaultTournament?.id ?? '');
@@ -86,11 +97,21 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   // while the host is actively editing. Only one field can be focused at a time.
   const [editingRound, setEditingRound] = useState<{ key: string; text: string } | null>(null);
 
-  // Prop bets — which standard props are enabled + custom props
-  const [enabledPropKeys, setEnabledPropKeys] = useState<Set<string>>(new Set());
-  const [propPercentages, setPropPercentages] = useState<Record<string, number>>({});
+  // Prop bets — which standard props are enabled + custom props.
+  // Seeded from the default tournament's "balanced" preset (not an empty
+  // Set) — otherwise the Balanced preset renders as selected on page load
+  // while its non-zero props (e.g. NFL's bestRecord/worstRecord, 3% each)
+  // sit un-enabled, and submitting silently writes 0% for them.
+  const [enabledPropKeys, setEnabledPropKeys] = useState<Set<string>>(
+    () => getBalancedPropSync(defaultTournament).enabledKeys
+  );
+  const [propPercentages, setPropPercentages] = useState<Record<string, number>>(
+    () => getBalancedPropSync(defaultTournament).percentages
+  );
   const [customProps, setCustomProps] = useState<Array<{ id: string; label: string; percentage: number }>>([]);
-  const [showPropsSection, setShowPropsSection] = useState(false);
+  const [showPropsSection, setShowPropsSection] = useState(
+    () => getBalancedPropSync(defaultTournament).enabledKeys.size > 0
+  );
 
   const selectedTournament = tournaments.find((t) => t.id === tournamentId);
   const presets = selectedTournament ? getPayoutPresets(selectedTournament.id) : {};
@@ -109,15 +130,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
 
       // Auto-enable props from preset: if a preset includes non-zero prop values,
       // sync them into the Prop Bets section so there's a single source of truth.
-      const propKeys = new Set(standardProps.map((p) => p.key));
-      const presetPropKeys = new Set<string>();
-      const presetPropPcts: Record<string, number> = {};
-      for (const [key, val] of Object.entries(rules)) {
-        if (propKeys.has(key) && val > 0) {
-          presetPropKeys.add(key);
-          presetPropPcts[key] = val;
-        }
-      }
+      const { enabledKeys: presetPropKeys, percentages: presetPropPcts } = syncPropsFromRules(rules, standardProps);
       setEnabledPropKeys(presetPropKeys);
       setPropPercentages(presetPropPcts);
       if (presetPropKeys.size > 0) setShowPropsSection(true);
@@ -320,11 +333,23 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
           <select
             value={tournamentId}
             onChange={(e) => {
-              setTournamentId(e.target.value);
+              const newId = e.target.value;
+              setTournamentId(newId);
               // Reset payout mode when switching tournaments (presets differ per sport)
               setPayoutMode('balanced');
               setCustomRules({});
               setShowCustomEditor(false);
+              // Re-sync prop toggles to the NEW tournament's balanced preset —
+              // each sport's standard props (and which ones a preset enables
+              // by default) differ, so leftover state from the old tournament
+              // would leak stale prop keys or leave a newly-relevant prop
+              // (e.g. NFL's bestRecord/worstRecord) unselected despite the
+              // reset payout mode implying it should be on.
+              const newTournament = tournaments.find((t) => t.id === newId);
+              const sync = getBalancedPropSync(newTournament);
+              setEnabledPropKeys(sync.enabledKeys);
+              setPropPercentages(sync.percentages);
+              setShowPropsSection(sync.enabledKeys.size > 0);
             }}
             className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
           >

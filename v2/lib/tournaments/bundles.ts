@@ -293,11 +293,25 @@ function bundleSoccer(
  *
  * Rank instead by `probabilities.regularSeasonWins` (Kalshi-derived expected
  * regular-season wins, ~4-12, distinct per team) — the densest true strength
- * signal available. Falls back to `seed` for any team/config missing that
- * probability, so this stays safe if a future config lacks the data.
+ * signal available. There's no safe fallback to `seed` here: since seed is
+ * division-positional rather than a strength rank, silently falling back to
+ * it would bundle the *strongest* teams as if they were the weakest (the
+ * exact bug this function exists to avoid). Throw instead so missing odds
+ * data is a loud failure, not a silent one.
  */
 function bundleNfl(teams: BaseTeam[], weakestCount: number, groupSize: number): TeamBundle[] {
-  const rankValue = (t: BaseTeam) => t.probabilities?.regularSeasonWins ?? t.seed;
+  const rankValue = (t: BaseTeam) => {
+    const wins = t.probabilities?.regularSeasonWins;
+    if (wins === undefined) {
+      throw new Error(
+        `bundleNfl: "${t.name}" (id ${t.id}) has no probabilities.regularSeasonWins. ` +
+        `seed is division-positional, not a strength rank, so it cannot stand in as a ` +
+        `fallback here — that would silently bundle the strongest teams as "weakest". ` +
+        `Fix the odds data instead of bundling on seed.`
+      );
+    }
+    return wins;
+  };
   const ranked = [...teams].sort((a, b) => rankValue(a) - rankValue(b));
   const weakest = ranked.slice(0, weakestCount);
   const bundles: TeamBundle[] = [];

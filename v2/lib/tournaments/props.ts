@@ -216,6 +216,35 @@ export function getStandardProps(tournamentId: string): PropDefinition[] {
 }
 
 /**
+ * Given a payout-rules record (e.g. a payout preset's `rules`) and a
+ * tournament's standard prop definitions, determine which props the rules
+ * enable (any standard prop key present with a positive value) and at what
+ * percentage.
+ *
+ * Used by the create-session form to keep its Prop Bets toggles in sync with
+ * whichever preset is active — both on initial page load and when a preset
+ * is (re-)selected. Without this, a preset whose props default to non-zero
+ * (NFL's Balanced preset enables bestRecord + worstRecord at 3% each) shows
+ * as selected but leaves those props un-enabled until the host clicks the
+ * preset again, so the pot silently under-distributes by their share.
+ */
+export function syncPropsFromRules(
+  rules: Record<string, number>,
+  standardProps: PropDefinition[]
+): { enabledKeys: Set<string>; percentages: Record<string, number> } {
+  const propKeySet = new Set(standardProps.map((p) => p.key));
+  const enabledKeys = new Set<string>();
+  const percentages: Record<string, number> = {};
+  for (const [key, val] of Object.entries(rules)) {
+    if (propKeySet.has(key) && val > 0) {
+      enabledKeys.add(key);
+      percentages[key] = val;
+    }
+  }
+  return { enabledKeys, percentages };
+}
+
+/**
  * Enabled prop — stored in SessionSettings.
  * The commissioner chooses which props to enable and at what percentage.
  */

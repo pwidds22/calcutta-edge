@@ -55,16 +55,26 @@ export function SessionRulesCard({
     }
   }
 
-  // Sort payout rules by round order and compute total
-  const sortedRules = Object.entries(payoutRules)
-    .filter(([, pct]) => pct > 0)
-    .sort(([, a], [, b]) => b - a);
-
   // Build a map of round key → round config for fast lookup
   const roundMap: Record<string, RoundConfig> = {};
   for (const r of rounds) {
     roundMap[r.key] = r;
   }
+
+  // Sort payout lines by their share of the pot (roundBudget), not the raw
+  // rate — a flat-rate round like NFL's per-win bonus has a tiny rate
+  // (0.1029%) but the LARGEST budget (28% of the pot, ×272 wins), so sorting
+  // by raw rate buried it at the bottom of the list. Props (no round entry)
+  // fall back to their rate, matching totalPayout's treatment below.
+  const sortedRules = Object.entries(payoutRules)
+    .filter(([, pct]) => pct > 0)
+    .sort(([keyA, a], [keyB, b]) => {
+      const roundA = roundMap[keyA];
+      const roundB = roundMap[keyB];
+      const budgetA = roundA ? roundBudget(roundA, a) : a;
+      const budgetB = roundB ? roundBudget(roundB, b) : b;
+      return budgetB - budgetA;
+    });
 
   // Compute total payout using roundBudget (accounts for payoutUnits)
   const totalPayout = sortedRules.reduce((sum, [key, pct]) => {
@@ -100,7 +110,7 @@ export function SessionRulesCard({
               return (
                 <div key={roundKey} className="flex items-center justify-between">
                   <span className="text-xs text-white/40 capitalize">
-                    {formatRoundName(roundKey)}
+                    {round?.payoutLabel ?? formatRoundName(roundKey)}
                   </span>
                   <span className="text-xs font-medium text-white/80">
                     {pct}%{units > 1 && (

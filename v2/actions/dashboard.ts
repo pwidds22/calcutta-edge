@@ -284,7 +284,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         const teamStatus = getTeamStatus(bid.team_id, results, config, playInLosers);
         status = teamStatus.status;
         roundsWon = teamStatus.roundsWon;
-        earnings = calculateTeamEarnings(roundsWon, actualPot, adjustedPayoutRules);
+        earnings = calculateTeamEarnings(roundsWon, actualPot, adjustedPayoutRules, teamStatus.roundCounts);
       }
 
       userTotalEarned += earnings;

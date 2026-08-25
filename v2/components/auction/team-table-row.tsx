@@ -8,7 +8,7 @@ import { formatCurrency, formatPercent } from '@/lib/calculations/format';
 import { calculateRoundProfits } from '@/lib/calculations/profits';
 import { useAuction } from '@/lib/auction/auction-context';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import type { Team, TeamBundle, PayoutRules } from '@/lib/calculations/types';
+import type { Team, TeamBundle, PayoutRules, RoundConfig } from '@/lib/calculations/types';
 
 interface TeamTableRowProps {
   team: Team;
@@ -20,14 +20,44 @@ interface TeamTableRowProps {
   indented?: boolean;
 }
 
+/** Minimal shape needed to know how to display a round's `odds` value. */
+type OddsDisplayRound = Pick<RoundConfig, 'flatRate' | 'unitLabel'>;
+
+/**
+ * Format a round's `odds` value for display. Most rounds store a 0–1
+ * probability of reaching that round, formatted as a percent. A `flatRate`
+ * round (e.g. NFL's per-win bonus) stores an expected COUNT instead (e.g.
+ * 10.52 expected wins) — running that through formatPercent reads as
+ * nonsense ("1051.82%"), so show the count with its unit noun instead.
+ */
+function formatRoundOdds(value: number, round: OddsDisplayRound): string {
+  if (round.flatRate) {
+    const noun = round.unitLabel ?? 'unit';
+    return `${value.toFixed(1)} ${noun}${value === 1 ? '' : 's'}`;
+  }
+  return formatPercent(value);
+}
+
+/** Tooltip phrasing for a round's odds value — "chance to reach this round"
+ *  is nonsense for a flatRate round's expected win count. */
+function formatRoundOddsTooltip(value: number, round: OddsDisplayRound): string {
+  if (round.flatRate) {
+    const noun = round.unitLabel ?? 'unit';
+    return `${value.toFixed(2)} expected ${noun}${value === 1 ? '' : 's'}`;
+  }
+  return `${formatPercent(value)} chance to reach this round`;
+}
+
 function ProfitCell({
   profit,
   odds,
   roundValue,
+  round,
 }: {
   profit: number;
   odds: number;
   roundValue: number;
+  round: OddsDisplayRound;
 }) {
   return (
     <TableCell className="px-2 py-1.5 text-center">
@@ -40,9 +70,9 @@ function ProfitCell({
       </div>
       <div
         className="text-[10px] text-muted-foreground tabular-nums cursor-help"
-        title={`${formatPercent(odds)} chance to reach this round\n${formatPercent(roundValue)} of pot → adds ${roundValue > 0 ? '$' + (roundValue * 10000).toFixed(0) : '$0'} to fair value per $10k pot`}
+        title={`${formatRoundOddsTooltip(odds, round)}\n${formatPercent(roundValue)} of pot → adds ${roundValue > 0 ? '$' + (roundValue * 10000).toFixed(0) : '$0'} to fair value per $10k pot`}
       >
-        {formatPercent(odds)}
+        {formatRoundOdds(odds, round)}
       </div>
     </TableCell>
   );
@@ -138,6 +168,7 @@ export const TeamTableRow = memo(function TeamTableRow({
           profit={profits[round.key] ?? 0}
           odds={team.odds[round.key] ?? 0}
           roundValue={team.roundValues[round.key] ?? 0}
+          round={round}
         />
       ))}
 
@@ -330,7 +361,7 @@ export const BundleRow = memo(function BundleRow({
               {formatCurrency(combinedProfits[round.key] ?? 0)}
             </div>
             <div className="text-[10px] text-muted-foreground tabular-nums">
-              {formatPercent(combinedOdds[round.key] ?? 0)}
+              {formatRoundOdds(combinedOdds[round.key] ?? 0, round)}
             </div>
           </TableCell>
         ))}
