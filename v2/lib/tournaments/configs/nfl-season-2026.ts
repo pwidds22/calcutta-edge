@@ -63,7 +63,7 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
   endDate: '2027-02-14',
   hostingOpensAt: '2026-08-20',
   isActive: true,
-  strategyPrice: 1499,
+  strategyPrice: 1999, // $19.99 — a season-long pool is 5 months of value, not 4 days
   stripePaymentLinkEnvKey: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_NFL',
   liveSyncMatchers: ['nfl', 'nfl season'],
   // `seed` is division-positional (Bills 1 ... Cardinals 32, in division order),

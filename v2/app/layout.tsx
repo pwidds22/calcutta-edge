@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
+import { STRATEGY_PRICE_DOLLARS, STRATEGY_PRICE_MAX_DOLLARS } from "@/lib/pricing";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -90,11 +91,15 @@ const jsonLd = {
       description: 'Live auction hosting with real-time bidding, commissioner controls, and settlement tools.',
     },
     {
-      '@type': 'Offer',
+      // AggregateOffer, not Offer: the price varies by tournament (most events
+      // are $14.99; the season-long NFL pool is $19.99). A single `price` here
+      // would be a false structured-data claim the moment two events disagree.
+      '@type': 'AggregateOffer',
       name: 'Strategy Analytics',
-      price: '14.99',
+      lowPrice: STRATEGY_PRICE_DOLLARS,
+      highPrice: STRATEGY_PRICE_MAX_DOLLARS,
       priceCurrency: 'USD',
-      description: 'Per-tournament unlock: devigged odds from multiple sportsbooks, fair value calculations, suggested bids, and round-by-round profit projections. Available for the Masters, PGA Championship, March Madness, and other supported events.',
+      description: 'Per-tournament unlock: devigged odds from multiple sportsbooks, fair value calculations, suggested bids, and round-by-round profit projections. Available for the NFL season, the Masters, PGA Championship, March Madness, and other supported events.',
     },
   ],
   publisher: {

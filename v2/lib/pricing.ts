@@ -20,3 +20,26 @@ export const STRATEGY_PRICE_DOLLARS = (STRATEGY_PRICE_CENTS / 100).toFixed(2);
 
 /** Default strategy-tool price formatted with $ prefix. */
 export const STRATEGY_PRICE_LABEL = `$${STRATEGY_PRICE_DOLLARS}`;
+
+/**
+ * Highest strategy price across all tournaments, for "from $X" copy and for the
+ * JSON-LD AggregateOffer. Bump this when a tournament sets a `strategyPrice`
+ * above it — a single `price` in structured data would otherwise be a false
+ * claim once two tournaments disagree.
+ */
+export const STRATEGY_PRICE_MAX_CENTS = 1999;
+
+/** Highest strategy price as a dollar string (no $ prefix). */
+export const STRATEGY_PRICE_MAX_DOLLARS = (STRATEGY_PRICE_MAX_CENTS / 100).toFixed(2);
+
+/**
+ * A tournament's strategy price as a dollar string (no $ prefix), honoring the
+ * per-tournament override and falling back to the global default.
+ *
+ * Four call sites used to inline `((config.strategyPrice ?? STRATEGY_PRICE_CENTS)
+ * / 100).toFixed(2)` — the checkout page, the strategy overlay, the team table,
+ * and the auction tool. Duplicated pricing formulas drift; use this instead.
+ */
+export function strategyPriceDollars(config?: { strategyPrice?: number } | null): string {
+  return ((config?.strategyPrice ?? STRATEGY_PRICE_CENTS) / 100).toFixed(2);
+}

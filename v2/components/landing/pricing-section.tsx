@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Check, ArrowRight } from 'lucide-react'
+import { STRATEGY_PRICE_DOLLARS, STRATEGY_PRICE_MAX_DOLLARS } from '@/lib/pricing'
 
 const TIERS = [
   {
@@ -22,9 +23,9 @@ const TIERS = [
   },
   {
     name: 'Strategy Analytics',
-    price: '$14.99',
-    priceDetail: 'One-time, per event',
-    description: 'See what every golfer is actually worth before you bid.',
+    price: `$${STRATEGY_PRICE_DOLLARS}`,
+    priceDetail: `One-time, per event · $${STRATEGY_PRICE_MAX_DOLLARS} for the season-long NFL pool`,
+    description: 'See what every team is actually worth before you bid.',
     features: [
       'Everything in Free, plus:',
       'Devigged sportsbook odds',
@@ -116,6 +117,25 @@ export function PricingSection() {
               </Button>
             </div>
           ))}
+        </div>
+
+        {/* Custom Calcuttas are built by hand, so they're a conversation rather
+            than a checkout button — a mailto keeps it honest about that. */}
+        <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 text-center">
+          <h3 className="text-sm font-semibold text-white">
+            Want a Calcutta for something we don&apos;t support yet?
+          </h3>
+          <p className="mt-1.5 text-sm text-white/50">
+            Any sport or event — a golf trip, a club championship, the Olympics, your
+            fantasy league&apos;s draft. We&apos;ll build the board, source the odds, and set up
+            the payout structure for you — from $74.99.
+          </p>
+          <a
+            href="mailto:support@calcuttaedge.com?subject=Custom%20Calcutta%20request"
+            className="mt-3 inline-block text-sm font-medium text-emerald-400 hover:text-emerald-300"
+          >
+            support@calcuttaedge.com →
+          </a>
         </div>
       </div>
     </section>

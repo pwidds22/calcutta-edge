@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { getActiveTournament, getTournament } from '@/lib/tournaments/registry'
 import { getTournamentPhase } from '@/lib/tournaments/phase'
 import { hasTournamentAccess } from '@/lib/auth/tournament-access'
-import { STRATEGY_PRICE_CENTS } from '@/lib/pricing'
+import { strategyPriceDollars } from '@/lib/pricing'
 
 const FEATURES_BY_SPORT: Record<string, string[]> = {
   basketball: [
@@ -87,7 +87,7 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
     redirect(paymentUrl.toString())
   }
 
-  const price = ((config.strategyPrice ?? STRATEGY_PRICE_CENTS) / 100).toFixed(2)
+  const price = strategyPriceDollars(config)
   const features = FEATURES_BY_SPORT[config.sport] ?? DEFAULT_FEATURES
 
   return (

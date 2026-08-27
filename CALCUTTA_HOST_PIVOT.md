@@ -1,8 +1,31 @@
 # Calcutta Host pivot + NFL season Calcutta — Design
 
 **Date:** 2026-08-16
-**Status:** approved design, pending implementation plan
+**Status:** ⚠️ **SUPERSEDED 2026-08-24 — the host-pays pivot was cancelled before any of it was built.**
 **Context:** `MEMORY.md`, `CLAUDE.md`, background research run `wf_40064ceb-9b7`
+
+---
+
+## ⚠️ What actually happened
+
+**Hosting stays free. The $19 League Pass in §3 was never implemented and will not be.**
+No `paid_leagues` table, no checkout route, no gate on `startAuction` — none of §3 exists in the codebase. Read it as a record of the reasoning, not as a description of the app.
+
+What was kept from this document:
+
+| Decision | Outcome |
+|---|---|
+| Free hosting | **Kept — and now permanent**, not a free tier under a paywall |
+| Strategy tool as a paid SKU | **Kept.** $14.99 per event, **$19.99 for the season-long NFL pool** |
+| Custom Calcuttas on request | **Kept** at from $74.99, surfaced on the pricing section and the create-form empty state |
+| $19 per-league host fee | **Cancelled** |
+| calcuttahost.com rebrand | **Cancelled** — the name only made sense under host-pays |
+
+The NFL work in §4 was built in full and is real: see `NFL_CALCUTTA_PLAN.md` and `NFL_SYNC_PLAN.md`.
+
+Why the reversal: traffic never justified it. §1's numbers held — 4 signups in the 45 days after this was written, none of whom created or joined anything, and zero purchases since June. The honest read is the one already recorded in §1's caveat: this changes *what* is sold, not *discovery*, and discovery was the actual constraint. Charging hosts would have taxed the one channel that works (free hosting for friends) to chase revenue that was not arriving either way.
+
+---
 
 ---
 

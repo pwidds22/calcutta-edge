@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuction } from '@/lib/auction/auction-context';
-import { STRATEGY_PRICE_CENTS } from '@/lib/pricing';
+import { strategyPriceDollars } from '@/lib/pricing';
 import {
   Table,
   TableBody,
@@ -323,7 +323,7 @@ export function TeamTable() {
             href={`/payment?tournament=${config?.id ?? ''}&returnTo=${encodeURIComponent(`/strategy?tournament=${config?.id ?? ''}`)}`}
             className="rounded-md bg-emerald-600 px-6 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
           >
-            Unlock Full Access — ${((config?.strategyPrice ?? STRATEGY_PRICE_CENTS) / 100).toFixed(2)}
+            Unlock Full Access — ${strategyPriceDollars(config)}
           </Link>
         </div>
       )}
