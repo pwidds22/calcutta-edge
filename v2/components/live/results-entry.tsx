@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
-import { updateResult } from '@/actions/tournament-results';
+import { updateResult, bulkUpdateResults } from '@/actions/tournament-results';
 import { getAliveTeamsForRound } from '@/lib/auction/live/actual-payouts';
-import { CheckCircle2, XCircle, Clock, Trophy } from 'lucide-react';
+import { roundBudget } from '@/lib/tournaments/payout-presets';
+import { CheckCircle2, XCircle, Clock, Trophy, Save } from 'lucide-react';
 
 interface ResultsEntryProps {
   sessionId: string;
@@ -29,6 +30,8 @@ export function ResultsEntry({
 }: ResultsEntryProps) {
   const [activeRound, setActiveRound] = useState(config.rounds[0]?.key ?? '');
   const [saving, setSaving] = useState<string | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
+  const unitInputRefs = useRef(new Map<number, HTMLInputElement>());
 
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
   const soldTeamIds = soldTeams.map((t) => t.teamId);
@@ -39,8 +42,18 @@ export function ResultsEntry({
     resultMap.set(`${r.team_id}:${r.round_key}`, r.result);
   }
 
+  // Build unit-count lookup for flat-rate rounds: "teamId:roundKey" -> count.
+  // Lets the numeric input prefill with a previously-saved value on reopen.
+  const countMap = new Map<string, number>();
+  for (const r of results) {
+    if (r.result_count != null) {
+      countMap.set(`${r.team_id}:${r.round_key}`, r.result_count);
+    }
+  }
+
   // Get alive teams for the active round
   const aliveTeams = getAliveTeamsForRound(soldTeamIds, results, config, activeRound);
+  const activeRoundConfig = config.rounds.find((r) => r.key === activeRound);
 
   // Get sold team info for display
   const soldTeamMap = new Map(soldTeams.map((t) => [t.teamId, t]));
@@ -64,6 +77,13 @@ export function ResultsEntry({
     return 'pending';
   });
 
+  // Sort alive teams by seed
+  const sortedAlive = [...aliveTeams].sort((a, b) => {
+    const teamA = teamMap.get(a);
+    const teamB = teamMap.get(b);
+    return (teamA?.seed ?? 99) - (teamB?.seed ?? 99);
+  });
+
   const handleToggle = useCallback(
     async (teamId: number, newResult: 'won' | 'lost' | 'pending') => {
       if (!isCommissioner) return;
@@ -75,12 +95,43 @@ export function ResultsEntry({
     [sessionId, activeRound, isCommissioner]
   );
 
-  // Sort alive teams by seed
-  const sortedAlive = [...aliveTeams].sort((a, b) => {
-    const teamA = teamMap.get(a);
-    const teamB = teamMap.get(b);
-    return (teamA?.seed ?? 99) - (teamB?.seed ?? 99);
-  });
+  // Save a flat-rate round's unit count for one team. Zero wins is stored as
+  // 'lost' with count 0, never 'won' with count 0 — storing 'won' with count 0
+  // would pollute countWinnersPerRound and put a bogus "won" chip on the
+  // leaderboard.
+  const saveUnits = useCallback(
+    async (teamId: number, value: number) => {
+      if (!isCommissioner) return;
+      const key = `${teamId}:${activeRound}`;
+      setSaving(key);
+      const units = Number(value) || 0;
+      await updateResult(sessionId, teamId, activeRound, units > 0 ? 'won' : 'lost', units);
+      setSaving(null);
+    },
+    [sessionId, activeRound, isCommissioner]
+  );
+
+  // Batch-save every alive team's current input value for a flat-rate round in
+  // one round trip, instead of one updateResult call per team every week.
+  // Plain function (not useCallback): it's only ever an onClick handler, so
+  // there's no downstream memoization to preserve, and its inputs
+  // (activeRoundConfig, sortedAlive) are derived values recomputed on every
+  // render anyway.
+  async function handleSaveAll() {
+    if (!isCommissioner || !activeRoundConfig?.flatRate) return;
+    setSavingAll(true);
+    const updates = sortedAlive.map((teamId) => {
+      const units = Number(unitInputRefs.current.get(teamId)?.value) || 0;
+      return {
+        teamId,
+        roundKey: activeRound,
+        result: (units > 0 ? 'won' : 'lost') as 'won' | 'lost',
+        resultCount: units,
+      };
+    });
+    await bulkUpdateResults(sessionId, updates);
+    setSavingAll(false);
+  }
 
   return (
     <div className="space-y-4">
@@ -127,10 +178,27 @@ export function ResultsEntry({
         </span>
         {payoutRules[activeRound] !== undefined && (
           <span className="text-emerald-400/60">
-            {payoutRules[activeRound]}% of pot
+            {activeRoundConfig?.flatRate
+              ? `${activeRoundConfig.payoutUnits ?? activeRoundConfig.teamsAdvancing} ${
+                  activeRoundConfig.unitLabel ?? 'unit'
+                }s = ${roundBudget(activeRoundConfig, payoutRules[activeRound]).toFixed(1)}% of pot`
+              : `${payoutRules[activeRound]}% of pot`}
           </span>
         )}
       </div>
+
+      {isCommissioner && activeRoundConfig?.flatRate && aliveTeams.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleSaveAll}
+            disabled={savingAll}
+            className="flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+          >
+            <Save className="size-3" />
+            {savingAll ? 'Saving…' : 'Save All'}
+          </button>
+        </div>
+      )}
 
       {/* Team list */}
       {aliveTeams.length === 0 ? (
@@ -174,34 +242,59 @@ export function ResultsEntry({
 
                 {isCommissioner ? (
                   <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                    <button
-                      onClick={() =>
-                        handleToggle(teamId, currentResult === 'won' ? 'pending' : 'won')
-                      }
-                      disabled={isSaving}
-                      className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                        currentResult === 'won'
-                          ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30'
-                          : 'bg-white/[0.04] text-white/40 hover:bg-emerald-500/10 hover:text-emerald-400'
-                      }`}
-                    >
-                      <CheckCircle2 className="size-3" />
-                      Won
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleToggle(teamId, currentResult === 'lost' ? 'pending' : 'lost')
-                      }
-                      disabled={isSaving}
-                      className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                        currentResult === 'lost'
-                          ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/30'
-                          : 'bg-white/[0.04] text-white/40 hover:bg-red-500/10 hover:text-red-400'
-                      }`}
-                    >
-                      <XCircle className="size-3" />
-                      Lost
-                    </button>
+                    {activeRoundConfig?.flatRate ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          step={0.5}
+                          min={0}
+                          max={17}
+                          defaultValue={countMap.get(`${teamId}:${activeRound}`) ?? ''}
+                          onBlur={(e) => saveUnits(teamId, Number(e.target.value))}
+                          disabled={isSaving || savingAll}
+                          ref={(el) => {
+                            if (el) unitInputRefs.current.set(teamId, el);
+                            else unitInputRefs.current.delete(teamId);
+                          }}
+                          placeholder="0"
+                          className="w-16 rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-right text-xs text-white focus:border-emerald-500/40 focus:outline-none"
+                        />
+                        <span className="text-[10px] text-white/30">
+                          {activeRoundConfig.unitLabel ?? 'unit'}s
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() =>
+                            handleToggle(teamId, currentResult === 'won' ? 'pending' : 'won')
+                          }
+                          disabled={isSaving}
+                          className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                            currentResult === 'won'
+                              ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30'
+                              : 'bg-white/[0.04] text-white/40 hover:bg-emerald-500/10 hover:text-emerald-400'
+                          }`}
+                        >
+                          <CheckCircle2 className="size-3" />
+                          Won
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleToggle(teamId, currentResult === 'lost' ? 'pending' : 'lost')
+                          }
+                          disabled={isSaving}
+                          className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                            currentResult === 'lost'
+                              ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/30'
+                              : 'bg-white/[0.04] text-white/40 hover:bg-red-500/10 hover:text-red-400'
+                          }`}
+                        >
+                          <XCircle className="size-3" />
+                          Lost
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="flex-shrink-0 ml-2">
