@@ -39,7 +39,8 @@ export async function updateResult(
   sessionId: string,
   teamId: number,
   roundKey: string,
-  result: 'won' | 'lost' | 'pending'
+  result: 'won' | 'lost' | 'pending',
+  resultCount?: number | null
 ) {
   const supabase = await createClient();
   const {
@@ -65,6 +66,7 @@ export async function updateResult(
       team_id: teamId,
       round_key: roundKey,
       result,
+      result_count: result === 'pending' ? null : (resultCount ?? null),
       entered_by: user.id,
       entered_at: new Date().toISOString(),
     },
@@ -87,6 +89,7 @@ export async function updateResult(
     teamId,
     roundKey,
     result,
+    resultCount: result === 'pending' ? null : (resultCount ?? null),
   });
 
   return { success: true };
@@ -98,7 +101,12 @@ export async function updateResult(
  */
 export async function bulkUpdateResults(
   sessionId: string,
-  updates: Array<{ teamId: number; roundKey: string; result: 'won' | 'lost' | 'pending' }>
+  updates: Array<{
+    teamId: number;
+    roundKey: string;
+    result: 'won' | 'lost' | 'pending';
+    resultCount?: number | null;
+  }>
 ) {
   const supabase = await createClient();
   const {
@@ -123,6 +131,7 @@ export async function bulkUpdateResults(
     team_id: u.teamId,
     round_key: u.roundKey,
     result: u.result,
+    result_count: u.result === 'pending' ? null : (u.resultCount ?? null),
     entered_by: user.id,
     entered_at: now,
   }));

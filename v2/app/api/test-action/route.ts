@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         result = await getTournamentResults(params.sessionId)
         break
       case 'updateResult':
-        result = await updateResult(params.sessionId, params.teamId, params.roundKey, params.result)
+        result = await updateResult(params.sessionId, params.teamId, params.roundKey, params.result, params.resultCount)
         break
       case 'bulkUpdateResults':
         result = await bulkUpdateResults(params.sessionId, params.updates)
