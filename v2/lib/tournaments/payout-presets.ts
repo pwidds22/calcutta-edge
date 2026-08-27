@@ -367,6 +367,28 @@ export function roundBudget(round: RoundConfig, rate: number): number {
 }
 
 /**
+ * What one full round is worth, as a percent of the pot, for the payout-preview
+ * surfaces (the settlement matrix, its "Per-Win Payout Structure" chips, and the
+ * dashboard's break-even column). Those surfaces walk `config.rounds` and add the
+ * stored rate ONCE per round, which is right for a round that pays a team once —
+ * and 272x wrong for NFL's per-win round, where the stored 0.1029% is the price of
+ * a SINGLE win and the round covers a 272-win season.
+ *
+ * Rounds without `payoutUnits` are returned untouched, so this is a provable no-op
+ * for every tournament but NFL (`payoutUnits` appears on exactly one round of one
+ * config). Rounds WITH it get `roundBudget`'s convention: rate x units.
+ *
+ * Caveat worth knowing at the call sites: for a per-unit round the unit count is
+ * LEAGUE-wide (272 wins across 32 teams), so this is the round's total share of the
+ * pot, not what any single team can collect. `calculateTeamEarnings` remains the
+ * only authority on an individual team's actual earnings — it multiplies by that
+ * team's own recorded `result_count`.
+ */
+export function fullRoundRate(round: RoundConfig, rate: number): number {
+  return round.payoutUnits === undefined ? rate : roundBudget(round, rate);
+}
+
+/**
  * Convert a flat per-unit dollar amount (what a host types for a flat-rate round,
  * e.g. NFL's "$ per win") into the percent-of-pot rate that's actually stored.
  * Returns `null` when the pot isn't usable (<=0) — there's no sane percentage to

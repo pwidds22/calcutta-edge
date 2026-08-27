@@ -76,7 +76,7 @@ export function calculateSoccerProjectedStandings(
   // slots are ALSO covered by the roundScale projection below — double-counting the pot.
   // Completed rounds settle normally; in-progress rounds pay base pct and project the rest.
   const completedRounds = results.length
-    ? new Set(getCompletedRounds(soldTeams.map((s) => s.teamId), results, config))
+    ? new Set(getCompletedRounds(soldTeams.map((s) => s.teamId), results, config, playInLosers))
     : new Set<string>();
   const adjustedPayoutRules = winnersPerRound.size
     ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config, completedRounds)

@@ -146,7 +146,7 @@ export function calculateProjectedStandings(
     ? countWinnersPerRound(soldTeams, results, config, playInLosers)
     : new Map<string, number>();
   const completedRounds = (config && results && results.length > 0)
-    ? new Set(getCompletedRounds(soldTeams.map((s) => s.teamId), results, config))
+    ? new Set(getCompletedRounds(soldTeams.map((s) => s.teamId), results, config, playInLosers))
     : new Set<string>();
   const adjustedPayoutRules = (config && winnersPerRound.size > 0)
     ? adjustPayoutRulesForTies(payoutRules, winnersPerRound, config, completedRounds)

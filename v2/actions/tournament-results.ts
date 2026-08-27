@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
+import { normalizeResultCount } from '@/lib/auction/live/unit-entry';
 import type { PropWinner } from '@/lib/tournaments/props';
 
 export interface TournamentResult {
@@ -66,7 +67,7 @@ export async function updateResult(
       team_id: teamId,
       round_key: roundKey,
       result,
-      result_count: result === 'pending' ? null : (resultCount ?? null),
+      result_count: normalizeResultCount(result, resultCount),
       entered_by: user.id,
       entered_at: new Date().toISOString(),
     },
@@ -89,7 +90,7 @@ export async function updateResult(
     teamId,
     roundKey,
     result,
-    resultCount: result === 'pending' ? null : (resultCount ?? null),
+    resultCount: normalizeResultCount(result, resultCount),
   });
 
   return { success: true };
@@ -126,12 +127,23 @@ export async function bulkUpdateResults(
   }
 
   const now = new Date().toISOString();
-  const rows = updates.map((u) => ({
+
+  // Normalize ONCE, then write and broadcast the same shape. Emitting the raw
+  // `updates` array let a 'pending' update carrying a count push that count to
+  // every client while the DB stored null — a write-shape/read-shape divergence.
+  const normalized = updates.map((u) => ({
+    teamId: u.teamId,
+    roundKey: u.roundKey,
+    result: u.result,
+    resultCount: normalizeResultCount(u.result, u.resultCount),
+  }));
+
+  const rows = normalized.map((u) => ({
     session_id: sessionId,
     team_id: u.teamId,
     round_key: u.roundKey,
     result: u.result,
-    result_count: u.result === 'pending' ? null : (u.resultCount ?? null),
+    result_count: u.resultCount,
     entered_by: user.id,
     entered_at: now,
   }));
@@ -151,7 +163,7 @@ export async function bulkUpdateResults(
 
   // Broadcast bulk update
   await broadcastToChannel(`auction:${sessionId}`, 'RESULTS_BULK_UPDATED', {
-    updates,
+    updates: normalized,
   });
 
   return { success: true };

@@ -254,7 +254,17 @@ describe('calculateLeaderboard must not inflate a partially-resolved parallel ro
       winnerName: `User ${i}`,
       amount: 100,
     }));
-    const baseTeams = soldTeams.map((t) => ({ id: t.teamId, name: `Team ${t.teamId}`, seed: 1, group: 'test' }));
+    // Distinct seed+group per team — one per division, as the real config has.
+    // A shared `${group}-${seed}` key would make buildPlayInLoserSet treat all 8 as
+    // one play-in bucket and flag teams 2-8 as losers, so the round would look
+    // COMPLETE with a single alive team and the assertion below would pass for
+    // entirely the wrong reason.
+    const baseTeams = soldTeams.map((t, i) => ({
+      id: t.teamId,
+      name: `Team ${t.teamId}`,
+      seed: i + 1,
+      group: `div${i}`,
+    }));
 
     // Only team 1's division has clinched. The other 7 divisions are undecided.
     const results: TournamentResult[] = [{ team_id: 1, round_key: 'divisionWinner', result: 'won' }];
@@ -270,5 +280,118 @@ describe('calculateLeaderboard must not inflate a partially-resolved parallel ro
     const winner = leaderboard.entries.find((e) => e.participantId === 'user0')!;
     // Correct payout: 2% of the $800 pot = $16, NOT 2% * 8 slots / 1 winner = 16% = $128.
     expect(winner.totalEarned).toBeCloseTo(16, 2);
+  });
+});
+
+describe('round completion must survive a sold team that is never graded', () => {
+  // Finding 1 regression tests. `getCompletedRounds` gates `adjustPayoutRulesForTies`.
+  // If a sold team can never be resolved, the gate used to slam shut on the FIRST
+  // round and stay shut forever, silently disabling pot conservation for the whole
+  // tournament — March Madness (play-in losers) and golf (unmatched players) both.
+
+  const mmConfig = {
+    id: 'test-mm',
+    name: 'Test MM',
+    sport: 'ncaa_basketball',
+    rounds: [
+      { key: 'r32', label: 'R32', teamsAdvancing: 4, payoutLabel: 'Round of 32' },
+      { key: 's16', label: 'S16', teamsAdvancing: 2, payoutLabel: 'Sweet 16' },
+    ],
+    groups: [],
+    devigStrategy: 'none',
+    teamLabel: 'Team',
+    groupLabel: 'Region',
+  } as unknown as TournamentConfig;
+
+  // 4 seeds, one play-in pair: teams 4 and 5 share seed+group (the First Four game).
+  // ESPN skips First Four games, so the loser (team 5) NEVER gets an r32 row.
+  const mmBaseTeams = [
+    { id: 1, name: 'One', seed: 1, group: 'East' },
+    { id: 2, name: 'Two', seed: 2, group: 'East' },
+    { id: 3, name: 'Three', seed: 3, group: 'East' },
+    { id: 4, name: 'Four A', seed: 4, group: 'East' },
+    { id: 5, name: 'Four B', seed: 4, group: 'East' },
+  ];
+  const mmSoldTeams: SoldTeam[] = mmBaseTeams.map((t, i) => ({
+    teamId: t.id,
+    winnerId: `user${i}`,
+    winnerName: `User ${i}`,
+    amount: 100,
+  }));
+  const mmResults: TournamentResult[] = [
+    { team_id: 1, round_key: 'r32', result: 'won' },
+    { team_id: 2, round_key: 'r32', result: 'won' },
+    { team_id: 3, round_key: 'r32', result: 'lost' },
+    { team_id: 4, round_key: 'r32', result: 'won' },
+  ];
+
+  it('a March Madness play-in loser does not block first-round completion', () => {
+    const playInLosers = buildPlayInLoserSet(mmBaseTeams as never, mmResults, mmConfig);
+    expect(playInLosers.has(5)).toBe(true);
+
+    const soldTeamIds = mmSoldTeams.map((s) => s.teamId);
+    const completed = getCompletedRounds(soldTeamIds, mmResults, mmConfig, playInLosers);
+    expect(completed).toContain('r32');
+  });
+
+  it('calculateLeaderboard still scales an under-filled tier up (pot conservation)', () => {
+    // 3 of the 4 R32 slots went to sold teams; the 4th advancing team was unsold —
+    // a state this app explicitly supports. The tier budget (pct x 4) must still be
+    // split across the 3 sold winners, or the league under-distributes.
+    const oneRound = {
+      ...mmConfig,
+      rounds: [mmConfig.rounds[0]],
+    } as unknown as TournamentConfig;
+
+    // 25% per advancing team x 4 slots = the whole pot.
+    const leaderboard = calculateLeaderboard(
+      mmSoldTeams, mmBaseTeams as never, mmResults, oneRound, { r32: 25 }
+    );
+    const totalDistributed = leaderboard.entries.reduce((s, e) => s + e.totalEarned, 0);
+
+    expect(totalDistributed).toBeCloseTo(leaderboard.actualPot, 2);
+    const winner = leaderboard.entries.find((e) => e.participantId === 'user0')!;
+    expect(winner.totalEarned).toBeCloseTo(leaderboard.actualPot / 3, 2);
+  });
+
+  it('a golfer the feed never grades does not block completion once a later tier settles', () => {
+    // The golf sync writes rows only for players it can name-match and keeps an
+    // explicit `unmatched` list. A sold golfer missing from the feed (name drift, a
+    // pre-tournament withdrawal) gets NO makeCut row — ever. He has a unique
+    // seed+group, so `playInLosers` cannot rescue him; the later, fully-settled
+    // tiers are the proof that makeCut finished.
+    const positions = [
+      1,
+      3, 4, 5, 5, 5,
+      7, 8, 10, 10,
+      12, 15, 18, 20, 20, 20, 20,
+      25, 30, 35, 40, 45, 50,
+      55, 60, 70, 80,
+    ];
+    const { results, soldTeams, baseTeams } = buildTestData(positions);
+
+    // Add one more sold golfer with zero result rows in any round.
+    const ghostId = positions.length + 1;
+    soldTeams.push({ teamId: ghostId, winnerId: 'ghostOwner', winnerName: 'Ghost Owner', amount: 27 });
+    baseTeams.push({ id: ghostId, name: 'Unmatched Player', seed: ghostId, group: 'test' });
+
+    const soldTeamIds = soldTeams.map((s) => s.teamId);
+    expect(getCompletedRounds(soldTeamIds, results, config)).toEqual([
+      'makeCut', 'top20', 'top10', 'top5', 'winner',
+    ]);
+
+    // ...and the settled tiers must still conserve the pot.
+    const leaderboard = calculateLeaderboard(soldTeams, baseTeams as never, results, config, payoutRules);
+    const totalDistributed = leaderboard.entries.reduce((s, e) => s + e.totalEarned, 0);
+    expect(totalDistributed).toBeCloseTo(leaderboard.actualPot, 2);
+  });
+
+  it('an in-progress ladder round is still NOT complete (f172400 guard holds)', () => {
+    // The guard this branch added must survive the fix: one decided team out of many
+    // alive is mid-round, not a finished round, and no later round proves otherwise.
+    const partial: TournamentResult[] = [{ team_id: 1, round_key: 'r32', result: 'won' }];
+    const playInLosers = buildPlayInLoserSet(mmBaseTeams as never, partial, mmConfig);
+    const soldTeamIds = mmSoldTeams.map((s) => s.teamId);
+    expect(getCompletedRounds(soldTeamIds, partial, mmConfig, playInLosers)).toEqual([]);
   });
 });

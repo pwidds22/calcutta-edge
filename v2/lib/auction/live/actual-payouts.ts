@@ -99,22 +99,35 @@ export function buildPlayInLoserSet(
 /**
  * Get team IDs that are "alive" entering a given round.
  * A team is alive if it has won all previous rounds (or there are no previous rounds).
+ *
+ * `playInLosers` (optional): teams knocked out in a game the feed never records —
+ * March Madness First Four losers, whose elimination is inferred from their
+ * partner's first-round row (`buildPlayInLoserSet`). They are alive for NOTHING,
+ * including the first round: ESPN skips First Four games (`lib/espn/scoreboard.ts`),
+ * so they can never be resolved and would otherwise sit "alive but unresolved"
+ * forever, permanently blocking `getCompletedRounds`. Omitting the argument
+ * reproduces the previous behavior exactly.
  */
 export function getAliveTeamsForRound(
   soldTeamIds: number[],
   results: TournamentResult[],
   config: TournamentConfig,
-  roundKey: string
+  roundKey: string,
+  playInLosers?: Set<number>
 ): number[] {
   const roundIndex = config.rounds.findIndex((r) => r.key === roundKey);
   if (roundIndex < 0) return [];
 
+  const eligible = playInLosers?.size
+    ? soldTeamIds.filter((id) => !playInLosers.has(id))
+    : soldTeamIds;
+
   // Parallel/bonus rounds (e.g. soccer "win group") are over the whole field —
   // every sold team is eligible, independent of the advancement ladder.
-  if (config.rounds[roundIndex].parallel) return [...soldTeamIds];
+  if (config.rounds[roundIndex].parallel) return [...eligible];
 
   // For the first round, all sold teams are alive
-  if (roundIndex === 0) return [...soldTeamIds];
+  if (roundIndex === 0) return [...eligible];
 
   // For subsequent rounds, a team must have won ALL previous LADDER rounds.
   // Parallel rounds do NOT gate advancement, so they're excluded here.
@@ -124,7 +137,7 @@ export function getAliveTeamsForRound(
     .map((r) => r.key);
   const resultMap = buildResultMap(results);
 
-  return soldTeamIds.filter((teamId) => {
+  return eligible.filter((teamId) => {
     return previousRounds.every((prevRound) => {
       const result = resultMap.get(`${teamId}:${prevRound}`);
       return result === 'won';
@@ -226,43 +239,80 @@ export function calculateTeamEarnings(
 
 /**
  * Which rounds are fully completed (all alive teams have a result)?
+ *
+ * This gates `adjustPayoutRulesForTies`, so under-reporting completion is not
+ * cosmetic — it silently switches OFF pot conservation, and a tier with fewer
+ * sold winners than slots stops being scaled up to its full budget.
+ *
+ * Two ways a SOLD team can be alive-but-unresolvable, either of which used to
+ * jam the very first round and therefore the whole ladder, forever:
+ *
+ *  1. Play-in losers (March Madness First Four — ESPN skips those games). Pass
+ *     `playInLosers` from `buildPlayInLoserSet` and they drop out of the alive
+ *     set. Every caller has it in scope.
+ *
+ *  2. A team the feed simply never grades: the golf sync writes rows only for
+ *     players it can name-match (it reports the rest as `unmatched`), and a
+ *     withdrawal before round 1 may never appear in the leaderboard at all.
+ *     Nothing about the results identifies these — the row is absent exactly
+ *     like a not-yet-played game's would be. So we do NOT guess from absence;
+ *     we look for positive downstream evidence instead: if a LATER ladder round
+ *     is itself fully resolved, the earlier rung must have finished (you cannot
+ *     grade the Elite 8 before the Sweet 16 is played). That inference cannot
+ *     fire mid-round — a partially-decided round leaves nothing later resolved —
+ *     so the f172400 guard this branch added still holds. It restores the
+ *     pre-branch behavior for a finished tournament without reopening the
+ *     mid-round double-count.
  */
 export function getCompletedRounds(
   soldTeamIds: number[],
   results: TournamentResult[],
-  config: TournamentConfig
+  config: TournamentConfig,
+  playInLosers?: Set<number>
 ): string[] {
   const completed: string[] = [];
   const resultMap = buildResultMap(results);
 
-  for (const round of config.rounds) {
-    const aliveTeams = getAliveTeamsForRound(soldTeamIds, results, config, round.key);
+  const isResolved = (teamId: number, roundKey: string) => {
+    const result = resultMap.get(`${teamId}:${roundKey}`);
+    return result === 'won' || result === 'lost';
+  };
+  const fullyResolved = (roundKey: string) => {
+    const alive = getAliveTeamsForRound(soldTeamIds, results, config, roundKey, playInLosers);
+    return alive.length > 0 && alive.every((teamId) => isResolved(teamId, roundKey));
+  };
+
+  for (let i = 0; i < config.rounds.length; i++) {
+    const round = config.rounds[i];
 
     if (round.parallel) {
       // Parallel/bonus round: completion is independent and NEVER blocks the
       // ladder. Mark it completed if every eligible team is resolved, then carry on.
-      const resolved =
-        aliveTeams.length > 0 &&
-        aliveTeams.every((teamId) => {
-          const result = resultMap.get(`${teamId}:${round.key}`);
-          return result === 'won' || result === 'lost';
-        });
-      if (resolved) completed.push(round.key);
+      // Deliberately NOT eligible for the downstream-evidence rule below: a parallel
+      // bonus is not a rung, so a graded ladder round proves nothing about it, and
+      // over-crediting a half-decided one is the exact bug this branch fixed.
+      if (fullyResolved(round.key)) completed.push(round.key);
       continue;
     }
 
+    const aliveTeams = getAliveTeamsForRound(soldTeamIds, results, config, round.key, playInLosers);
     if (aliveTeams.length === 0) break;
 
-    const allResolved = aliveTeams.every((teamId) => {
-      const result = resultMap.get(`${teamId}:${round.key}`);
-      return result === 'won' || result === 'lost';
-    });
-
-    if (allResolved) {
+    if (aliveTeams.every((teamId) => isResolved(teamId, round.key))) {
       completed.push(round.key);
-    } else {
-      break; // Ladder rounds must complete sequentially
+      continue;
     }
+
+    // Unresolved — but a fully-resolved later rung proves this one finished.
+    const provenByLaterRound = config.rounds
+      .slice(i + 1)
+      .some((later) => !later.parallel && fullyResolved(later.key));
+    if (provenByLaterRound) {
+      completed.push(round.key);
+      continue;
+    }
+
+    break; // Ladder rounds must complete sequentially
   }
 
   return completed;
@@ -274,9 +324,10 @@ export function getCompletedRounds(
 export function getCurrentRound(
   soldTeamIds: number[],
   results: TournamentResult[],
-  config: TournamentConfig
+  config: TournamentConfig,
+  playInLosers?: Set<number>
 ): string | null {
-  const completed = getCompletedRounds(soldTeamIds, results, config);
+  const completed = getCompletedRounds(soldTeamIds, results, config, playInLosers);
   const nextRoundIndex = completed.length;
   if (nextRoundIndex >= config.rounds.length) return null; // Tournament complete
   return config.rounds[nextRoundIndex].key;
@@ -298,12 +349,14 @@ export function calculateLeaderboard(
   const actualPot = soldTeams.reduce((sum, t) => sum + t.amount, 0);
   const soldTeamIds = soldTeams.map((t) => t.teamId);
 
-  const completedRounds = getCompletedRounds(soldTeamIds, results, config);
-  const currentRound = getCurrentRound(soldTeamIds, results, config);
-  const isTournamentComplete = completedRounds.length === config.rounds.length;
-
-  // Pre-compute play-in losers so they show as eliminated, not alive
+  // Pre-compute play-in losers so they show as eliminated, not alive — and so
+  // round completion below ignores them. They never get a first-round row, and
+  // waiting for one froze `completedRounds` at [] for every March Madness league.
   const playInLosers = buildPlayInLoserSet(baseTeams, results, config);
+
+  const completedRounds = getCompletedRounds(soldTeamIds, results, config, playInLosers);
+  const currentRound = getCurrentRound(soldTeamIds, results, config, playInLosers);
+  const isTournamentComplete = completedRounds.length === config.rounds.length;
 
   // Precompute all team statuses + count winners per round for tie adjustment
   const teamStatusCache = new Map<

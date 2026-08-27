@@ -1,5 +1,6 @@
 import type { SoldTeam } from './use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import { fullRoundRate } from '@/lib/tournaments/payout-presets';
 
 export interface TeamSettlement {
   teamId: number;
@@ -25,7 +26,10 @@ export interface SettlementSummary {
   /** Actual pot = sum of all winning bids */
   actualPot: number;
   participants: ParticipantSettlement[];
-  roundLabels: Array<{ key: string; label: string }>;
+  /** Per round: its label, its full percent-of-pot rate, and that rate in dollars.
+   *  `pct`/`amount` are unit-aware (see `fullRoundRate`), so the reference chips
+   *  and the matrix below can never quote different numbers for the same round. */
+  roundLabels: Array<{ key: string; label: string; pct: number; amount: number }>;
 }
 
 /**
@@ -75,7 +79,10 @@ export function calculateSettlement(
       const roundProfits: Record<string, number> = {};
 
       for (const round of config.rounds) {
-        const roundPayout = actualPot * ((payoutRules[round.key] ?? 0) / 100);
+        // Unit-aware: a flat-rate per-unit round (NFL wins) stores the price of ONE
+        // unit, so adding it once per round undervalues the round by `payoutUnits`.
+        // No-op for every round without `payoutUnits`.
+        const roundPayout = actualPot * (fullRoundRate(round, payoutRules[round.key] ?? 0) / 100);
         cumulative += roundPayout;
         roundPayouts[round.key] = cumulative;
         roundProfits[round.key] = cumulative - sold.amount;
@@ -107,6 +114,9 @@ export function calculateSettlement(
   return {
     actualPot,
     participants,
-    roundLabels: config.rounds.map((r) => ({ key: r.key, label: r.label })),
+    roundLabels: config.rounds.map((r) => {
+      const pct = fullRoundRate(r, payoutRules[r.key] ?? 0);
+      return { key: r.key, label: r.label, pct, amount: actualPot * (pct / 100) };
+    }),
   };
 }

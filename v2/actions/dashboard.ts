@@ -10,6 +10,7 @@ import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { PropResult } from '@/lib/tournaments/props';
 import { getPropWinners } from '@/lib/tournaments/props';
+import { fullRoundRate } from '@/lib/tournaments/payout-presets';
 import { dedupeBy } from '@/lib/auction/winning-bids';
 import { normalizeName } from '@/lib/datagolf/ev';
 import { fetchInPlay, fetchPreTournament, formatPlayerName } from '@/lib/datagolf/client';
@@ -264,7 +265,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           payoutRules,
           countWinnersPerRound(soldTeamsForTies, results, config, playInLosers),
           config,
-          new Set(getCompletedRounds(soldTeamsForTies.map((t) => t.teamId), results, config))
+          new Set(getCompletedRounds(soldTeamsForTies.map((t) => t.teamId), results, config, playInLosers))
         )
       : payoutRules;
 
@@ -303,7 +304,10 @@ export async function getDashboardData(): Promise<DashboardData> {
       if (config && payoutRules) {
         let cumulative = 0;
         for (const round of config.rounds) {
-          cumulative += actualPot * ((payoutRules[round.key] ?? 0) / 100);
+          // Unit-aware - see `fullRoundRate`. A flat-rate per-unit round (NFL wins)
+          // stores the price of one unit; counting it once per round makes a whole
+          // 272-win season look like a rounding error against the purchase price.
+          cumulative += actualPot * (fullRoundRate(round, payoutRules[round.key] ?? 0) / 100);
           if (cumulative >= bid.amount) {
             breakEvenRound = round.label;
             break;

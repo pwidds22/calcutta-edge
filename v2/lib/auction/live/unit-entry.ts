@@ -31,3 +31,19 @@ export function resolveUnitEntry(rawValue: string): UnitEntryDecision {
   const count = Math.min(MAX_FLAT_RATE_UNITS, Math.max(0, parsed));
   return { action: 'save', result: count > 0 ? 'won' : 'lost', count };
 }
+
+/**
+ * The stored/broadcast shape of a result's unit count.
+ *
+ * A 'pending' result has no count — clearing it is the whole point of going back
+ * to pending. Every writer must apply this rule to BOTH the row it upserts and
+ * the payload it broadcasts, or clients render a count the database does not hold
+ * and it silently disappears on the next reload. `bulkUpdateResults` re-emitted
+ * its raw input and diverged exactly that way.
+ */
+export function normalizeResultCount(
+  result: 'won' | 'lost' | 'pending',
+  resultCount?: number | null
+): number | null {
+  return result === 'pending' ? null : (resultCount ?? null);
+}

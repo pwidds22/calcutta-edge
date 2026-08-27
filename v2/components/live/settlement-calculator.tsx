@@ -45,9 +45,7 @@ export function SettlementCalculator({
           Per-Win Payout Structure (Pot: ${settlement.actualPot.toLocaleString()})
         </p>
         <div className="flex flex-wrap gap-2">
-          {settlement.roundLabels.map(({ key, label }) => {
-            const pct = payoutRules[key] ?? 0;
-            const amount = settlement.actualPot * (pct / 100);
+          {settlement.roundLabels.map(({ key, label, pct, amount }) => {
             return (
               <div
                 key={key}
@@ -57,7 +55,7 @@ export function SettlementCalculator({
                 <p className="text-xs font-mono font-medium text-emerald-400">
                   ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <span className="text-[9px] text-white/20">{pct}%</span>
+                <span className="text-[9px] text-white/20">{Number(pct.toFixed(4))}%</span>
               </div>
             );
           })}

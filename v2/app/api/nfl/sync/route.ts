@@ -96,42 +96,62 @@ function isCronRequest(req: NextRequest): boolean {
   return !!secret && req.headers.get('authorization') === `Bearer ${secret}`;
 }
 
+/**
+ * Every failure path logs before returning. This runs unattended on a cron: the
+ * response body is read by nobody, so a silent `{ error }` in a 200 means the
+ * parser's deliberately loud throws — name-join mismatch, missing stat, wrong
+ * seasonType, the 8-division assertion — are loud to no one, and a season quietly
+ * stops settling.
+ */
+function syncFailure(message: string): { error: string } {
+  console.error(`[NFL Sync] ${message}`);
+  return { error: message };
+}
+
 /** Fetch ESPN once per tournament and compute the decidable row set. */
 async function computeTournamentRows(
   tournamentId: string
 ): Promise<{ rows: NflSyncResultRow[] } | { error: string }> {
   const tournament = getTournament(tournamentId);
-  if (!tournament) return { error: `Unknown tournament ${tournamentId}` };
+  if (!tournament) return syncFailure(`Unknown tournament ${tournamentId}`);
+
+  // From the CONFIG, never `new Date().getFullYear()`. In January 2027 the
+  // wall-clock year is 2027 but the 2026 NFL season is still ESPN season
+  // 2026 — a clock-year call would ask for an unplayed season and settle
+  // everyone at zero, mid-playoffs.
+  const seasonYear = Number(tournament.config.startDate.slice(0, 4));
+  if (!Number.isInteger(seasonYear)) {
+    return syncFailure(`Bad startDate on ${tournamentId}: ${tournament.config.startDate}`);
+  }
+
+  // Scoped tightly to the fetch+parse so the prefix stays true. The old single
+  // catch wrapped `computeSeasonResults` too, so a config NAME MISMATCH surfaced
+  // as "ESPN fetch failed" and sent whoever read it hunting the wrong bug.
+  let standings;
   try {
-    // From the CONFIG, never `new Date().getFullYear()`. In January 2027 the
-    // wall-clock year is 2027 but the 2026 NFL season is still ESPN season
-    // 2026 — a clock-year call would ask for an unplayed season and settle
-    // everyone at zero, mid-playoffs.
-    const seasonYear = Number(tournament.config.startDate.slice(0, 4));
-    if (!Number.isInteger(seasonYear)) {
-      return { error: `Bad startDate on ${tournamentId}: ${tournament.config.startDate}` };
-    }
+    standings = parseStandings(await fetchStandings(seasonYear));
+  } catch (err) {
+    return syncFailure(`ESPN fetch/parse failed for ${tournamentId} (${seasonYear}): ${err}`);
+  }
 
-    const standings = parseStandings(await fetchStandings(seasonYear));
+  // seasonType is NOT top-level in the ESPN payload — it hangs off each
+  // division node, and parseStandings hoists it. Reading it from raw JSON
+  // gives `undefined` and would reject every run. This is defence in depth:
+  // `computeSeasonResults` asserts it too, and `&seasontype=2` on the
+  // request is the primary guard. Preseason records are real numbers in the
+  // same shape as regular-season ones, so nothing downstream would notice.
+  if (standings.seasonType !== 2) {
+    return syncFailure(
+      `ESPN returned seasonType ${standings.seasonType} for ${seasonYear} — ` +
+        'refusing to settle anything but the regular season (2).'
+    );
+  }
 
-    // seasonType is NOT top-level in the ESPN payload — it hangs off each
-    // division node, and parseStandings hoists it. Reading it from raw JSON
-    // gives `undefined` and would reject every run. This is defence in depth:
-    // `computeSeasonResults` asserts it too, and `&seasontype=2` on the
-    // request is the primary guard. Preseason records are real numbers in the
-    // same shape as regular-season ones, so nothing downstream would notice.
-    if (standings.seasonType !== 2) {
-      return {
-        error:
-          `ESPN returned seasonType ${standings.seasonType} for ${seasonYear} — ` +
-          'refusing to settle anything but the regular season (2).',
-      };
-    }
-
+  try {
     // No `seasonComplete` — weekly wins only this phase.
     return { rows: computeSeasonResults(standings, tournament.teams) };
   } catch (err) {
-    return { error: `ESPN fetch failed: ${err}` };
+    return syncFailure(`Result computation failed for ${tournamentId} (${seasonYear}): ${err}`);
   }
 }
 
@@ -148,9 +168,12 @@ async function syncAllNflSessions(supabase: ReturnType<typeof createAdminClient>
   }
 
   const summaries = [];
+  let tournamentsErrored = 0;
   for (const tournament of nfl) {
     const rows = await computeTournamentRows(tournament.config.id);
     if ('error' in rows) {
+      // computeTournamentRows already logged it.
+      tournamentsErrored++;
       summaries.push({ tournamentId: tournament.config.id, ...rows });
       continue;
     }
@@ -166,7 +189,11 @@ async function syncAllNflSessions(supabase: ReturnType<typeof createAdminClient>
       .eq('status', 'completed')
       .in('tournament_status', ['pre_tournament', 'in_progress']);
     if (error) {
-      summaries.push({ tournamentId: tournament.config.id, error: error.message });
+      tournamentsErrored++;
+      summaries.push({
+        tournamentId: tournament.config.id,
+        ...syncFailure(`session lookup failed for ${tournament.config.id}: ${error.message}`),
+      });
       continue;
     }
 
@@ -175,7 +202,14 @@ async function syncAllNflSessions(supabase: ReturnType<typeof createAdminClient>
       summaries.push({ tournamentId: tournament.config.id, sessionId: session.id, ...result });
     }
   }
-  return NextResponse.json({ message: `Synced ${summaries.length} sessions`, results: summaries });
+
+  // Vercel grades a cron by its HTTP status. Returning 200 with the failure
+  // buried in the body logs a successful run for a sync that settled nothing.
+  const allFailed = tournamentsErrored === nfl.length;
+  return NextResponse.json(
+    { message: `Synced ${summaries.length} sessions`, results: summaries },
+    { status: allFailed ? 502 : 200 }
+  );
 }
 
 async function writeSessionResults(
@@ -187,6 +221,11 @@ async function writeSessionResults(
 
   let inserted = 0;
   let updated = 0;
+  // Every row is its own statement, so a partial failure is a real state. Track
+  // WHICH rows landed: the broadcast must carry only those. Sending a row the DB
+  // rejected paints a win total on every client that vanishes on the next reload.
+  const persisted: NflSyncResultRow[] = [];
+  const failed: Array<{ teamId: number; roundKey: string }> = [];
   for (const row of rows) {
     const { error, status } = await supabase.from('tournament_results').upsert(
       {
@@ -205,19 +244,21 @@ async function writeSessionResults(
     );
     if (error) {
       console.error(`[NFL Sync] upsert failed team ${row.teamId} ${row.roundKey}:`, error);
-    } else if (status === 201) {
-      inserted++;
+      failed.push({ teamId: row.teamId, roundKey: row.roundKey });
     } else {
-      updated++;
+      persisted.push(row);
+      if (status === 201) inserted++;
+      else updated++;
     }
   }
 
   // This is a WRITE-SUCCESS gate, not a change signal: the wins round is a
   // running total re-upserted every week, so "nothing changed" is a state these
   // counters cannot express and must never be inferred from them. What they can
-  // tell us is that every upsert failed — in which case broadcasting a full set
-  // of results the DB does not hold would paint wins that vanish on reload.
-  if (inserted === 0 && updated === 0) {
+  // tell us is that every upsert failed — in which case there is nothing to
+  // broadcast and nothing to mark in progress.
+  if (persisted.length === 0) {
+    console.error(`[NFL Sync] all ${rows.length} result upserts failed for session ${sessionId}`);
     return { error: 'All result upserts failed — see server logs', inserted, updated };
   }
 
@@ -228,7 +269,7 @@ async function writeSessionResults(
     .eq('tournament_status', 'pre_tournament');
 
   await broadcastToChannel(`auction:${sessionId}`, 'RESULTS_BULK_UPDATED', {
-    updates: rows.map((r) => ({
+    updates: persisted.map((r) => ({
       teamId: r.teamId,
       roundKey: r.roundKey,
       result: r.result,
@@ -237,6 +278,16 @@ async function writeSessionResults(
     })),
   });
 
-  // `matched` feeds the dashboard's "Synced N teams" message.
-  return { message: `Synced ${rows.length} result rows`, matched: rows.length, inserted, updated };
+  // `matched` feeds the dashboard's "Synced N teams" message — it must count
+  // what was WRITTEN, not what was attempted.
+  return {
+    message:
+      failed.length > 0
+        ? `Synced ${persisted.length} of ${rows.length} result rows (${failed.length} failed — see server logs)`
+        : `Synced ${persisted.length} result rows`,
+    matched: persisted.length,
+    inserted,
+    updated,
+    ...(failed.length > 0 ? { failed } : {}),
+  };
 }
