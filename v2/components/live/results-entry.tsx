@@ -6,6 +6,7 @@ import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/
 import type { TournamentResult } from '@/actions/tournament-results';
 import { updateResult, bulkUpdateResults } from '@/actions/tournament-results';
 import { getAliveTeamsForRound } from '@/lib/auction/live/actual-payouts';
+import { resolveUnitEntry, MAX_FLAT_RATE_UNITS } from '@/lib/auction/live/unit-entry';
 import { roundBudget } from '@/lib/tournaments/payout-presets';
 import { CheckCircle2, XCircle, Clock, Trophy, Save } from 'lucide-react';
 
@@ -98,14 +99,18 @@ export function ResultsEntry({
   // Save a flat-rate round's unit count for one team. Zero wins is stored as
   // 'lost' with count 0, never 'won' with count 0 — storing 'won' with count 0
   // would pollute countWinnersPerRound and put a bogus "won" chip on the
-  // leaderboard.
+  // leaderboard. An empty or non-numeric field means "no change": the
+  // commissioner may be mid-edit (cleared the field to retype), and blurring
+  // must never silently wipe a previously-saved count by writing 0. See
+  // resolveUnitEntry for the empty-vs-zero distinction and clamping.
   const saveUnits = useCallback(
-    async (teamId: number, value: number) => {
+    async (teamId: number, rawValue: string) => {
       if (!isCommissioner) return;
+      const decision = resolveUnitEntry(rawValue);
+      if (decision.action === 'skip') return;
       const key = `${teamId}:${activeRound}`;
       setSaving(key);
-      const units = Number(value) || 0;
-      await updateResult(sessionId, teamId, activeRound, units > 0 ? 'won' : 'lost', units);
+      await updateResult(sessionId, teamId, activeRound, decision.result, decision.count);
       setSaving(null);
     },
     [sessionId, activeRound, isCommissioner]
@@ -113,6 +118,8 @@ export function ResultsEntry({
 
   // Batch-save every alive team's current input value for a flat-rate round in
   // one round trip, instead of one updateResult call per team every week.
+  // Fields left empty (or non-numeric) are skipped rather than saved as 0 —
+  // same no-change rule as saveUnits.
   // Plain function (not useCallback): it's only ever an onClick handler, so
   // there's no downstream memoization to preserve, and its inputs
   // (activeRoundConfig, sortedAlive) are derived values recomputed on every
@@ -120,16 +127,23 @@ export function ResultsEntry({
   async function handleSaveAll() {
     if (!isCommissioner || !activeRoundConfig?.flatRate) return;
     setSavingAll(true);
-    const updates = sortedAlive.map((teamId) => {
-      const units = Number(unitInputRefs.current.get(teamId)?.value) || 0;
-      return {
-        teamId,
-        roundKey: activeRound,
-        result: (units > 0 ? 'won' : 'lost') as 'won' | 'lost',
-        resultCount: units,
-      };
-    });
-    await bulkUpdateResults(sessionId, updates);
+    const updates = sortedAlive.reduce<
+      { teamId: number; roundKey: string; result: 'won' | 'lost'; resultCount: number }[]
+    >((acc, teamId) => {
+      const decision = resolveUnitEntry(unitInputRefs.current.get(teamId)?.value ?? '');
+      if (decision.action === 'save') {
+        acc.push({
+          teamId,
+          roundKey: activeRound,
+          result: decision.result,
+          resultCount: decision.count,
+        });
+      }
+      return acc;
+    }, []);
+    if (updates.length > 0) {
+      await bulkUpdateResults(sessionId, updates);
+    }
     setSavingAll(false);
   }
 
@@ -245,12 +259,27 @@ export function ResultsEntry({
                     {activeRoundConfig?.flatRate ? (
                       <div className="flex items-center gap-1.5">
                         <input
+                          // Keyed on the externally-saved count (not just
+                          // teamId/round) so a live broadcast that changes
+                          // this team's count remounts the input with a
+                          // fresh defaultValue. Without this, an already-open
+                          // input keeps showing its stale value after
+                          // another commissioner's device saves a new one —
+                          // and blurring or "Save All" here would silently
+                          // overwrite their fresh save with this stale
+                          // number. Typing never changes countMap (there's
+                          // no onChange, only onBlur), so this key is stable
+                          // for the whole duration of an edit and only
+                          // changes in response to a real external update.
+                          key={`${teamId}:${activeRound}:${
+                            countMap.get(`${teamId}:${activeRound}`) ?? 'empty'
+                          }`}
                           type="number"
                           step={0.5}
                           min={0}
-                          max={17}
+                          max={MAX_FLAT_RATE_UNITS}
                           defaultValue={countMap.get(`${teamId}:${activeRound}`) ?? ''}
-                          onBlur={(e) => saveUnits(teamId, Number(e.target.value))}
+                          onBlur={(e) => saveUnits(teamId, e.target.value)}
                           disabled={isSaving || savingAll}
                           ref={(el) => {
                             if (el) unitInputRefs.current.set(teamId, el);
