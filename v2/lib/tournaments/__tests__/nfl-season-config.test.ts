@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NFL_SEASON_2026_CONFIG, NFL_SEASON_2026_TEAMS } from '../configs/nfl-season-2026';
+import { strategyPriceDollars } from '@/lib/pricing';
 import { getTeamStatus } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 
@@ -51,5 +52,14 @@ describe('nfl_season_2026 config', () => {
   it('declares props that exist and a Stripe link of its own', () => {
     expect(NFL_SEASON_2026_CONFIG.propBets.map((p) => p.key)).toEqual(['bestRecord', 'worstRecord']);
     expect(NFL_SEASON_2026_CONFIG.stripePaymentLinkEnvKey).toBe('NEXT_PUBLIC_STRIPE_PAYMENT_LINK_NFL');
+  });
+
+  // A season-long pool is five months of value, not four days, so it carries a
+  // per-tournament override. Four surfaces read this through strategyPriceDollars();
+  // pinning it here means a stray edit shows up as a failing test, not a wrong charge.
+  it('prices the strategy tool at $19.99, above the $14.99 default', () => {
+    expect(NFL_SEASON_2026_CONFIG.strategyPrice).toBe(1999);
+    expect(strategyPriceDollars(NFL_SEASON_2026_CONFIG)).toBe('19.99');
+    expect(strategyPriceDollars(undefined)).toBe('14.99');
   });
 });
