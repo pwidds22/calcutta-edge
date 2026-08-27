@@ -178,12 +178,12 @@ export async function getDashboardData(): Promise<DashboardData> {
   if (completedIds.length > 0) {
     const { data: results } = await supabase
       .from('tournament_results')
-      .select('session_id, team_id, round_key, result')
+      .select('session_id, team_id, round_key, result, result_count')
       .in('session_id', completedIds);
 
     for (const r of results ?? []) {
       const list = resultsBySession.get(r.session_id) ?? [];
-      list.push({ team_id: r.team_id, round_key: r.round_key, result: r.result });
+      list.push({ team_id: r.team_id, round_key: r.round_key, result: r.result, result_count: r.result_count });
       resultsBySession.set(r.session_id, list);
     }
   }

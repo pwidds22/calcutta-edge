@@ -260,7 +260,7 @@ export async function getSessionState(sessionId: string) {
   // Load tournament results (for post-auction tournament lifecycle)
   const { data: tournamentResults } = await supabase
     .from('tournament_results')
-    .select('team_id, round_key, result')
+    .select('team_id, round_key, result, result_count')
     .eq('session_id', sessionId);
 
   // Check payment status for strategy overlay (per-tournament)

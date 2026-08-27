@@ -170,7 +170,7 @@ export function TournamentDashboard({
 
   // Listen for real-time result updates from broadcast
   const handleResultUpdate = useCallback(
-    (data: { teamId: number; roundKey: string; result: string }) => {
+    (data: { teamId: number; roundKey: string; result: string; resultCount?: number | null }) => {
       setResults((prev) => {
         const idx = prev.findIndex(
           (r) => r.team_id === data.teamId && r.round_key === data.roundKey
@@ -179,6 +179,7 @@ export function TournamentDashboard({
           team_id: data.teamId,
           round_key: data.roundKey,
           result: data.result as TournamentResult['result'],
+          result_count: data.resultCount ?? null,
         };
         if (idx >= 0) {
           const next = [...prev];
@@ -193,7 +194,7 @@ export function TournamentDashboard({
 
   const handleBulkUpdate = useCallback(
     (data: {
-      updates: Array<{ teamId: number; roundKey: string; result: string }>;
+      updates: Array<{ teamId: number; roundKey: string; result: string; resultCount?: number | null }>;
     }) => {
       setResults((prev) => {
         const next = [...prev];
@@ -205,6 +206,7 @@ export function TournamentDashboard({
             team_id: u.teamId,
             round_key: u.roundKey,
             result: u.result as TournamentResult['result'],
+            result_count: u.resultCount ?? null,
           };
           if (idx >= 0) {
             next[idx] = updated;
