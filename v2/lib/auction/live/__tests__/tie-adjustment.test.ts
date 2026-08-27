@@ -6,6 +6,7 @@ import {
   getTeamStatus,
   buildPlayInLoserSet,
   calculateLeaderboard,
+  getCompletedRounds,
 } from '../actual-payouts';
 import type { PayoutRules, TournamentConfig } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
@@ -200,5 +201,74 @@ describe('Tie-adjusted payouts', () => {
 
     // DISTRIBUTED must equal POT — this is the user's core requirement
     expect(totalDistributed).toBeCloseTo(actualPot, 2);
+  });
+});
+
+describe('partially-resolved parallel round must not inflate', () => {
+  it('one clinched division winner earns 1 slot, not the whole 8-slot budget', () => {
+    const config = {
+      rounds: [
+        { key: 'divisionWinner', label: 'Div', payoutLabel: 'Win Division', teamsAdvancing: 8, parallel: true },
+      ],
+    } as unknown as TournamentConfig;
+
+    // 8 teams sold (one per division). Only ONE division has clinched — the other 7
+    // are undecided (no result rows at all), so the round as a whole is NOT complete.
+    const results = [{ team_id: 1, round_key: 'divisionWinner', result: 'won' as const }];
+    const soldTeamIds = [1, 2, 3, 4, 5, 6, 7, 8];
+    const soldTeams = soldTeamIds.map((teamId) => ({ teamId, amount: 100 })) as never[];
+
+    const winners = countWinnersPerRound(soldTeams, results, config);
+    const completed = new Set(getCompletedRounds(soldTeamIds, results, config));
+
+    const adjusted = adjustPayoutRulesForTies({ divisionWinner: 2.0 }, winners, config, completed);
+
+    // The round is NOT complete, so its rate must be untouched: 2% of pot, not 16%.
+    expect(adjusted.divisionWinner).toBeCloseTo(2.0, 5);
+  });
+});
+
+describe('calculateLeaderboard must not inflate a partially-resolved parallel round', () => {
+  it('one clinched division winner earns 2% of the pot, not the whole 8-slot budget', () => {
+    // Regression test for the actual call site this task fixes: calculateLeaderboard
+    // (actual-payouts.ts) must gate adjustPayoutRulesForTies on completed rounds, or a
+    // partially-decided parallel round (NFL divisionWinner: 8 slots, one per division)
+    // hands the first clinched division the WHOLE 8-slot budget instead of its own slot.
+    const nflConfig = {
+      id: 'test-nfl',
+      name: 'Test NFL',
+      sport: 'nfl',
+      rounds: [
+        { key: 'divisionWinner', label: 'Div', payoutLabel: 'Win Division', teamsAdvancing: 8, parallel: true },
+      ],
+      groups: [],
+      devigStrategy: 'global',
+      teamLabel: 'Team',
+      groupLabel: 'Division',
+    } as unknown as TournamentConfig;
+
+    // 8 teams sold (one per division), $100 each -> $800 pot.
+    const soldTeams: SoldTeam[] = Array.from({ length: 8 }, (_, i) => ({
+      teamId: i + 1,
+      winnerId: `user${i}`,
+      winnerName: `User ${i}`,
+      amount: 100,
+    }));
+    const baseTeams = soldTeams.map((t) => ({ id: t.teamId, name: `Team ${t.teamId}`, seed: 1, group: 'test' }));
+
+    // Only team 1's division has clinched. The other 7 divisions are undecided.
+    const results: TournamentResult[] = [{ team_id: 1, round_key: 'divisionWinner', result: 'won' }];
+
+    const leaderboard = calculateLeaderboard(
+      soldTeams,
+      baseTeams as any,
+      results,
+      nflConfig,
+      { divisionWinner: 2.0 }
+    );
+
+    const winner = leaderboard.entries.find((e) => e.participantId === 'user0')!;
+    // Correct payout: 2% of the $800 pot = $16, NOT 2% * 8 slots / 1 winner = 16% = $128.
+    expect(winner.totalEarned).toBeCloseTo(16, 2);
   });
 });

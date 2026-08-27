@@ -315,8 +315,16 @@ export function calculateLeaderboard(
     teamStatusCache.set(sold.teamId, getTeamStatus(sold.teamId, results, config, playInLosers));
   }
 
-  // Adjust payout rules when ties cause more winners than teamsAdvancing
-  const adjustedPayoutRules = adjustPayoutRulesForTies(payoutRules, winnersPerRound, config);
+  // Adjust payout rules when ties cause more winners than teamsAdvancing — but only
+  // for COMPLETED rounds. Mid-round, redistributing a tier's whole budget among its
+  // few already-decided winners double-counts the pot alongside the pending slots
+  // (the soccer R16 over-credit bug, f172400).
+  const adjustedPayoutRules = adjustPayoutRulesForTies(
+    payoutRules,
+    winnersPerRound,
+    config,
+    new Set(completedRounds)
+  );
 
   // Build per-participant data
   const byParticipant = new Map<string, { name: string; teams: SoldTeam[] }>();

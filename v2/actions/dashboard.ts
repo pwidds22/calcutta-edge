@@ -5,7 +5,7 @@ import { getTournament, getFeaturedTournament, matchesTournamentEvent } from '@/
 import { getTournamentPhase } from '@/lib/tournaments/phase';
 import type { TournamentPhase } from '@/lib/tournaments/types';
 import { hasTournamentAccess } from '@/lib/auth/tournament-access';
-import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies } from '@/lib/auction/live/actual-payouts';
+import { getTeamStatus, calculateTeamEarnings, buildPlayInLoserSet, countWinnersPerRound, adjustPayoutRulesForTies, getCompletedRounds } from '@/lib/auction/live/actual-payouts';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { PropResult } from '@/lib/tournaments/props';
@@ -254,14 +254,17 @@ export async function getDashboardData(): Promise<DashboardData> {
     const playInLosers = (config && teams) ? buildPlayInLoserSet(teams, results, config) : new Set<number>();
     const propResults = (session.prop_results ?? []) as PropResult[];
 
-    // Adjust payout rules for ties (more winners than teamsAdvancing)
+    // Adjust payout rules for ties (more winners than teamsAdvancing) — but only for
+    // COMPLETED rounds. Mid-round, redistributing a tier's whole budget among its few
+    // already-decided winners double-counts the pot (the soccer R16 over-credit bug, f172400).
     const allSessionBids = allBidsBySession.get(session.id) ?? [];
     const soldTeamsForTies = allSessionBids.map((b) => ({ teamId: b.team_id, winnerId: '', winnerName: '', amount: b.amount }));
     const adjustedPayoutRules = (config && results.length > 0)
       ? adjustPayoutRulesForTies(
           payoutRules,
           countWinnersPerRound(soldTeamsForTies, results, config, playInLosers),
-          config
+          config,
+          new Set(getCompletedRounds(soldTeamsForTies.map((t) => t.teamId), results, config))
         )
       : payoutRules;
 
