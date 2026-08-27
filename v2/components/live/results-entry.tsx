@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
@@ -147,6 +147,31 @@ export function ResultsEntry({
     setSavingAll(false);
   }
 
+  // Sync flat-rate unit inputs from external updates (a broadcast from
+  // another commissioner device, an ESPN sync, or this browser's own
+  // updateResult echoing back) without disturbing a field being actively
+  // typed into. updateResult resolves as soon as the server has *sent* the
+  // broadcast, not once it round-trips back, and broadcastToChannel has no
+  // sender exclusion — so the committing browser gets its own write back
+  // while the field may already be mid-retype (blur-saved, then clicked
+  // back in to fix a typo). The input stays uncontrolled (no value/onChange)
+  // so typing itself never fights a render; this effect is the only thing
+  // that writes into it post-mount, and skipping the focused element is
+  // what keeps an in-flight edit safe from that echo. Runs off `results`
+  // (a fresh array only when data actually changes) and `activeRound`
+  // rather than the render-local countMap/sortedAlive, which are rebuilt
+  // (new identity) on every render regardless of whether anything changed.
+  useEffect(() => {
+    unitInputRefs.current.forEach((el, teamId) => {
+      if (document.activeElement === el) return;
+      const external = results.find(
+        (r) => r.team_id === teamId && r.round_key === activeRound
+      );
+      const nextValue = external?.result_count != null ? String(external.result_count) : '';
+      if (el.value !== nextValue) el.value = nextValue;
+    });
+  }, [results, activeRound]);
+
   return (
     <div className="space-y-4">
       {/* Round tabs */}
@@ -259,21 +284,19 @@ export function ResultsEntry({
                     {activeRoundConfig?.flatRate ? (
                       <div className="flex items-center gap-1.5">
                         <input
-                          // Keyed on the externally-saved count (not just
-                          // teamId/round) so a live broadcast that changes
-                          // this team's count remounts the input with a
-                          // fresh defaultValue. Without this, an already-open
-                          // input keeps showing its stale value after
-                          // another commissioner's device saves a new one —
-                          // and blurring or "Save All" here would silently
-                          // overwrite their fresh save with this stale
-                          // number. Typing never changes countMap (there's
-                          // no onChange, only onBlur), so this key is stable
-                          // for the whole duration of an edit and only
-                          // changes in response to a real external update.
-                          key={`${teamId}:${activeRound}:${
-                            countMap.get(`${teamId}:${activeRound}`) ?? 'empty'
-                          }`}
+                          // Keyed on teamId/round only — NOT on the saved
+                          // count. Remounting on every external count change
+                          // (the old approach) raced with our own broadcast
+                          // echo: updateResult resolves on broadcast send,
+                          // not round-trip, so the committing browser can
+                          // receive its own write back and remount this
+                          // field mid-retype, wiping an in-progress edit.
+                          // The key still changes across rounds so switching
+                          // tabs remounts with a fresh defaultValue; syncing
+                          // an in-place external update (without disturbing
+                          // an active edit) is handled by the sync effect
+                          // above instead, via the ref set below.
+                          key={`${teamId}:${activeRound}`}
                           type="number"
                           step={0.5}
                           min={0}
