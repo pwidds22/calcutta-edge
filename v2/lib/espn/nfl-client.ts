@@ -43,10 +43,23 @@ async function getJson<T>(url: string, label: string): Promise<T> {
  *
  * `level=3` groups entries by division, which is what division-winner grading
  * needs; the caller should still assert `seasonType === 2` on the parsed result.
+ *
+ * Like `fetchRegularSeasonWeek`, the echoed-back `season.year` is verified
+ * rather than trusted from the query string. The dangerous direction is a PAST
+ * year: `?season=2025` returns a complete, perfectly gradable season that is
+ * simply the wrong one, and it would settle silently. A FUTURE year is already
+ * loud (ESPN returns a stub with no entries, which `parseStandings` rejects).
  */
 export async function fetchStandings(seasonYear: number): Promise<EspnStandings> {
   const url = `${STANDINGS_BASE}?season=${seasonYear}&level=3&seasontype=2`;
-  return getJson<EspnStandings>(url, 'standings');
+  const data = await getJson<EspnStandings>(url, 'standings');
+
+  if (data.season?.year !== seasonYear) {
+    throw new Error(
+      `[nfl] ESPN standings returned season ${data.season?.year}, asked for ${seasonYear}`
+    );
+  }
+  return data;
 }
 
 /**

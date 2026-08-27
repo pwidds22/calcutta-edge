@@ -48,6 +48,9 @@ function supportsManualSync(config: TournamentConfig): boolean {
   if (config.sport === 'soccer') {
     return true; // /api/soccer/sync is registry-driven; any live soccer tournament qualifies
   }
+  if (config.sport === 'nfl') {
+    return true; // /api/nfl/sync is registry-driven (sport filter — ESPN's NFL feed is league-wide)
+  }
   return config.id === 'march_madness_2026';
 }
 
@@ -93,7 +96,9 @@ export function TournamentDashboard({
       ? '/api/golf/sync'
       : config.sport === 'soccer'
         ? '/api/soccer/sync'
-        : '/api/espn/sync';
+        : config.sport === 'nfl'
+          ? '/api/nfl/sync'
+          : '/api/espn/sync';
 
   const handleEspnSync = useCallback(async () => {
     setSyncing(true);
@@ -117,7 +122,10 @@ export function TournamentDashboard({
         const lowRoundMsg = data.lowRound
           ? ` | Low R${data.lowRound.round}: ${data.lowRound.players.join(', ')} (${data.lowRound.score > 0 ? '+' : ''}${data.lowRound.score})`
           : '';
-        setSyncMessage(`Synced ${count} ${config.sport === 'golf' ? 'players' : 'games'}${lowRoundMsg}`);
+        // NFL syncs a per-team running win total, not a set of finished games.
+        const unit =
+          config.sport === 'golf' ? 'players' : config.sport === 'nfl' ? 'teams' : 'games';
+        setSyncMessage(`Synced ${count} ${unit}${lowRoundMsg}`);
         // Results will update via broadcast — no manual refetch needed
       }
     } catch {

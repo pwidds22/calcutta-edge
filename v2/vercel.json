@@ -11,6 +11,10 @@
     {
       "path": "/api/soccer/sync",
       "schedule": "0 2,6 * * *"
+    },
+    {
+      "path": "/api/nfl/sync",
+      "schedule": "0 7,13 * * *"
     }
   ]
 }
