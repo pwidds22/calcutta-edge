@@ -1,14 +1,16 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight } from 'lucide-react'
+import { getFeaturedInfo } from './hero-section'
 
 export function CtaSection() {
+  const featured = getFeaturedInfo()
   return (
     <section className="border-t border-white/[0.06]">
       <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 md:py-20">
         <div className="text-center">
           <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            The Masters starts Thursday.
+            {featured?.ctaHeadline ?? 'Your next Calcutta starts here.'}
           </h2>
           <p className="mt-3 text-base text-white/50">
             Set up your group&apos;s Calcutta in 5 minutes. Free.

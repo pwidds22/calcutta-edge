@@ -50,7 +50,10 @@ export const NFL_SEASON_2026_CONFIG: TournamentConfig = {
     bestRecord: 3.0,
     worstRecord: 3.0,
   },
-  defaultPotSize: 4000,
+  // Keep this near what real pools actually raise (median real drafted pot is
+  // ~$1,900; the owner's own is ~$1,000). $4,000 read as wildly optimistic on
+  // the pre-draft strategy page (Pat's walkthrough, 2026-09-01).
+  defaultPotSize: 1000,
   propBets: [
     { key: 'bestRecord', label: 'Best Record in the NFL' },
     { key: 'worstRecord', label: 'Worst Record in the NFL' },

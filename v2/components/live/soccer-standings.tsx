@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules, RoundKey } from '@/lib/tournaments/types';
 import type { TournamentResult } from '@/actions/tournament-results';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import type { PropResult } from '@/lib/tournaments/props';
 import { calculateSoccerProjectedStandings } from '@/lib/auction/live/soccer-standings';
 import { ChevronRight, Crown } from 'lucide-react';
@@ -136,7 +137,7 @@ export function SoccerStandings({
                     <div key={team.teamId} className="flex items-center justify-between py-0.5 text-xs">
                       <span className={`flex min-w-0 items-center truncate ${isOut ? 'text-white/30' : isChamp ? 'text-amber-300' : 'text-white/60'}`}>
                         {isChamp && <Crown className="mr-1 size-3 shrink-0 text-amber-400" />}
-                        {team.group ? <span className={isOut ? 'text-white/20' : 'text-white/30'}>({team.group})&nbsp;</span> : null}
+                        {team.group ? <span className={isOut ? 'text-white/20' : 'text-white/30'}>({formatGroupLabel(team.group)})&nbsp;</span> : null}
                         <span className="truncate">{team.teamName}</span>
                         {isOut && (
                           <span className="ml-1.5 shrink-0 rounded bg-red-500/10 px-1 py-px text-[9px] font-semibold tracking-wide text-red-400">

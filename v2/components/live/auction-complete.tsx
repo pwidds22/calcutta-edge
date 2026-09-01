@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import {
   getParticipantPortfolios,
   generateCSV,
@@ -165,7 +166,7 @@ export function AuctionComplete({
                       <span className="text-xs text-white/60">
                         <span className="text-white/30 mr-1">({t.seed})</span>
                         {t.teamName}
-                        <span className="ml-1.5 text-white/20">{t.group}</span>
+                        <span className="ml-1.5 text-white/20">{formatGroupLabel(t.group)}</span>
                       </span>
                       <span className="text-xs font-mono text-white/50">
                         ${t.amount.toLocaleString()}
@@ -217,7 +218,7 @@ export function AuctionComplete({
                         {team?.name ?? `Team ${sold.teamId}`}
                       </td>
                       <td className="hidden px-3 py-1.5 text-xs text-white/30 sm:table-cell">
-                        {team?.group}
+                        {formatGroupLabel(team?.group)}
                       </td>
                       <td className="px-3 py-1.5 text-xs text-white/50">
                         {sold.winnerName}

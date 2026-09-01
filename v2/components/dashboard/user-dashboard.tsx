@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import type { DashboardData, DashboardFeaturedEvent, DashboardSession, DashboardTeam } from '@/actions/dashboard';
 import { isCompletedDashboardSession } from '@/lib/dashboard/categorize';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import { deleteSession } from '@/actions/session';
 
 function formatLongDate(dateStr: string): string {
@@ -334,7 +335,7 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
         <div className="min-w-0">
           <p className="text-xs text-white/70 truncate">
             <span className="text-white/30">({team.seed})</span> {team.teamName}
-            <span className="ml-1 text-white/15">{team.group}</span>
+            <span className="ml-1 text-white/15">{formatGroupLabel(team.group)}</span>
           </p>
           <div className="flex items-center gap-2 text-[10px]">
             <span className="text-white/20">{team.leagueName}</span>

@@ -1,4 +1,5 @@
 import { Radio, Settings, Calculator, TrendingUp } from 'lucide-react'
+import { STRATEGY_PRICE_LABEL } from '@/lib/pricing'
 
 const HOSTING_FEATURES = [
   { icon: Radio, text: 'Live real-time bidding with countdown timers' },
@@ -42,10 +43,10 @@ export function FeaturesSection() {
           {/* Strategy column */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-amber-400">
-              Strategy analytics &middot; $14.99
+              Strategy analytics &middot; from {STRATEGY_PRICE_LABEL}
             </p>
             <h3 className="mt-2 text-xl font-bold text-white sm:text-2xl">
-              Know what every golfer is worth.
+              Know what every team is worth.
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-white/50">
               We pull odds from 13+ sportsbooks, strip the vig, and calculate

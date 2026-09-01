@@ -14,6 +14,7 @@ import { getPayoutPresets, roundBudget, dollarsToRate, rateToDollars, type Payou
 import { getBundlePresets, generateBundles, countAuctionItems } from '@/lib/tournaments/bundles';
 import { getTournament } from '@/lib/tournaments/registry';
 import { getStandardProps, syncPropsFromRules, type EnabledProp } from '@/lib/tournaments/props';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import { ArrowLeft, Gavel, Timer, DollarSign, Trophy, ChevronDown, ChevronUp, Zap, Lock, Layers, Dice5, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 
@@ -62,7 +63,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
 
   const [name, setName] = useState('');
   const [tournamentId, setTournamentId] = useState(defaultTournament?.id ?? '');
-  const [potSize, setPotSize] = useState('10000');
+  // Seed the pot estimate from the tournament config, not a global constant —
+  // a season-long NFL pool and March Madness raise very different pots.
+  const [potSize, setPotSize] = useState(String(defaultTournament?.defaultPotSize ?? 10000));
   const [minimumBid, setMinimumBid] = useState('1');
 
   // Bundle preset + custom bundles
@@ -86,10 +89,11 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Payout rules
+  // Payout rules. The tier editor is visible by default — hosts kept missing
+  // that the preset values were editable at all behind the "Customize" toggle.
   const [payoutMode, setPayoutMode] = useState<PayoutMode>('balanced');
   const [customRules, setCustomRules] = useState<PayoutRules>({});
-  const [showCustomEditor, setShowCustomEditor] = useState(false);
+  const [showCustomEditor, setShowCustomEditor] = useState(true);
   // The custom-rule field (dollar or percent) currently focused, holding exactly
   // what the host has typed so far. A controlled numeric field whose displayed
   // value is derived (parseFloat -> round-trip) clobbers an in-progress decimal
@@ -138,7 +142,11 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   };
 
   const handleCustomRuleChange = (key: string, value: string) => {
-    setCustomRules((prev) => ({ ...prev, [key]: parseFloat(value) || 0 }));
+    // The editor is open even while a preset is selected, so the first edit
+    // must FORK from the currently active preset's rules — spreading a stale
+    // `customRules` here would zero every tier the host hasn't touched yet.
+    const base = payoutMode === 'custom' ? customRules : getActiveRules();
+    setCustomRules({ ...base, [key]: parseFloat(value) || 0 });
     // Editing an individual rule implies "custom" — otherwise the total readout
     // and submitted rules silently ignore the edit (mode still points at a preset).
     setPayoutMode('custom');
@@ -263,7 +271,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
       tournamentId,
       name: name.trim(),
       payoutRules,
-      estimatedPotSize: Number(potSize) || 10000,
+      estimatedPotSize: Number(potSize) || selectedTournament.defaultPotSize || 10000,
       settings,
       password: password.trim() || undefined,
     });
@@ -338,7 +346,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
               // Reset payout mode when switching tournaments (presets differ per sport)
               setPayoutMode('balanced');
               setCustomRules({});
-              setShowCustomEditor(false);
+              setShowCustomEditor(true);
               // Re-sync prop toggles to the NEW tournament's balanced preset —
               // each sport's standard props (and which ones a preset enables
               // by default) differ, so leftover state from the old tournament
@@ -350,6 +358,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
               setEnabledPropKeys(sync.enabledKeys);
               setPropPercentages(sync.percentages);
               setShowPropsSection(sync.enabledKeys.size > 0);
+              // Pot estimates are tournament-sized too — reset alongside the
+              // payout mode rather than carrying one sport's pot to another.
+              setPotSize(String(newTournament?.defaultPotSize ?? 10000));
             }}
             className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
           >
@@ -524,7 +535,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                                 : 'border-white/[0.06] bg-white/[0.02] text-white/50 hover:border-white/10 hover:text-white/70'
                           }`}
                         >
-                          <span className="font-medium">{selectedTournament?.showSeedColumn === false ? team.group : team.seed}</span>{' '}
+                          <span className="font-medium">{selectedTournament?.showSeedColumn === false ? formatGroupLabel(team.group) : team.seed}</span>{' '}
                           {team.name}
                         </button>
                       );
@@ -649,13 +660,10 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
             </div>
             <button
               type="button"
-              onClick={() => {
-                if (!showCustomEditor) {
-                  setCustomRules({ ...activeRules });
-                  setPayoutMode('custom');
-                }
-                setShowCustomEditor(!showCustomEditor);
-              }}
+              // Pure show/hide: the editor displays the ACTIVE rules (preset or
+              // custom), and the first edit forks to custom — so opening no
+              // longer has to hijack the payout mode.
+              onClick={() => setShowCustomEditor(!showCustomEditor)}
               className="flex items-center gap-1 text-xs text-white/40 hover:text-white/60 transition-colors"
             >
               Customize
@@ -666,9 +674,12 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
           {/* Custom editor */}
           {showCustomEditor && (
             <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
+              {/* 4 columns max: NFL's long tier labels ("Reach Conference
+                  Championship") wrapped illegibly at 6-up, and the $-per-win
+                  input sat misaligned against the % tiers. */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
                 {rounds.map((round) => {
-                  const rate = customRules[round.key] ?? 0;
+                  const rate = activeRules[round.key] ?? 0;
                   const units = round.payoutUnits ?? round.teamsAdvancing;
                   const unitNoun = round.unitLabel ?? selectedTournament?.teamLabel?.toLowerCase() ?? 'team';
                   const pot = Number(potSize) || 0;
@@ -687,7 +698,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                     editingRound && editingRound.key === round.key ? editingRound.text : formattedValue;
                   return (
                     <div key={round.key}>
-                      <label className="block text-[10px] text-white/40 mb-0.5">
+                      {/* min-height keeps inputs on one baseline when a long
+                          label wraps to two lines and its neighbor doesn't. */}
+                      <label className="flex min-h-7 items-end text-[10px] leading-tight text-white/40 mb-0.5">
                         {round.payoutLabel}
                       </label>
                       <div className="relative">

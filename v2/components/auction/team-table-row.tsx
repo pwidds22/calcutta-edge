@@ -4,7 +4,7 @@ import { memo, useCallback, useState, useEffect } from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { formatCurrency, formatPercent } from '@/lib/calculations/format';
+import { formatCurrency, formatPercent, formatGroupLabel } from '@/lib/calculations/format';
 import { calculateRoundProfits } from '@/lib/calculations/profits';
 import { useAuction } from '@/lib/auction/auction-context';
 import { ChevronRight, ChevronDown } from 'lucide-react';
@@ -130,7 +130,7 @@ export const TeamTableRow = memo(function TeamTableRow({
         <TableCell className="px-2 py-1.5 text-xs font-medium whitespace-nowrap">
           {team.name}
         </TableCell>
-        <TableCell className="px-2 py-1.5 text-xs">{team.group}</TableCell>
+        <TableCell className="px-2 py-1.5 text-xs">{formatGroupLabel(team.group)}</TableCell>
         {rounds.map((round) => (
           <TableCell key={round.key} className="px-2 py-1.5 text-center">
             <div className="text-xs select-none blur-[3px]">$---.--</div>
@@ -160,7 +160,7 @@ export const TeamTableRow = memo(function TeamTableRow({
       <TableCell className={`px-2 py-1.5 text-xs font-medium whitespace-nowrap ${indented ? 'pl-6' : ''}`}>
         {team.name}
       </TableCell>
-      <TableCell className="px-2 py-1.5 text-xs">{team.group}</TableCell>
+      <TableCell className="px-2 py-1.5 text-xs">{formatGroupLabel(team.group)}</TableCell>
 
       {rounds.map((round) => (
         <ProfitCell

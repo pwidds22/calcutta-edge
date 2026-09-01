@@ -12,7 +12,7 @@ const STEPS = [
   {
     number: '3',
     title: 'Track results',
-    description: 'Follow your portfolio as the Masters plays out. Payouts calculated automatically.',
+    description: 'Follow your portfolio as results roll in. Payouts calculated automatically.',
   },
 ]
 

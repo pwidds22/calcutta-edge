@@ -4,6 +4,7 @@ import type { BaseTeam, TeamBundle, TournamentConfig } from '@/lib/tournaments/t
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import { presentTeam } from '@/actions/bidding';
 import { deriveBundleLabel } from '@/lib/tournaments/bundles';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import { cn } from '@/lib/utils';
 import { List, Package, Pointer } from 'lucide-react';
 
@@ -149,7 +150,7 @@ export function TeamQueue({
                     not a strength rank — show the group letter instead, like the
                     strategy table + the bundle rows above. Other sports keep the seed. */}
                 <span className="truncate">
-                  ({config?.showSeedColumn === false && team?.group ? team.group : team?.seed}) {team?.name ?? `Team ${teamId}`}
+                  ({config?.showSeedColumn === false && team?.group ? formatGroupLabel(team.group) : team?.seed}) {team?.name ?? `Team ${teamId}`}
                 </span>
               </span>
               {sold ? (

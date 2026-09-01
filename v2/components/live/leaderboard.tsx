@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SoldTeam } from '@/lib/auction/live/use-auction-channel';
 import type { BaseTeam, TournamentConfig, PayoutRules } from '@/lib/tournaments/types';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import type { TournamentResult } from '@/actions/tournament-results';
 import type { PropResult } from '@/lib/tournaments/props';
 import { calculateLeaderboard, type LeaderboardEntry } from '@/lib/auction/live/actual-payouts';
@@ -299,7 +300,7 @@ export function Leaderboard({
                               <div>
                                 <span className="text-white/30">({team.seed}) </span>
                                 <span className="text-white/70">{team.teamName}</span>
-                                <span className="ml-1 text-white/15">{team.group}</span>
+                                <span className="ml-1 text-white/15">{formatGroupLabel(team.group)}</span>
                               </div>
                               {team.roundsWon.length > 0 && (
                                 <div className="flex gap-1 mt-0.5">
@@ -646,7 +647,7 @@ function ProjectedLeaderboard({
                             <td className="px-3 py-1.5">
                               <span className="text-white/30">({team.seed}) </span>
                               <span className="text-white/70">{team.teamName}</span>
-                              <span className="ml-1 text-white/15">{team.group}</span>
+                              <span className="ml-1 text-white/15">{formatGroupLabel(team.group)}</span>
                             </td>
                             <td className="px-3 py-1.5 text-right font-mono text-white/40">
                               ${team.purchasePrice.toLocaleString()}

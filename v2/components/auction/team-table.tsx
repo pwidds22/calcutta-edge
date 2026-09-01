@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { TeamTableRow, BundleRow } from './team-table-row';
 import { getBundlePresets } from '@/lib/tournaments/bundles';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import { ArrowUpDown, Lock } from 'lucide-react';
 import type { GroupFilter, StatusFilter, SortOption, BundlePreset } from '@/lib/calculations/types';
 
@@ -109,7 +110,7 @@ export function TeamTable() {
           <SelectContent>
             {groups.map((g) => (
               <SelectItem key={g} value={g}>
-                {g}
+                {formatGroupLabel(g)}
               </SelectItem>
             ))}
           </SelectContent>

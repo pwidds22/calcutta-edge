@@ -66,10 +66,13 @@ export function PayoutRulesEditor() {
 
       {isOpen && (
         <div className="border-t p-4">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+          {/* 4 columns max — NFL's long tier labels wrap illegibly at 6-up.
+              The min-height keeps inputs on one baseline when a wrapped label
+              sits next to a single-line one. */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
             {rounds.map((round) => (
               <div key={round.key}>
-                <Label className="text-xs">
+                <Label className="flex min-h-8 items-end text-xs leading-tight">
                   {round.payoutLabel} ({round.payoutUnits ?? round.teamsAdvancing}{' '}
                   {round.unitLabel ?? config?.teamLabel?.toLowerCase() ?? 'team'}s)
                 </Label>

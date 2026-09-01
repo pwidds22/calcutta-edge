@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { ArrowRight } from 'lucide-react'
+import { HeroAuctionMockup } from './hero-auction-mockup'
 import { getFeaturedTournament } from '@/lib/tournaments/registry'
 import { getTournamentPhase } from '@/lib/tournaments/phase'
+import { STRATEGY_PRICE_LABEL } from '@/lib/pricing'
 
 function formatLongDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00Z')
@@ -21,10 +22,15 @@ interface FeaturedInfo {
   shortName: string
   fullName: string
   badgeText: string
+  /** Urgency headline for the bottom CTA, e.g. "NFL Season starts September 10." */
+  ctaHeadline: string
   isLive: boolean
 }
 
-function getFeaturedInfo(): FeaturedInfo | null {
+// Shared with CtaSection so the top badge and the bottom CTA can never drift
+// apart (the CTA used to hardcode "The Masters starts Thursday." — still live
+// in September, under an NFL hero).
+export function getFeaturedInfo(): FeaturedInfo | null {
   const featured = getFeaturedTournament()
   if (!featured) return null
 
@@ -33,21 +39,31 @@ function getFeaturedInfo(): FeaturedInfo | null {
   const shortName = cleanName(fullName)
 
   if (phase === 'live') {
-    return { shortName, fullName, badgeText: `${fullName} — Live Now`, isLive: true }
-  }
-  if (phase === 'hostable') {
     return {
       shortName,
       fullName,
-      badgeText: `${fullName} — Starts ${formatLongDate(featured.config.startDate)}`,
+      badgeText: `${fullName} — Live Now`,
+      ctaHeadline: `${shortName} is live right now.`,
+      isLive: true,
+    }
+  }
+  if (phase === 'hostable') {
+    const dateText = formatLongDate(featured.config.startDate)
+    return {
+      shortName,
+      fullName,
+      badgeText: `${fullName} — Starts ${dateText}`,
+      ctaHeadline: `${shortName} starts ${dateText}.`,
       isLive: false,
     }
   }
   if (phase === 'upcoming') {
+    const opensText = formatLongDate(featured.config.hostingOpensAt ?? featured.config.startDate)
     return {
       shortName,
       fullName,
-      badgeText: `${fullName} — Hosting opens ${formatLongDate(featured.config.hostingOpensAt ?? featured.config.startDate)}`,
+      badgeText: `${fullName} — Hosting opens ${opensText}`,
+      ctaHeadline: `${shortName} is coming — hosting opens ${opensText}.`,
       isLive: false,
     }
   }
@@ -129,24 +145,19 @@ export function HeroSection() {
           </div>
 
           <p className="mt-3 text-xs text-white/30">
-            Free to host &middot; Strategy analytics from $14.99/event
+            Free to host &middot; Strategy analytics from {STRATEGY_PRICE_LABEL}/event
           </p>
         </div>
 
-        {/* Real product screenshot — not a mockup */}
+        {/* Product mockup drawn in code — follows the featured sport without
+            re-shooting screenshots (the old Masters PNG sat under an NFL
+            headline). No photos, no logos. */}
         <div className="mt-10 lg:mt-12">
           <div className="relative overflow-hidden rounded-xl border border-white/[0.08] shadow-2xl">
-            <Image
-              src="/images/auction-live.png"
-              alt={altText}
-              width={1200}
-              height={675}
-              className="w-full"
-              priority
-            />
+            <HeroAuctionMockup ariaLabel={altText} />
           </div>
           <p className="mt-3 text-center text-xs text-white/25">
-            Real auction — live bidding with strategy data overlay
+            The live auction room — real-time bidding with the strategy overlay
           </p>
         </div>
       </div>
