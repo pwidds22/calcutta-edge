@@ -127,7 +127,8 @@ async function syncAllGolfSessions(supabase: ReturnType<typeof createAdminClient
 
   // Pull sessions for the matched tournament. Same status filter as before:
   // auction must be completed (results phase) and tournament_status must be
-  // pre_tournament or in_progress (not yet settled).
+  // pre_tournament or in_progress (not yet settled). Un-ranged is safe: one
+  // row per active league for one tournament, far under the 1,000-row cap.
   const { data: sessions, error } = await supabase
     .from('auction_sessions')
     .select('id')

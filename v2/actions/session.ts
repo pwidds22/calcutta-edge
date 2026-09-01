@@ -9,6 +9,7 @@ import { getUnbundledTeams } from '@/lib/tournaments/bundles';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { SessionSettings } from '@/lib/auction/live/types';
 import { dedupeBy } from '@/lib/auction/winning-bids';
+import { fetchAllPages } from '@/lib/supabase/fetch-all';
 
 /**
  * Parse team_order from DB (text[]) back to (number | string)[].
@@ -208,15 +209,18 @@ export async function getSessionState(sessionId: string) {
   // Parse team_order from text[] back to (number | string)[]
   session.team_order = parseTeamOrder(session.team_order);
 
-  // Load participants
+  // Load participants. Un-ranged is safe: bounded by league size (tens of
+  // people), nowhere near PostgREST's silent 1,000-row cap.
   const { data: participants } = await supabase
     .from('auction_participants')
     .select('id, user_id, display_name, is_commissioner, joined_at')
     .eq('session_id', sessionId)
     .order('joined_at', { ascending: true });
 
-  // Load winning bids (sold teams). Dedupe by team — a team is won once, but the
-  // settling UPDATE can stamp two rows winning (see lib/auction/winning-bids.ts).
+  // Load winning bids (sold teams). Un-ranged is safe: at most one row per team
+  // (largest config is 156 golfers) plus the rare duplicate — never near the
+  // 1,000-row cap. Dedupe by team — a team is won once, but the settling UPDATE
+  // can stamp two rows winning (see lib/auction/winning-bids.ts).
   const { data: rawWinningBids } = await supabase
     .from('auction_bids')
     .select('team_id, bidder_id, amount, created_at')
@@ -245,23 +249,56 @@ export async function getSessionState(sessionId: string) {
     }
 
     if (bidTeamId != null) {
-      const { data } = await supabase
-        .from('auction_bids')
-        .select('bidder_id, amount, created_at')
-        .eq('session_id', sessionId)
-        .eq('team_id', bidTeamId)
-        .order('created_at', { ascending: true });
-      currentBids = data ?? [];
+      // Full bid history for ONE team. Bid-war length has no schema ceiling,
+      // and PostgREST silently truncates any select at 1,000 rows — un-ranged
+      // + ascending would keep the EARLIEST bids and drop the newest (the high
+      // bid included). Page it; the id tiebreak keeps the page order total
+      // when bid-war timestamps collide. On error, degrade to [] exactly like
+      // the un-paged read did — the live view must render without history.
+      const historyTeamId = bidTeamId;
+      try {
+        currentBids = await fetchAllPages<{
+          bidder_id: string;
+          amount: number;
+          created_at: string;
+        }>((from, to) =>
+          supabase
+            .from('auction_bids')
+            .select('bidder_id, amount, created_at')
+            .eq('session_id', sessionId)
+            .eq('team_id', historyTeamId)
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to)
+        );
+      } catch {
+        currentBids = [];
+      }
     }
   }
 
   const isCommissioner = session.commissioner_id === user.id;
 
-  // Load tournament results (for post-auction tournament lifecycle)
-  const { data: tournamentResults } = await supabase
-    .from('tournament_results')
-    .select('team_id, round_key, result, result_count')
-    .eq('session_id', sessionId);
+  // Load tournament results (for post-auction tournament lifecycle). Bounded
+  // by teams × rounds, but that's config-driven and already ~780 for PGA (156
+  // golfers × 5 rounds) — close enough to the silent 1,000-row cap that the
+  // next big-field config would cross it with no error anywhere. Page it;
+  // degrade to [] on error, matching the pre-pagination behavior.
+  let tournamentResults:
+    | Array<{ team_id: number; round_key: string; result: string; result_count: number | null }>
+    | null = null;
+  try {
+    tournamentResults = await fetchAllPages((from, to) =>
+      supabase
+        .from('tournament_results')
+        .select('team_id, round_key, result, result_count')
+        .eq('session_id', sessionId)
+        .order('id')
+        .range(from, to)
+    );
+  } catch {
+    tournamentResults = null;
+  }
 
   // Check payment status for strategy overlay (per-tournament)
   const { hasTournamentAccess } = await import('@/lib/auth/tournament-access');
@@ -426,7 +463,8 @@ export async function getMyHostedSessions() {
   } = await supabase.auth.getUser();
   if (!user) return { sessions: [], joined: [] };
 
-  // Sessions I created (include participant count)
+  // Sessions I created (include participant count). Un-ranged is safe: one row
+  // per league this user hosts/joins — nowhere near the 1,000-row cap.
   const { data: hosted } = await supabase
     .from('auction_sessions')
     .select('id, name, join_code, status, tournament_id, created_at, password_hash, auction_participants(count)')

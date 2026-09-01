@@ -182,6 +182,9 @@ async function syncAllNflSessions(supabase: ReturnType<typeof createAdminClient>
       continue;
     }
 
+    // Un-ranged is safe: one row per active league for one tournament, far
+    // under PostgREST's 1,000-row cap (a truncated list would silently skip
+    // syncing leagues — revisit if league counts ever approach that).
     const { data: sessions, error } = await supabase
       .from('auction_sessions')
       .select('id')

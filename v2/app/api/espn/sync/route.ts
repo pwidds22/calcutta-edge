@@ -69,7 +69,8 @@ export async function GET(req: NextRequest) {
 }
 
 async function syncAllSessions(supabase: ReturnType<typeof createAdminClient>) {
-  // Find all completed March Madness 2026 auction sessions
+  // Find all completed March Madness 2026 auction sessions. Un-ranged is safe:
+  // one row per active league, far under the 1,000-row cap.
   const { data: sessions, error } = await supabase
     .from('auction_sessions')
     .select('id')
