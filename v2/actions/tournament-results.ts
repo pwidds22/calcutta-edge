@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { fetchAllPages } from '@/lib/supabase/fetch-all';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
 import { normalizeResultCount } from '@/lib/auction/live/unit-entry';
 import type { PropWinner } from '@/lib/tournaments/props';
@@ -23,13 +24,22 @@ export async function getTournamentResults(sessionId: string) {
   } = await supabase.auth.getUser();
   if (!user) return { error: 'Not authenticated' };
 
-  const { data, error } = await supabase
-    .from('tournament_results')
-    .select('team_id, round_key, result, result_count')
-    .eq('session_id', sessionId);
-
-  if (error) return { error: error.message };
-  return { results: (data ?? []) as TournamentResult[] };
+  // Bounded by teams × rounds, but that's config-driven and already ~780 for
+  // PGA (156 golfers × 5 rounds) — close enough to PostgREST's silent
+  // 1,000-row cap that the next big-field config would cross it. Page it.
+  try {
+    const data = await fetchAllPages<TournamentResult>((from, to) =>
+      supabase
+        .from('tournament_results')
+        .select('team_id, round_key, result, result_count')
+        .eq('session_id', sessionId)
+        .order('id')
+        .range(from, to)
+    );
+    return { results: data };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to load results' };
+  }
 }
 
 /**

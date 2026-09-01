@@ -122,7 +122,8 @@ async function writeSessionProps(
   const propResults = Array.isArray(session.prop_results) ? [...session.prop_results] : [];
   const gradedKeys = new Set(propResults.map((r: { key: string }) => r.key));
 
-  // Team → owner (deduped winning bids).
+  // Team → owner (deduped winning bids). Un-ranged is safe: at most one row
+  // per nation (48) plus the rare duplicate — never near the 1,000-row cap.
   const { data: rawBids } = await supabase
     .from('auction_bids')
     .select('team_id, bidder_id, created_at')
