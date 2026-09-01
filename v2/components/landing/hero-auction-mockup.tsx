@@ -11,6 +11,13 @@ import { Radio, MessageCircle, Users, Trophy, Zap, TrendingUp, ListOrdered } fro
  * Numbers are illustrative but internally coherent: the probability chips are
  * the real Kalshi-derived Chiefs odds from the NFL config, and fair value ≈
  * their share of the shown projected pot. No photos, no logos — Pat's rule.
+ *
+ * ROTATION CHECKLIST: the headline/badge/CTA around this mockup rotate with
+ * the featured tournament (lib/tournaments/featured.ts) but this content is
+ * static. When the featured event changes (next: post-Super-Bowl, ~Feb 2027),
+ * refresh QUEUE, PROB_CHIPS, MY_TEAMS, RESULTS, the chat lines, the title in
+ * the top bar, and the aria-label below — or the landing page regresses to
+ * exactly the sport-mismatch this component was built to fix.
  */
 
 const QUEUE: Array<{ name: string; division: string; state?: 'sold' | 'current' }> = [
@@ -45,9 +52,10 @@ const BID_HISTORY = [
   { who: 'Dan W.', amount: '$70' },
 ]
 
+// Only teams the QUEUE above marks as sold can appear here.
 const MY_TEAMS = [
   { name: 'Baltimore Ravens', amount: '$118' },
-  { name: 'Jacksonville Jaguars', amount: '$64' },
+  { name: 'Seattle Seahawks', amount: '$95' },
 ]
 
 const RESULTS = [
@@ -65,11 +73,13 @@ function PanelHeader({ icon: Icon, children }: { icon: React.ElementType; childr
   )
 }
 
-export function HeroAuctionMockup({ ariaLabel }: { ariaLabel: string }) {
+export function HeroAuctionMockup() {
   return (
     <div
       role="img"
-      aria-label={ariaLabel}
+      // Static on purpose: the label must describe THIS (NFL) content, not the
+      // rotating featured tournament — see the rotation checklist above.
+      aria-label="Live NFL Season Calcutta auction on Calcutta Edge — real-time bidding with the strategy overlay"
       className="select-none pointer-events-none bg-[#0b0f0e] text-left"
     >
       {/* Top bar: league identity + join code */}
@@ -85,7 +95,7 @@ export function HeroAuctionMockup({ ariaLabel }: { ariaLabel: string }) {
             Code: <span className="font-semibold text-white">7KQX2N</span>
           </span>
           <span className="hidden items-center gap-1 text-[10px] text-white/40 sm:flex">
-            <Radio className="size-3 text-emerald-400" />8 online
+            <Radio className="size-3 text-emerald-400" />5 online
           </span>
         </div>
       </div>

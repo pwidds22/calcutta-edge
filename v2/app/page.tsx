@@ -1,3 +1,9 @@
+// The hero badge and CTA derive date copy ("NFL Season starts September 10.",
+// "Live Now") from the wall clock; a purely static build freezes that copy at
+// deploy time, so it would keep advertising a start date after kickoff.
+// Revalidate hourly so phase flips surface without a deploy.
+export const revalidate = 3600
+
 import { Navbar } from '@/components/layout/navbar'
 import { Footer } from '@/components/layout/footer'
 import { HeroSection } from '@/components/landing/hero-section'

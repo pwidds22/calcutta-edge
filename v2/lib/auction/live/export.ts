@@ -1,5 +1,6 @@
 import type { SoldTeam } from './use-auction-channel';
-import type { BaseTeam } from '@/lib/tournaments/types';
+import type { BaseTeam, TournamentConfig } from '@/lib/tournaments/types';
+import { formatGroupLabel } from '@/lib/calculations/format';
 
 interface ParticipantPortfolio {
   name: string;
@@ -41,17 +42,20 @@ export function getParticipantPortfolios(
 export function generateCSV(
   soldTeams: SoldTeam[],
   baseTeams: BaseTeam[],
-  sessionName: string
+  sessionName: string,
+  config?: TournamentConfig
 ): string {
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
-  const rows = [['Team', 'Seed', 'Region', 'Winner', 'Price'].join(',')];
+  // Sport-correct column name (Division/Region/Group) with the historical
+  // default for callers that don't pass a config.
+  const rows = [['Team', 'Seed', config?.groupLabel ?? 'Region', 'Winner', 'Price'].join(',')];
 
   for (const sold of soldTeams) {
     const team = teamMap.get(sold.teamId);
     // Escape double quotes in CSV fields by doubling them (RFC 4180)
     const teamName = (team?.name ?? `Team ${sold.teamId}`).replace(/"/g, '""');
     const winnerName = sold.winnerName.replace(/"/g, '""');
-    const groupName = (team?.group ?? '').replace(/"/g, '""');
+    const groupName = formatGroupLabel(team?.group, config).replace(/"/g, '""');
     rows.push(
       [
         `"${teamName}"`,
@@ -74,11 +78,17 @@ export function generateCSV(
 export function generateTextSummary(
   soldTeams: SoldTeam[],
   baseTeams: BaseTeam[],
-  sessionName: string
+  sessionName: string,
+  config?: TournamentConfig
 ): string {
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
   const total = soldTeams.reduce((s, t) => s + t.amount, 0);
   const portfolios = getParticipantPortfolios(soldTeams, baseTeams);
+  // NFL (and soccer): `seed` is positional within the group, not a rank —
+  // printing "(23) Houston Texans" reads as a strength rank. Same gate the
+  // on-screen surfaces use.
+  const seedPrefix = (seed: number | undefined) =>
+    config?.showSeedColumn === false || seed === undefined ? '' : `(${seed}) `;
 
   const lines = [
     `${sessionName} — Auction Results`,
@@ -91,7 +101,7 @@ export function generateTextSummary(
   for (const sold of soldTeams) {
     const team = teamMap.get(sold.teamId);
     lines.push(
-      `(${team?.seed}) ${team?.name ?? `Team ${sold.teamId}`} — ${sold.winnerName} — $${sold.amount.toLocaleString()}`
+      `${seedPrefix(team?.seed)}${team?.name ?? `Team ${sold.teamId}`} — ${sold.winnerName} — $${sold.amount.toLocaleString()}`
     );
   }
 
@@ -100,7 +110,7 @@ export function generateTextSummary(
   for (const p of portfolios) {
     lines.push(`${p.name}: $${p.totalSpent.toLocaleString()} (${p.teams.length} teams)`);
     for (const t of p.teams) {
-      lines.push(`  (${t.seed}) ${t.teamName} — $${t.amount.toLocaleString()}`);
+      lines.push(`  ${seedPrefix(t.seed)}${t.teamName} — $${t.amount.toLocaleString()}`);
     }
   }
 

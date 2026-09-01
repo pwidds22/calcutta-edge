@@ -334,7 +334,8 @@ function AliveTeamRow({ team }: { team: DashboardTeam }) {
         )}
         <div className="min-w-0">
           <p className="text-xs text-white/70 truncate">
-            <span className="text-white/30">({team.seed})</span> {team.teamName}
+            {team.showSeed && <span className="text-white/30">({team.seed}) </span>}
+            {team.teamName}
             <span className="ml-1 text-white/15">{formatGroupLabel(team.group)}</span>
           </p>
           <div className="flex items-center gap-2 text-[10px]">

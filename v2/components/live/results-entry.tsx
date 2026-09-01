@@ -8,6 +8,7 @@ import { updateResult, bulkUpdateResults } from '@/actions/tournament-results';
 import { getAliveTeamsForRound } from '@/lib/auction/live/actual-payouts';
 import { resolveUnitEntry, MAX_FLAT_RATE_UNITS } from '@/lib/auction/live/unit-entry';
 import { roundBudget } from '@/lib/tournaments/payout-presets';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import { CheckCircle2, XCircle, Clock, Trophy, Save } from 'lucide-react';
 
 interface ResultsEntryProps {
@@ -274,7 +275,7 @@ export function ResultsEntry({
                       {team?.name ?? `Team ${teamId}`}
                     </p>
                     <p className="text-[10px] text-white/30">
-                      {team?.group} · {sold?.winnerName ?? 'Unknown'} · ${sold?.amount.toLocaleString()}
+                      {formatGroupLabel(team?.group, config)} · {sold?.winnerName ?? 'Unknown'} · ${sold?.amount.toLocaleString()}
                     </p>
                   </div>
                 </div>

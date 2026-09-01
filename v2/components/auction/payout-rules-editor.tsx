@@ -25,22 +25,39 @@ const propDescriptions: Record<string, string> = {
 export function PayoutRulesEditor() {
   const { state, dispatch, config } = useAuction();
   const [isOpen, setIsOpen] = useState(false);
-  const [draft, setDraft] = useState<PayoutRules>(state.payoutRules);
+  // The draft holds RAW TYPED STRINGS, parsed only for the total readout and
+  // on Apply. A controlled number field whose value round-trips parseFloat on
+  // every keystroke corrupts decimal entry ('0.' collapses to '0', so NFL's
+  // 0.1029 per-win rate was untypeable — it landed as 1029). Seeded once per
+  // mount; auction-tool keys this component by league so a league switch
+  // remounts it instead of Applying league A's draft onto league B.
+  const [draft, setDraft] = useState<Record<string, string>>(() => {
+    const d: Record<string, string> = {};
+    for (const r of config?.rounds ?? []) d[r.key] = String(state.payoutRules[r.key] ?? 0);
+    for (const p of config?.propBets ?? []) d[p.key] = String(state.payoutRules[p.key] ?? 0);
+    return d;
+  });
 
   const rounds = config?.rounds ?? [];
   const propBets = config?.propBets ?? [];
 
+  const draftValue = (key: string) => parseFloat(draft[key] ?? '') || 0;
+
   const totalPercent = rounds.reduce(
-    (sum, r) => sum + roundBudget(r, draft[r.key] ?? 0),
+    (sum, r) => sum + roundBudget(r, draftValue(r.key)),
     0
-  ) + propBets.reduce((sum, p) => sum + (draft[p.key] ?? 0), 0);
+  ) + propBets.reduce((sum, p) => sum + draftValue(p.key), 0);
 
   const handleChange = (key: string, value: string) => {
-    setDraft((prev) => ({ ...prev, [key]: parseFloat(value) || 0 }));
+    // Allow only what a decimal amount can look like while typing.
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleApply = () => {
-    dispatch({ type: 'UPDATE_PAYOUT_RULES', payoutRules: draft });
+    const rules: PayoutRules = { ...state.payoutRules };
+    for (const key of Object.keys(draft)) rules[key] = draftValue(key);
+    dispatch({ type: 'UPDATE_PAYOUT_RULES', payoutRules: rules });
   };
 
   return (
@@ -78,14 +95,9 @@ export function PayoutRulesEditor() {
                 </Label>
                 <div className="relative mt-1">
                   <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    // A flatRate round's rate is a tiny per-unit price (NFL's
-                    // per-win rate is 0.1029%) — the default 0.01 step makes
-                    // the spinner snap to 0.10/0.11, a 2.7pp swing in budget.
-                    step={round.flatRate ? 0.0001 : 0.01}
-                    value={draft[round.key] ?? 0}
+                    type="text"
+                    inputMode="decimal"
+                    value={draft[round.key] ?? '0'}
                     onChange={(e) => handleChange(round.key, e.target.value)}
                     className="pr-7 text-right text-sm"
                   />
@@ -94,7 +106,7 @@ export function PayoutRulesEditor() {
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Total: {roundBudget(round, draft[round.key] ?? 0).toFixed(1)}%
+                  Total: {roundBudget(round, draftValue(round.key)).toFixed(1)}%
                 </p>
               </div>
             ))}
@@ -107,11 +119,9 @@ export function PayoutRulesEditor() {
                   <Label className="text-xs cursor-help" title={propDescriptions[prop.key]}>{prop.label}</Label>
                   <div className="relative mt-1">
                     <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.01}
-                      value={draft[prop.key] ?? 0}
+                      type="text"
+                      inputMode="decimal"
+                      value={draft[prop.key] ?? '0'}
                       onChange={(e) => handleChange(prop.key, e.target.value)}
                       className="pr-7 text-right text-sm"
                     />

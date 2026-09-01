@@ -18,4 +18,18 @@ describe('formatGroupLabel', () => {
     expect(formatGroupLabel(null)).toBe('');
     expect(formatGroupLabel('')).toBe('');
   });
+
+  it('prefers the config-declared label when a config is passed', () => {
+    const config = {
+      groups: [
+        { key: 'favorites', label: 'Favorites' }, // golf: lowercase key, capitalized label
+        { key: 'AFC_East', label: 'AFC East' },
+      ],
+    };
+    expect(formatGroupLabel('favorites', config)).toBe('Favorites');
+    expect(formatGroupLabel('AFC_East', config)).toBe('AFC East');
+    // Unknown keys fall back to the underscore swap, never crash.
+    expect(formatGroupLabel('NFC_Wild', config)).toBe('NFC Wild');
+    expect(formatGroupLabel('AFC_East', null)).toBe('AFC East');
+  });
 });

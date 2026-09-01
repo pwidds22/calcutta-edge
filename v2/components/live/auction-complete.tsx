@@ -46,14 +46,14 @@ export function AuctionComplete({
   const highestTeamInfo = highestTeam ? teamMap.get(highestTeam.teamId) : null;
 
   const handleCopy = async () => {
-    const text = generateTextSummary(soldTeams, baseTeams, sessionName);
+    const text = generateTextSummary(soldTeams, baseTeams, sessionName, config);
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleExport = () => {
-    const csv = generateCSV(soldTeams, baseTeams, sessionName);
+    const csv = generateCSV(soldTeams, baseTeams, sessionName, config);
     const filename = `${sessionName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}-results.csv`;
     downloadCSV(csv, filename);
   };
@@ -164,9 +164,11 @@ export function AuctionComplete({
                       className="flex items-center justify-between px-4 py-1.5"
                     >
                       <span className="text-xs text-white/60">
-                        <span className="text-white/30 mr-1">({t.seed})</span>
+                        {config.showSeedColumn !== false && (
+                          <span className="text-white/30 mr-1">({t.seed})</span>
+                        )}
                         {t.teamName}
-                        <span className="ml-1.5 text-white/20">{formatGroupLabel(t.group)}</span>
+                        <span className="ml-1.5 text-white/20">{formatGroupLabel(t.group, config)}</span>
                       </span>
                       <span className="text-xs font-mono text-white/50">
                         ${t.amount.toLocaleString()}
@@ -212,13 +214,15 @@ export function AuctionComplete({
                       className="border-b border-white/[0.04] last:border-0"
                     >
                       <td className="px-3 py-1.5 text-white/70">
-                        <span className="text-white/30 text-xs mr-1">
-                          ({team?.seed})
-                        </span>
+                        {config.showSeedColumn !== false && (
+                          <span className="text-white/30 text-xs mr-1">
+                            ({team?.seed})
+                          </span>
+                        )}
                         {team?.name ?? `Team ${sold.teamId}`}
                       </td>
                       <td className="hidden px-3 py-1.5 text-xs text-white/30 sm:table-cell">
-                        {formatGroupLabel(team?.group)}
+                        {formatGroupLabel(team?.group, config)}
                       </td>
                       <td className="px-3 py-1.5 text-xs text-white/50">
                         {sold.winnerName}

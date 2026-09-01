@@ -150,7 +150,7 @@ export function TeamQueue({
                     not a strength rank — show the group letter instead, like the
                     strategy table + the bundle rows above. Other sports keep the seed. */}
                 <span className="truncate">
-                  ({config?.showSeedColumn === false && team?.group ? formatGroupLabel(team.group) : team?.seed}) {team?.name ?? `Team ${teamId}`}
+                  ({config?.showSeedColumn === false && team?.group ? formatGroupLabel(team.group, config) : team?.seed}) {team?.name ?? `Team ${teamId}`}
                 </span>
               </span>
               {sold ? (

@@ -15,16 +15,18 @@
  * These tests exercise `getDashboardData` itself, not the pagination helper —
  * reverting the dashboard call sites to un-ranged selects turns them red.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-const POSTGREST_MAX_ROWS = 1000;
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 type Row = Record<string, unknown>;
 
+/** Rotates un-ordered ranged reads differently per call — Postgres LIMIT/OFFSET
+ *  without ORDER BY guarantees nothing, so pagination that drops its .order()
+ *  must produce inconsistent pages here (and turn the assertions red). */
+let unorderedCallCounter = 0;
+
 class MockQuery {
   private filters: Array<(r: Row) => boolean> = [];
-  private orderCol: string | null = null;
-  private orderAsc = true;
+  private orderCols: Array<{ col: string; asc: boolean }> = [];
   private rangeBounds: [number, number] | null = null;
 
   constructor(private rows: Row[]) {}
@@ -42,8 +44,7 @@ class MockQuery {
     return this;
   }
   order(col: string, opts?: { ascending?: boolean }) {
-    this.orderCol = col;
-    this.orderAsc = opts?.ascending !== false;
+    this.orderCols.push({ col, asc: opts?.ascending !== false });
     return this;
   }
   range(from: number, to: number) {
@@ -53,21 +54,26 @@ class MockQuery {
   // Thenable, like the real PostgrestFilterBuilder.
   then<R>(resolve: (value: { data: Row[]; error: null }) => R): R {
     let out = this.rows.filter((r) => this.filters.every((f) => f(r)));
-    if (this.orderCol !== null) {
-      const col = this.orderCol;
-      const dir = this.orderAsc ? 1 : -1;
+    if (this.orderCols.length > 0) {
+      const cols = this.orderCols;
       out = [...out].sort((a, b) => {
-        const av = String(a[col]);
-        const bv = String(b[col]);
-        return av < bv ? -dir : av > bv ? dir : 0;
+        for (const { col, asc } of cols) {
+          const av = String(a[col]);
+          const bv = String(b[col]);
+          if (av !== bv) return (av < bv ? -1 : 1) * (asc ? 1 : -1);
+        }
+        return 0;
       });
+    } else if (this.rangeBounds) {
+      const shift = unorderedCallCounter++ % Math.max(out.length, 1);
+      out = [...out.slice(shift), ...out.slice(0, shift)];
     }
     if (this.rangeBounds) {
       out = out.slice(this.rangeBounds[0], this.rangeBounds[1] + 1);
     }
     // PostgREST max-rows: applies to every response, ranged or not, silently.
-    if (out.length > POSTGREST_MAX_ROWS) {
-      out = out.slice(0, POSTGREST_MAX_ROWS);
+    if (out.length > holder.maxRows) {
+      out = out.slice(0, holder.maxRows);
     }
     return resolve({ data: out, error: null });
   }
@@ -76,6 +82,9 @@ class MockQuery {
 const holder = vi.hoisted(() => ({
   tables: {} as Record<string, Row[]>,
   userId: 'user-1',
+  /** The server's PostgREST max-rows setting. Supabase's default is 1,000 but
+   *  it is dashboard-editable — the helper must survive it being lowered. */
+  maxRows: 1000,
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -154,21 +163,27 @@ function buildFixture() {
     },
   ];
 
-  const participants: Row[] = sessions.map((s) => ({
+  const participants: Row[] = sessions.map((s, i) => ({
+    id: `p-${pad(i)}`,
     session_id: s.id,
     user_id: USER,
     is_commissioner: false,
   }));
 
+  // created_at increments in fixture order so `.order('created_at')` (the
+  // dedupe-stability order shared with getSessionState) matches insertion
+  // order — s-real's bids sort first, and the capped un-ranged read of the
+  // buggy code keeps them while starving s-bids.
+  const bidAt = (i: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, 0, i)).toISOString();
   const bids: Row[] = [
-    // s-real first, so the capped un-ranged read keeps these and starves s-bids.
-    { id: `b-${pad(1)}`, session_id: 's-real', team_id: 1, amount: 100, bidder_id: USER, is_winning_bid: true },
-    { id: `b-${pad(2)}`, session_id: 's-real', team_id: 3, amount: 150, bidder_id: 'user-2', is_winning_bid: true },
-    { id: `b-${pad(3)}`, session_id: 's-real', team_id: 5, amount: 250, bidder_id: 'user-3', is_winning_bid: true },
+    { id: `b-${pad(1)}`, created_at: bidAt(1), session_id: 's-real', team_id: 1, amount: 100, bidder_id: USER, is_winning_bid: true },
+    { id: `b-${pad(2)}`, created_at: bidAt(2), session_id: 's-real', team_id: 3, amount: 150, bidder_id: 'user-2', is_winning_bid: true },
+    { id: `b-${pad(3)}`, created_at: bidAt(3), session_id: 's-real', team_id: 5, amount: 250, bidder_id: 'user-3', is_winning_bid: true },
   ];
   for (let i = 1; i <= 1001; i++) {
     bids.push({
       id: `b-${pad(100 + i)}`,
+      created_at: bidAt(100 + i),
       session_id: 's-bids',
       team_id: i,
       amount: 1,
@@ -220,8 +235,14 @@ function buildFixture() {
 beforeEach(() => {
   holder.tables = buildFixture();
   holder.userId = USER;
+  holder.maxRows = 1000;
+  unorderedCallCounter = 0;
   // Belt and braces: keep the golf-projection branch (and its fetches) off.
   vi.stubEnv('DATAGOLF_API_KEY', '');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('getDashboardData beyond the 1,000-row cap', () => {
@@ -248,5 +269,17 @@ describe('getDashboardData beyond the 1,000-row cap', () => {
     expect(data.totalPotExposure).toBe(1101);
     // s-real's pot is unaffected either way (its rows sit before the cap).
     expect(data.sessions.find((s) => s.id === 's-real')!.potSize).toBe(500);
+  });
+
+  it('survives a server max-rows configured below the page size', async () => {
+    // Supabase's max-rows is dashboard-editable. If it ever drops below the
+    // helper's page size, every "full" page comes back short — terminating on
+    // rows.length < pageSize would silently truncate again. The helper must
+    // advance by what it actually received and stop only on an empty page.
+    holder.maxRows = 400;
+    const data = await getDashboardData();
+    expect(data.sessions.find((s) => s.id === 's-real')!.userNetPL).toBeCloseTo(360, 5);
+    expect(data.sessions.find((s) => s.id === 's-bids')!.potSize).toBe(1001);
+    expect(data.totalPotExposure).toBe(1101);
   });
 });

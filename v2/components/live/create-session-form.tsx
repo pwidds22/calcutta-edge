@@ -61,11 +61,17 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
     return syncPropsFromRules(balancedRules, getStandardProps(tournament.id));
   };
 
+  const potDefault = (t?: TournamentConfig) => t?.defaultPotSize ?? 10000;
+
   const [name, setName] = useState('');
   const [tournamentId, setTournamentId] = useState(defaultTournament?.id ?? '');
   // Seed the pot estimate from the tournament config, not a global constant —
   // a season-long NFL pool and March Madness raise very different pots.
-  const [potSize, setPotSize] = useState(String(defaultTournament?.defaultPotSize ?? 10000));
+  const [potSize, setPotSize] = useState(String(potDefault(defaultTournament)));
+  // Whether the host has typed a pot value. A tournament switch re-seeds the
+  // estimate ONLY while untouched — an A→B→A flip through the dropdown must
+  // not wipe a real number the host already entered.
+  const [potTouched, setPotTouched] = useState(false);
   const [minimumBid, setMinimumBid] = useState('1');
 
   // Bundle preset + custom bundles
@@ -100,6 +106,13 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   // point on every re-render — this decouples the display from that derivation
   // while the host is actively editing. Only one field can be focused at a time.
   const [editingRound, setEditingRound] = useState<{ key: string; text: string } | null>(null);
+  // Same decoupling for the prop-percentage fields (standard props keyed by
+  // prop.key, custom props by `custom:${id}`) — a controlled number input
+  // whose value round-trips parseFloat per keystroke corrupts decimal entry,
+  // and its bare min={0.05} silently vetoed the whole form when a field was
+  // cleared (parseFloat('')||0 → 0 < min).
+  const [editingProp, setEditingProp] = useState<{ key: string; text: string } | null>(null);
+  const clampPropPct = (v: number) => Math.max(0.05, Math.min(50, v));
 
   // Prop bets — which standard props are enabled + custom props.
   // Seeded from the default tournament's "balanced" preset (not an empty
@@ -129,8 +142,10 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const handlePresetSelect = (mode: PayoutMode) => {
     setPayoutMode(mode);
     if (mode !== 'custom' && presets[mode]) {
+      // Note: customRules is deliberately NOT seeded here — the editor
+      // displays getActiveRules() and handleCustomRuleChange forks from it on
+      // the first edit, so that fork is the single seeding path.
       const rules = { ...presets[mode].rules };
-      setCustomRules(rules);
 
       // Auto-enable props from preset: if a preset includes non-zero prop values,
       // sync them into the Prop Bets section so there's a single source of truth.
@@ -271,7 +286,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
       tournamentId,
       name: name.trim(),
       payoutRules,
-      estimatedPotSize: Number(potSize) || selectedTournament.defaultPotSize || 10000,
+      estimatedPotSize: Number(potSize) || potDefault(selectedTournament),
       settings,
       password: password.trim() || undefined,
     });
@@ -358,9 +373,16 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
               setEnabledPropKeys(sync.enabledKeys);
               setPropPercentages(sync.percentages);
               setShowPropsSection(sync.enabledKeys.size > 0);
-              // Pot estimates are tournament-sized too — reset alongside the
-              // payout mode rather than carrying one sport's pot to another.
-              setPotSize(String(newTournament?.defaultPotSize ?? 10000));
+              // Pot estimates are tournament-sized too — re-seed on switch,
+              // but never over a value the host already typed.
+              if (!potTouched) setPotSize(String(potDefault(newTournament)));
+              // Custom bundles reference team IDs from the PREVIOUS
+              // tournament's config — ids collide across configs (NFL 1-32,
+              // MM 1-68), so stale bundles would sell the wrong teams.
+              setBundlePreset('none');
+              setCustomBundles([]);
+              setSelectedTeamIds(new Set());
+              setNewBundleName('');
             }}
             className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
           >
@@ -393,7 +415,10 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
             <input
               type="number"
               value={potSize}
-              onChange={(e) => setPotSize(e.target.value)}
+              onChange={(e) => {
+                setPotSize(e.target.value);
+                setPotTouched(true);
+              }}
               className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] pl-7 pr-3 text-sm text-white placeholder:text-white/20 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
             />
           </div>
@@ -535,7 +560,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                                 : 'border-white/[0.06] bg-white/[0.02] text-white/50 hover:border-white/10 hover:text-white/70'
                           }`}
                         >
-                          <span className="font-medium">{selectedTournament?.showSeedColumn === false ? formatGroupLabel(team.group) : team.seed}</span>{' '}
+                          <span className="font-medium">{selectedTournament?.showSeedColumn === false ? formatGroupLabel(team.group, selectedTournament) : team.seed}</span>{' '}
                           {team.name}
                         </button>
                       );
@@ -720,6 +745,12 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                             if (!/^\d*\.?\d*$/.test(text)) return;
                             setEditingRound({ key: round.key, text });
 
+                            // Empty = "no change": clearing to retype must not
+                            // commit 0 (or fork the mode to custom). The blur
+                            // clears editingRound and the field snaps back to
+                            // the stored rate.
+                            if (text === '') return;
+
                             if (isFlat) {
                               const d = parseFloat(text) || 0;
                               const pct = dollarsToRate(d, pot);
@@ -813,17 +844,27 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                           {isEnabled && (
                             <div className="relative">
                               <input
-                                type="number"
-                                min={0.05}
-                                max={50}
-                                step={0.01}
-                                value={pct}
-                                onChange={(e) =>
+                                type="text"
+                                inputMode="decimal"
+                                value={editingProp?.key === prop.key ? editingProp.text : String(pct)}
+                                onFocus={() => setEditingProp({ key: prop.key, text: String(pct) })}
+                                onChange={(e) => {
+                                  const text = e.target.value;
+                                  if (!/^\d*\.?\d*$/.test(text)) return;
+                                  setEditingProp({ key: prop.key, text });
+                                  if (text === '') return; // empty = no change
                                   setPropPercentages((prev) => ({
                                     ...prev,
-                                    [prop.key]: parseFloat(e.target.value) || 0,
-                                  }))
-                                }
+                                    [prop.key]: parseFloat(text) || 0,
+                                  }));
+                                }}
+                                onBlur={() => {
+                                  setEditingProp(null);
+                                  setPropPercentages((prev) => ({
+                                    ...prev,
+                                    [prop.key]: clampPropPct(prev[prop.key] ?? prop.defaultPercentage),
+                                  }));
+                                }}
                                 className="h-6 w-16 rounded border border-white/10 bg-white/[0.04] px-1.5 pr-5 text-right text-[11px] text-white focus:border-emerald-500/50 focus:outline-none"
                               />
                               <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/30">
@@ -861,18 +902,29 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                     />
                     <div className="relative">
                       <input
-                        type="number"
-                        min={0.05}
-                        max={50}
-                        step={0.01}
-                        value={cp.percentage}
-                        onChange={(e) =>
+                        type="text"
+                        inputMode="decimal"
+                        value={editingProp?.key === `custom:${cp.id}` ? editingProp.text : String(cp.percentage)}
+                        onFocus={() => setEditingProp({ key: `custom:${cp.id}`, text: String(cp.percentage) })}
+                        onChange={(e) => {
+                          const text = e.target.value;
+                          if (!/^\d*\.?\d*$/.test(text)) return;
+                          setEditingProp({ key: `custom:${cp.id}`, text });
+                          if (text === '') return; // empty = no change
                           setCustomProps((prev) =>
                             prev.map((p) =>
-                              p.id === cp.id ? { ...p, percentage: parseFloat(e.target.value) || 0 } : p
+                              p.id === cp.id ? { ...p, percentage: parseFloat(text) || 0 } : p
                             )
-                          )
-                        }
+                          );
+                        }}
+                        onBlur={() => {
+                          setEditingProp(null);
+                          setCustomProps((prev) =>
+                            prev.map((p) =>
+                              p.id === cp.id ? { ...p, percentage: clampPropPct(p.percentage) } : p
+                            )
+                          );
+                        }}
                         className="h-6 w-16 rounded border border-white/10 bg-white/[0.04] px-1.5 pr-5 text-right text-[11px] text-white focus:border-emerald-500/50 focus:outline-none"
                       />
                       <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/30">
@@ -987,6 +1039,13 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                       type="number"
                       value={initialDuration}
                       onChange={(e) => setInitialDuration(e.target.value)}
+                      // Clamp on blur: bare min/max alone lets the field HOLD
+                      // an out-of-range value, and native validation then
+                      // blocks submit with no visible error (bubble anchored
+                      // offscreen — caught in the 2026-09-01 e2e).
+                      onBlur={() =>
+                        setInitialDuration(String(Math.max(5, Math.min(120, Number(initialDuration) || 20))))
+                      }
                       min={5}
                       max={120}
                       className="h-9 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 pr-8 text-sm text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
@@ -1005,6 +1064,9 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                       type="number"
                       value={resetDuration}
                       onChange={(e) => setResetDuration(e.target.value)}
+                      onBlur={() =>
+                        setResetDuration(String(Math.max(3, Math.min(30, Number(resetDuration) || 8))))
+                      }
                       min={3}
                       max={30}
                       className="h-9 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 pr-8 text-sm text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"

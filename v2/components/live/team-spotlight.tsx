@@ -52,7 +52,7 @@ export function TeamSpotlight({
               <span className="text-sm font-medium text-white">
                 {member.name}
               </span>
-              <span className="text-xs text-white/30">{member.group}</span>
+              <span className="text-xs text-white/30">{formatGroupLabel(member.group, config)}</span>
             </div>
           ))}
         </div>
@@ -82,7 +82,7 @@ export function TeamSpotlight({
               // Soccer: `seed` is only within-group position, not a rank — show the
               // group (e.g. "Group A") instead of a meaningless "#N Seed" badge.
               <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
-                {config.groupLabel} {formatGroupLabel(team.group)}
+                {config.groupLabel} {formatGroupLabel(team.group, config)}
               </span>
             ) : (
               <>
@@ -90,7 +90,7 @@ export function TeamSpotlight({
                   #{team.seed}{config.sport !== 'golf' ? ' Seed' : ''}
                 </span>
                 <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-white/60">
-                  {formatGroupLabel(team.group)}
+                  {formatGroupLabel(team.group, config)}
                 </span>
               </>
             )}

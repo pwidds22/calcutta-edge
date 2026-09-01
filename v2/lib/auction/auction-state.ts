@@ -11,6 +11,7 @@ import type {
   SavedTeamData,
 } from '@/lib/calculations/types';
 import { calculateTeamValues } from '@/lib/calculations/values';
+import { formatGroupLabel } from '@/lib/calculations/format';
 import { calculateImpliedProbabilities } from '@/lib/calculations/odds';
 import { calculateProjectedPotSize } from '@/lib/calculations/pot';
 import { generateBundles } from '@/lib/tournaments/bundles';
@@ -267,13 +268,15 @@ export function getFilteredTeams(state: AuctionState): Team[] {
     filtered = filtered.filter((t) => t.isMyTeam);
   }
 
-  // Search filter
+  // Search filter. Match the group both as stored ('AFC_South') and as
+  // displayed ('AFC South') — users type what the Division column shows.
   if (state.searchTerm) {
     const term = state.searchTerm.toLowerCase();
     filtered = filtered.filter(
       (t) =>
         t.name.toLowerCase().includes(term) ||
         t.group.toLowerCase().includes(term) ||
+        formatGroupLabel(t.group, state.config).toLowerCase().includes(term) ||
         t.seed.toString().includes(term)
     );
   }

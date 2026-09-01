@@ -129,8 +129,11 @@ function AuctionToolInner({
       {/* Pot size */}
       <PotSizeSection />
 
-      {/* Payout rules */}
-      <PayoutRulesEditor />
+      {/* Payout rules. Keyed by league: the editor seeds its draft from
+          state.payoutRules once per mount, and a league switch re-dispatches
+          SET_INITIAL_DATA without unmounting children — without the key,
+          Apply would write league A's draft onto league B. */}
+      <PayoutRulesEditor key={state.leagueName} />
 
       {/* Summary stats */}
       <SummaryStatsCards />

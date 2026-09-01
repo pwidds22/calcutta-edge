@@ -20,6 +20,9 @@ import type { DataGolfInPlayPlayer } from '@/lib/datagolf/client';
 export interface DashboardTeam {
   teamName: string;
   seed: number;
+  /** False for sports whose seed is positional, not a rank (NFL divisions,
+   *  soccer groups) — the UI hides the "(N)" prefix for those. */
+  showSeed: boolean;
   group: string;
   status: 'alive' | 'eliminated' | 'champion';
   purchasePrice: number;
@@ -116,13 +119,22 @@ export async function getDashboardData(): Promise<DashboardData> {
   } = await supabase.auth.getUser();
   if (!user) return emptyResult;
 
-  // Get all sessions user is part of (hosted + joined)
-  const { data: participations } = await supabase
-    .from('auction_participants')
-    .select('session_id, is_commissioner')
-    .eq('user_id', user.id);
+  // Get all sessions user is part of (hosted + joined). Every multi-row
+  // select in this function is paginated: PostgREST silently truncates at
+  // max-rows, and a truncated read ANYWHERE here corrupts money numbers —
+  // a short participations list would even starve the paginated queries
+  // below of their sessionIds.
+  const participations = await fetchAllPages<{ session_id: string; is_commissioner: boolean }>(
+    (from, to) =>
+      supabase
+        .from('auction_participants')
+        .select('session_id, is_commissioner')
+        .eq('user_id', user.id)
+        .order('id')
+        .range(from, to)
+  );
 
-  if (!participations || participations.length === 0) {
+  if (participations.length === 0) {
     return emptyResult;
   }
 
@@ -130,84 +142,100 @@ export async function getDashboardData(): Promise<DashboardData> {
   const commissionerMap = new Map(participations.map((p) => [p.session_id, p.is_commissioner]));
 
   // Load all sessions
-  const { data: sessions } = await supabase
-    .from('auction_sessions')
-    .select('id, name, join_code, status, tournament_id, created_at, estimated_pot_size, payout_rules, prop_results, auction_participants(count)')
-    .in('id', sessionIds)
-    .order('created_at', { ascending: false });
+  interface SessionRow {
+    id: string;
+    name: string;
+    join_code: string;
+    status: string;
+    tournament_id: string;
+    created_at: string;
+    estimated_pot_size: number | string | null;
+    payout_rules: unknown;
+    prop_results: unknown;
+    auction_participants: unknown;
+  }
+  const sessions = await fetchAllPages<SessionRow>((from, to) =>
+    supabase
+      .from('auction_sessions')
+      .select('id, name, join_code, status, tournament_id, created_at, estimated_pot_size, payout_rules, prop_results, auction_participants(count)')
+      .in('id', sessionIds)
+      .order('created_at', { ascending: false })
+      .order('id') // created_at ties would make page boundaries ambiguous
+      .range(from, to)
+  );
 
-  if (!sessions || sessions.length === 0) {
+  if (sessions.length === 0) {
     return emptyResult;
   }
 
-  // Load user's winning bids across all sessions. These multi-session selects
-  // grow with lifetime league count and PostgREST silently truncates at 1,000
-  // rows — page them (with a stable order) or heavy users get wrong money
-  // numbers (the −$270-instead-of-+$486 dashboard bug, 2026-09-01).
-  const winningBids = await fetchAllPages<{ session_id: string; team_id: number; amount: number }>(
-    (from, to) =>
-      supabase
-        .from('auction_bids')
-        .select('session_id, team_id, amount')
-        .eq('bidder_id', user.id)
-        .eq('is_winning_bid', true)
-        .in('session_id', sessionIds)
-        .order('id')
-        .range(from, to)
-  );
-
-  // Group bids by session. Dedupe per (session, team) — a team is won once, but the
-  // settling UPDATE can stamp two rows winning (see lib/auction/winning-bids.ts),
-  // which would otherwise double-count spend, pot, and P&L here.
-  const bidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
-  for (const bid of dedupeBy(winningBids, (b) => `${b.session_id}:${b.team_id}`)) {
-    const list = bidsBySession.get(bid.session_id) ?? [];
-    list.push({ team_id: bid.team_id, amount: Number(bid.amount) });
-    bidsBySession.set(bid.session_id, list);
-  }
-
-  // Load all winning bids for actual pot calculation + tie adjustment
-  const allWinningBids = await fetchAllPages<{ session_id: string; team_id: number; amount: number }>(
-    (from, to) =>
-      supabase
-        .from('auction_bids')
-        .select('session_id, team_id, amount')
-        .eq('is_winning_bid', true)
-        .in('session_id', sessionIds)
-        .order('id')
-        .range(from, to)
-  );
-
-  const potBySession = new Map<string, number>();
-  const allBidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
-  for (const bid of dedupeBy(allWinningBids, (b) => `${b.session_id}:${b.team_id}`)) {
-    potBySession.set(bid.session_id, (potBySession.get(bid.session_id) ?? 0) + Number(bid.amount));
-    const list = allBidsBySession.get(bid.session_id) ?? [];
-    list.push({ team_id: bid.team_id, amount: Number(bid.amount) });
-    allBidsBySession.set(bid.session_id, list);
-  }
-
-  // Load tournament results for completed sessions. The biggest offender of
-  // the three: ~400 rows per NCAA league, 224 per NFL league — four completed
-  // leagues put one user past the 1,000-row cap and truncated `roundsWon`.
+  // Load winning bids and tournament results in parallel — both grow with
+  // lifetime league count and PostgREST silently truncates at 1,000 rows, so
+  // both are paginated (the −$270-instead-of-+$486 dashboard bug, 2026-09-01;
+  // tournament_results is the biggest offender at ~400 rows per NCAA league,
+  // 224 per NFL league). ONE bids query serves both the pot math and the
+  // user's own spend: the user's bids are just the bidder_id-filtered subset.
   const completedIds = sessions.filter((s) => s.status === 'completed').map((s) => s.id);
-  const resultsBySession = new Map<string, TournamentResult[]>();
-  if (completedIds.length > 0) {
-    const results = await fetchAllPages<TournamentResult & { session_id: string }>(
+
+  const [allWinningBidsRaw, resultRowsRaw] = await Promise.all([
+    fetchAllPages<{ session_id: string; team_id: number; amount: number; bidder_id: string }>(
       (from, to) =>
         supabase
-          .from('tournament_results')
-          .select('session_id, team_id, round_key, result, result_count')
-          .in('session_id', completedIds)
+          .from('auction_bids')
+          .select('session_id, team_id, amount, bidder_id')
+          .eq('is_winning_bid', true)
+          .in('session_id', sessionIds)
+          // created_at first, so the dedupe below keeps the EARLIEST of any
+          // legacy double-stamped rows — matching getSessionState's ordering
+          // (actions/session.ts). id breaks created_at ties to keep the
+          // pagination order total.
+          .order('created_at')
           .order('id')
           .range(from, to)
-    );
+    ),
+    completedIds.length > 0
+      ? fetchAllPages<TournamentResult & { session_id: string }>((from, to) =>
+          supabase
+            .from('tournament_results')
+            .select('session_id, team_id, round_key, result, result_count')
+            .in('session_id', completedIds)
+            .order('id')
+            .range(from, to)
+        )
+      : Promise.resolve<Array<TournamentResult & { session_id: string }>>([]),
+  ]);
 
-    for (const r of results) {
-      const list = resultsBySession.get(r.session_id) ?? [];
-      list.push({ team_id: r.team_id, round_key: r.round_key, result: r.result, result_count: r.result_count });
-      resultsBySession.set(r.session_id, list);
+  // Dedupe per (session, team) ONCE, before splitting out the user's bids — a
+  // team is won exactly once, but the settling UPDATE could stamp two rows
+  // winning (see lib/auction/winning-bids.ts). Deduping the shared list means
+  // the pot and the user's spend can never disagree about who owns a
+  // double-stamped team.
+  const allWinningBids = dedupeBy(allWinningBidsRaw, (b) => `${b.session_id}:${b.team_id}`);
+
+  const bidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
+  const potBySession = new Map<string, number>();
+  const allBidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
+  for (const bid of allWinningBids) {
+    const entry = { team_id: bid.team_id, amount: Number(bid.amount) };
+    potBySession.set(bid.session_id, (potBySession.get(bid.session_id) ?? 0) + entry.amount);
+    const all = allBidsBySession.get(bid.session_id) ?? [];
+    all.push(entry);
+    allBidsBySession.set(bid.session_id, all);
+    if (bid.bidder_id === user.id) {
+      const mine = bidsBySession.get(bid.session_id) ?? [];
+      mine.push(entry);
+      bidsBySession.set(bid.session_id, mine);
     }
+  }
+
+  // Results get the same keyed dedupe — offset pages fetched as separate
+  // statements can re-serve a row that shifts across a page boundary during a
+  // concurrent sync write, and a duplicated 'won' row would pay a round twice.
+  // unique(session_id, team_id, round_key) in the DB makes this collapse safe.
+  const resultsBySession = new Map<string, TournamentResult[]>();
+  for (const r of dedupeBy(resultRowsRaw, (row) => `${row.session_id}:${row.team_id}:${row.round_key}`)) {
+    const list = resultsBySession.get(r.session_id) ?? [];
+    list.push({ team_id: r.team_id, round_key: r.round_key, result: r.result, result_count: r.result_count });
+    resultsBySession.set(r.session_id, list);
   }
 
   // Fetch DataGolf projections for active golf sessions (best-effort, non-blocking).
@@ -344,6 +372,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       const team: DashboardTeam = {
         teamName: baseTeam?.name ?? `Team ${bid.team_id}`,
         seed: baseTeam?.seed ?? 0,
+        showSeed: config?.showSeedColumn !== false,
         group: baseTeam?.group ?? '',
         status,
         purchasePrice: bid.amount,

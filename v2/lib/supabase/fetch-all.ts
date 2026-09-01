@@ -36,15 +36,25 @@ export async function fetchAllPages<T>(
   fetchPage: (from: number, to: number) => PromiseLike<PageResult<T>>
 ): Promise<T[]> {
   const all: T[] = [];
+  let from = 0;
   for (let page = 0; page < MAX_PAGES; page++) {
-    const from = page * SUPABASE_PAGE_SIZE;
     const { data, error } = await fetchPage(from, from + SUPABASE_PAGE_SIZE - 1);
     if (error) {
       throw new Error(`Paginated fetch failed on rows ${from}+: ${error.message}`);
     }
     const rows = data ?? [];
     all.push(...rows);
-    if (rows.length < SUPABASE_PAGE_SIZE) return all;
+    // Terminate only on an EMPTY page, advancing by however many rows the
+    // server actually returned. Stopping on `rows.length < SUPABASE_PAGE_SIZE`
+    // would silently truncate if the server's `max-rows` setting is ever
+    // configured below our page size (it caps every response, so a "full"
+    // page would come back short forever) — the exact bug class this helper
+    // exists to kill. Costs one extra (empty) request per fetch; callers run
+    // their fetches in parallel, so the wall-clock price is one round-trip.
+    if (rows.length === 0) return all;
+    from += rows.length;
   }
-  throw new Error(`Paginated fetch exceeded ${MAX_PAGES * SUPABASE_PAGE_SIZE} rows — aborting`);
+  throw new Error(
+    `Paginated fetch still returning rows after ${MAX_PAGES} pages (${all.length} so far) — aborting rather than trusting an unbounded result`
+  );
 }
