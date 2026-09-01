@@ -229,6 +229,21 @@ export function TeamTable() {
       {/* Legend for sub-values */}
       <p className="text-[11px] text-muted-foreground">
         Each round column shows <span className="text-emerald-400">profit</span>/<span className="text-red-400">loss</span> if the team reaches that round. Below: <span className="text-white/70">probability of reaching that round</span>. Hover for more detail.
+        {rounds.some((r) => r.flatRate) && (
+          <>
+            {' '}The <span className="text-white/70">{rounds.find((r) => r.flatRate)?.label}</span> column
+            is different: it shows the team&apos;s expected season payout from
+            per-{rounds.find((r) => r.flatRate)?.unitLabel ?? 'unit'} money (and that amount is
+            baked into every column to its right).
+          </>
+        )}
+        {rounds.some((r) => r.parallel && !r.flatRate) && (
+          <>
+            {' '}A <span className="text-white/70">{rounds.find((r) => r.parallel && !r.flatRate)?.label}</span> win
+            pays on top of a playoff berth but isn&apos;t required for the later rounds, so it
+            isn&apos;t added into them.
+          </>
+        )}
       </p>
 
       {/* Data table */}
@@ -256,7 +271,17 @@ export function TeamTable() {
               <TableHead className="px-2 text-xs">{config?.teamLabel ?? 'Team'}</TableHead>
               <TableHead className="px-2 text-xs w-16">{config?.groupLabel ?? 'Group'}</TableHead>
               {rounds.map((round) => (
-                <TableHead key={round.key} className="px-2 text-center text-xs" title={round.payoutLabel ?? round.label}>
+                <TableHead
+                  key={round.key}
+                  className="px-2 text-center text-xs"
+                  title={
+                    round.flatRate
+                      ? `Expected season payout from per-${round.unitLabel ?? 'unit'} money (expected ${round.unitLabel ?? 'unit'}s × rate × pot) — included in every column to the right`
+                      : round.parallel
+                        ? `${round.payoutLabel ?? round.label} — pays alongside the ladder, not required for later rounds`
+                        : round.payoutLabel ?? round.label
+                  }
+                >
                   {round.label}
                 </TableHead>
               ))}

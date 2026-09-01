@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { calculateRoundProfits } from '../profits';
 import { MARCH_MADNESS_2026_CONFIG } from '@/lib/tournaments/configs/march-madness-2026';
+import { NFL_SEASON_2026_CONFIG } from '@/lib/tournaments/configs/nfl-season-2026';
+import { WORLD_CUP_2026_CONFIG } from '@/lib/tournaments/configs/world-cup-2026';
 
 const config = MARCH_MADNESS_2026_CONFIG;
 const rules = config.defaultPayoutRules;
@@ -51,5 +53,66 @@ describe('calculateRoundProfits', () => {
   it('handles undefined/NaN purchase price as 0', () => {
     const profits = calculateRoundProfits(NaN, rules, potSize, config);
     expect(profits['r32']).toBeGreaterThan(0);
+  });
+});
+
+describe('calculateRoundProfits — NFL (flatRate + parallel rounds)', () => {
+  const nfl = NFL_SEASON_2026_CONFIG;
+  const nflRules = nfl.defaultPayoutRules;
+  const pot = 10000;
+  const pct = (key: string) => pot * ((nflRules[key] ?? 0) / 100);
+  // A team expected to win 10 games.
+  const odds = { regularSeasonWins: 10 };
+
+  it('Wins column is the EXPECTED per-win payout, not the price of one win', () => {
+    const profits = calculateRoundProfits(0, nflRules, pot, nfl, odds);
+    // 10 expected wins × 0.1029% × $10,000 = $102.90 — the old code showed
+    // one win's worth ($10.29).
+    expect(profits['regularSeasonWins']).toBeCloseTo(pct('regularSeasonWins') * 10, 5);
+  });
+
+  it('falls back to one unit when odds are not provided', () => {
+    const profits = calculateRoundProfits(0, nflRules, pot, nfl);
+    expect(profits['regularSeasonWins']).toBeCloseTo(pct('regularSeasonWins'), 5);
+  });
+
+  it('Playoff column excludes the Division payout (wild cards exist)', () => {
+    const profits = calculateRoundProfits(0, nflRules, pot, nfl, odds);
+    const expectedWinsIncome = pct('regularSeasonWins') * 10;
+    expect(profits['playoffBerth']).toBeCloseTo(expectedWinsIncome + pct('playoffBerth'), 5);
+  });
+
+  it('Division column = wins income + division + playoff berth (div winners qualify)', () => {
+    const profits = calculateRoundProfits(0, nflRules, pot, nfl, odds);
+    const expectedWinsIncome = pct('regularSeasonWins') * 10;
+    expect(profits['divisionWinner']).toBeCloseTo(
+      expectedWinsIncome + pct('divisionWinner') + pct('playoffBerth'),
+      5
+    );
+  });
+
+  it('Champ column = wins income + the full ladder, no Division', () => {
+    const profits = calculateRoundProfits(100, nflRules, pot, nfl, odds);
+    const ladder = ['playoffBerth', 'reachDivisional', 'reachConfChamp', 'reachSuperBowl', 'superBowl']
+      .reduce((s, k) => s + pct(k), 0);
+    expect(profits['superBowl']).toBeCloseTo(pct('regularSeasonWins') * 10 + ladder - 100, 5);
+  });
+});
+
+describe('calculateRoundProfits — World Cup (parallel winGroup)', () => {
+  const wc = WORLD_CUP_2026_CONFIG;
+  const wcRules = wc.defaultPayoutRules;
+  const pot = 10000;
+  const pct = (key: string) => pot * ((wcRules[key] ?? 0) / 100);
+
+  it('winGroup column = its own payout + advancing (group winners advance)', () => {
+    const profits = calculateRoundProfits(0, wcRules, pot, wc);
+    expect(profits['winGroup']).toBeCloseTo(pct('winGroup') + pct('r32'), 5);
+  });
+
+  it('champion column no longer includes the winGroup payout', () => {
+    const profits = calculateRoundProfits(0, wcRules, pot, wc);
+    const ladder = ['r32', 'r16', 'qf', 'sf', 'final', 'champion'].reduce((s, k) => s + pct(k), 0);
+    expect(profits['champion']).toBeCloseTo(ladder, 5);
   });
 });

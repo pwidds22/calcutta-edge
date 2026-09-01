@@ -39,3 +39,36 @@ export function formatGroupLabel(
   const label = config?.groups?.find((g) => g.key === group)?.label;
   return label ?? group.replace(/_/g, ' ');
 }
+
+/** Minimal shape needed to know how to display a round's `odds` value. */
+export interface OddsDisplayRound {
+  flatRate?: boolean;
+  unitLabel?: string;
+}
+
+/**
+ * Format a round's `odds` value for display. Most rounds store a 0–1
+ * probability of reaching that round, formatted as a percent. A `flatRate`
+ * round (e.g. NFL's per-win bonus) stores an expected COUNT instead (e.g.
+ * 10.52 expected wins) — running that through formatPercent reads as
+ * nonsense ("1051.82%"), so show the count with its unit noun instead.
+ * Shared by the strategy table AND the live strategy overlay — the overlay
+ * once had its own inline `(odds * 100)%` and shipped "822.6%".
+ */
+export function formatRoundOdds(value: number, round: OddsDisplayRound): string {
+  if (round.flatRate) {
+    const noun = round.unitLabel ?? 'unit';
+    return `${value.toFixed(1)} ${noun}${value === 1 ? '' : 's'}`;
+  }
+  return formatPercent(value);
+}
+
+/** Tooltip phrasing for a round's odds value — "chance to reach this round"
+ *  is nonsense for a flatRate round's expected win count. */
+export function formatRoundOddsTooltip(value: number, round: OddsDisplayRound): string {
+  if (round.flatRate) {
+    const noun = round.unitLabel ?? 'unit';
+    return `${value.toFixed(2)} expected ${noun}${value === 1 ? '' : 's'}`;
+  }
+  return `${formatPercent(value)} chance to reach this round`;
+}

@@ -4,11 +4,18 @@ import { memo, useCallback, useState, useEffect } from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { formatCurrency, formatPercent, formatGroupLabel } from '@/lib/calculations/format';
+import {
+  formatCurrency,
+  formatPercent,
+  formatGroupLabel,
+  formatRoundOdds,
+  formatRoundOddsTooltip,
+  type OddsDisplayRound,
+} from '@/lib/calculations/format';
 import { calculateRoundProfits } from '@/lib/calculations/profits';
 import { useAuction } from '@/lib/auction/auction-context';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import type { Team, TeamBundle, PayoutRules, RoundConfig } from '@/lib/calculations/types';
+import type { Team, TeamBundle, PayoutRules } from '@/lib/calculations/types';
 
 interface TeamTableRowProps {
   team: Team;
@@ -18,34 +25,6 @@ interface TeamTableRowProps {
   onMyTeamToggle: (teamId: number, isMyTeam: boolean) => void;
   locked?: boolean;
   indented?: boolean;
-}
-
-/** Minimal shape needed to know how to display a round's `odds` value. */
-type OddsDisplayRound = Pick<RoundConfig, 'flatRate' | 'unitLabel'>;
-
-/**
- * Format a round's `odds` value for display. Most rounds store a 0–1
- * probability of reaching that round, formatted as a percent. A `flatRate`
- * round (e.g. NFL's per-win bonus) stores an expected COUNT instead (e.g.
- * 10.52 expected wins) — running that through formatPercent reads as
- * nonsense ("1051.82%"), so show the count with its unit noun instead.
- */
-function formatRoundOdds(value: number, round: OddsDisplayRound): string {
-  if (round.flatRate) {
-    const noun = round.unitLabel ?? 'unit';
-    return `${value.toFixed(1)} ${noun}${value === 1 ? '' : 's'}`;
-  }
-  return formatPercent(value);
-}
-
-/** Tooltip phrasing for a round's odds value — "chance to reach this round"
- *  is nonsense for a flatRate round's expected win count. */
-function formatRoundOddsTooltip(value: number, round: OddsDisplayRound): string {
-  if (round.flatRate) {
-    const noun = round.unitLabel ?? 'unit';
-    return `${value.toFixed(2)} expected ${noun}${value === 1 ? '' : 's'}`;
-  }
-  return `${formatPercent(value)} chance to reach this round`;
 }
 
 function ProfitCell({
@@ -96,7 +75,7 @@ export const TeamTableRow = memo(function TeamTableRow({
   const showSeed = config?.showSeedColumn !== false;
 
   const profits = config
-    ? calculateRoundProfits(team.purchasePrice, payoutRules, potSize, config)
+    ? calculateRoundProfits(team.purchasePrice, payoutRules, potSize, config, team.odds)
     : {};
 
   // Local state for price input — only dispatches on blur to prevent
@@ -245,7 +224,7 @@ export const BundleRow = memo(function BundleRow({
 
   // Combined profits per round = sum of member profits
   const memberProfits = memberTeams.map((t) =>
-    config ? calculateRoundProfits(t.purchasePrice, payoutRules, potSize, config) : {}
+    config ? calculateRoundProfits(t.purchasePrice, payoutRules, potSize, config, t.odds) : {}
   );
   const combinedProfits: Record<string, number> = {};
   for (const round of rounds) {

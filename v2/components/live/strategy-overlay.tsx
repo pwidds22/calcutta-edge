@@ -8,7 +8,8 @@ import { blendProbabilities } from '@/lib/tournaments/odds-sources';
 import { initializeTeams } from '@/lib/calculations/initialize';
 import { strategyPriceDollars } from '@/lib/pricing';
 import { calculateTeamValues } from '@/lib/calculations/values';
-import { formatCurrency } from '@/lib/calculations/format';
+import { formatCurrency, formatRoundOdds } from '@/lib/calculations/format';
+import { calculateRoundProfits } from '@/lib/calculations/profits';
 import { TrendingUp, Lock, ExternalLink, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
 
 const SUGGESTED_BID_KEY = 'calcutta_suggested_bid_pct';
@@ -32,11 +33,13 @@ function RoundOddsRow({
   projectedPot: number;
   purchasePrice: number;
 }) {
-  let cumulativePayout = 0;
+  // Round-type-aware math shared with the strategy table — the old inline
+  // cumulative added parallel rounds (Division) into every later column and
+  // priced NFL's flatRate Wins round as a single win.
+  const profits = calculateRoundProfits(purchasePrice, payoutRules, projectedPot, config, team.odds);
   const roundData = config.rounds.map((round) => {
-    cumulativePayout += (payoutRules[round.key] ?? 0) / 100 * projectedPot;
     const roundOdds = team.odds?.[round.key] ?? 0;
-    const profit = purchasePrice > 0 ? cumulativePayout - purchasePrice : null;
+    const profit = purchasePrice > 0 ? profits[round.key] ?? 0 : null;
     return { round, roundOdds, profit };
   });
 
@@ -49,7 +52,7 @@ function RoundOddsRow({
         >
           <p className="text-[9px] text-white/30">{round.label}</p>
           <p className="text-[10px] font-bold text-white/80">
-            {(roundOdds * 100).toFixed(1)}%
+            {formatRoundOdds(roundOdds, round)}
           </p>
           {profit !== null && (
             <p
@@ -495,7 +498,7 @@ export function StrategyOverlay({
                       >
                         <p className="text-[9px] text-white/30">{round.label}</p>
                         <p className="text-[10px] font-bold text-white/80">
-                          {(roundOdds * 100).toFixed(1)}%
+                          {formatRoundOdds(roundOdds, round)}
                         </p>
                       </div>
                     );
