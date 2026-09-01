@@ -12,6 +12,7 @@ import type { PropResult } from '@/lib/tournaments/props';
 import { getPropWinners } from '@/lib/tournaments/props';
 import { fullRoundRate } from '@/lib/tournaments/payout-presets';
 import { dedupeBy } from '@/lib/auction/winning-bids';
+import { fetchAllPages } from '@/lib/supabase/fetch-all';
 import { normalizeName } from '@/lib/datagolf/ev';
 import { fetchInPlay, fetchPreTournament, formatPlayerName } from '@/lib/datagolf/client';
 import type { DataGolfInPlayPlayer } from '@/lib/datagolf/client';
@@ -139,50 +140,70 @@ export async function getDashboardData(): Promise<DashboardData> {
     return emptyResult;
   }
 
-  // Load user's winning bids across all sessions
-  const { data: winningBids } = await supabase
-    .from('auction_bids')
-    .select('session_id, team_id, amount')
-    .eq('bidder_id', user.id)
-    .eq('is_winning_bid', true)
-    .in('session_id', sessionIds);
+  // Load user's winning bids across all sessions. These multi-session selects
+  // grow with lifetime league count and PostgREST silently truncates at 1,000
+  // rows — page them (with a stable order) or heavy users get wrong money
+  // numbers (the −$270-instead-of-+$486 dashboard bug, 2026-09-01).
+  const winningBids = await fetchAllPages<{ session_id: string; team_id: number; amount: number }>(
+    (from, to) =>
+      supabase
+        .from('auction_bids')
+        .select('session_id, team_id, amount')
+        .eq('bidder_id', user.id)
+        .eq('is_winning_bid', true)
+        .in('session_id', sessionIds)
+        .order('id')
+        .range(from, to)
+  );
 
   // Group bids by session. Dedupe per (session, team) — a team is won once, but the
   // settling UPDATE can stamp two rows winning (see lib/auction/winning-bids.ts),
   // which would otherwise double-count spend, pot, and P&L here.
   const bidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
-  for (const bid of dedupeBy(winningBids ?? [], (b) => `${b.session_id}:${b.team_id}`)) {
+  for (const bid of dedupeBy(winningBids, (b) => `${b.session_id}:${b.team_id}`)) {
     const list = bidsBySession.get(bid.session_id) ?? [];
     list.push({ team_id: bid.team_id, amount: Number(bid.amount) });
     bidsBySession.set(bid.session_id, list);
   }
 
   // Load all winning bids for actual pot calculation + tie adjustment
-  const { data: allWinningBids } = await supabase
-    .from('auction_bids')
-    .select('session_id, team_id, amount')
-    .eq('is_winning_bid', true)
-    .in('session_id', sessionIds);
+  const allWinningBids = await fetchAllPages<{ session_id: string; team_id: number; amount: number }>(
+    (from, to) =>
+      supabase
+        .from('auction_bids')
+        .select('session_id, team_id, amount')
+        .eq('is_winning_bid', true)
+        .in('session_id', sessionIds)
+        .order('id')
+        .range(from, to)
+  );
 
   const potBySession = new Map<string, number>();
   const allBidsBySession = new Map<string, Array<{ team_id: number; amount: number }>>();
-  for (const bid of dedupeBy(allWinningBids ?? [], (b) => `${b.session_id}:${b.team_id}`)) {
+  for (const bid of dedupeBy(allWinningBids, (b) => `${b.session_id}:${b.team_id}`)) {
     potBySession.set(bid.session_id, (potBySession.get(bid.session_id) ?? 0) + Number(bid.amount));
     const list = allBidsBySession.get(bid.session_id) ?? [];
     list.push({ team_id: bid.team_id, amount: Number(bid.amount) });
     allBidsBySession.set(bid.session_id, list);
   }
 
-  // Load tournament results for completed sessions
+  // Load tournament results for completed sessions. The biggest offender of
+  // the three: ~400 rows per NCAA league, 224 per NFL league — four completed
+  // leagues put one user past the 1,000-row cap and truncated `roundsWon`.
   const completedIds = sessions.filter((s) => s.status === 'completed').map((s) => s.id);
   const resultsBySession = new Map<string, TournamentResult[]>();
   if (completedIds.length > 0) {
-    const { data: results } = await supabase
-      .from('tournament_results')
-      .select('session_id, team_id, round_key, result, result_count')
-      .in('session_id', completedIds);
+    const results = await fetchAllPages<TournamentResult & { session_id: string }>(
+      (from, to) =>
+        supabase
+          .from('tournament_results')
+          .select('session_id, team_id, round_key, result, result_count')
+          .in('session_id', completedIds)
+          .order('id')
+          .range(from, to)
+    );
 
-    for (const r of results ?? []) {
+    for (const r of results) {
       const list = resultsBySession.get(r.session_id) ?? [];
       list.push({ team_id: r.team_id, round_key: r.round_key, result: r.result, result_count: r.result_count });
       resultsBySession.set(r.session_id, list);
