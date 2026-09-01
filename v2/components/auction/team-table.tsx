@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { TeamTableRow, BundleRow } from './team-table-row';
 import { getBundlePresets } from '@/lib/tournaments/bundles';
 import { formatGroupLabel } from '@/lib/calculations/format';
-import { ArrowUpDown, Lock } from 'lucide-react';
+import { ArrowUpDown, Lock, Info } from 'lucide-react';
 import type { GroupFilter, StatusFilter, SortOption, BundlePreset } from '@/lib/calculations/types';
 
 const PREVIEW_SEED_CUTOFF = 2; // Show seeds 1-2 (8 teams) in free preview
@@ -110,7 +110,7 @@ export function TeamTable() {
           <SelectContent>
             {groups.map((g) => (
               <SelectItem key={g} value={g}>
-                {formatGroupLabel(g)}
+                {formatGroupLabel(g, config)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -204,6 +204,26 @@ export function TeamTable() {
             dispatch({ type: 'SET_CUSTOM_BUNDLE_CONFIG', config: { cutoff, groupSize } })
           }
         />
+      )}
+
+      {/* Pre-draft explainer. With no prices entered, every team's profit
+          columns are payout-minus-price with price 0 — IDENTICAL across rows,
+          which reads as a bug (Pat's walkthrough). Say why, and point at the
+          columns that do differentiate teams before the draft. */}
+      {state.teams.length > 0 && state.teams.every((t) => t.purchasePrice === 0) && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-4 py-3">
+          <Info className="mt-0.5 size-4 shrink-0 text-sky-400" />
+          <p className="text-xs leading-relaxed text-white/60">
+            <span className="font-medium text-white/80">No sale prices yet.</span>{' '}
+            The profit columns show each round&apos;s payout minus what you pay, so they&apos;re
+            the same for every {config?.teamLabel?.toLowerCase() ?? 'team'} until prices come
+            in — they fill in live as your draft sells {config?.teamLabel?.toLowerCase() ?? 'team'}s
+            (or as you type prices below). Until then, compare using{' '}
+            <span className="font-medium text-emerald-400">Fair Val</span>,{' '}
+            <span className="font-medium text-emerald-400">Bid</span>, and the odds under each
+            column.
+          </p>
+        </div>
       )}
 
       {/* Legend for sub-values */}

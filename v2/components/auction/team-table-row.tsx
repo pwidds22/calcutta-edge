@@ -53,17 +53,21 @@ function ProfitCell({
   odds,
   roundValue,
   round,
+  hasPrice,
 }: {
   profit: number;
   odds: number;
   roundValue: number;
   round: OddsDisplayRound;
+  /** Until the team has a purchase price, the "profit" is just the gross
+   *  payout (identical for every team) — render it muted, not as a P&L. */
+  hasPrice: boolean;
 }) {
   return (
     <TableCell className="px-2 py-1.5 text-center">
       <div
         className={`text-xs font-medium tabular-nums ${
-          profit > 0 ? 'text-emerald-400' : profit < 0 ? 'text-red-400' : ''
+          !hasPrice ? 'text-white/35' : profit > 0 ? 'text-emerald-400' : profit < 0 ? 'text-red-400' : ''
         }`}
       >
         {formatCurrency(profit)}
@@ -130,7 +134,7 @@ export const TeamTableRow = memo(function TeamTableRow({
         <TableCell className="px-2 py-1.5 text-xs font-medium whitespace-nowrap">
           {team.name}
         </TableCell>
-        <TableCell className="px-2 py-1.5 text-xs">{formatGroupLabel(team.group)}</TableCell>
+        <TableCell className="px-2 py-1.5 text-xs">{formatGroupLabel(team.group, config)}</TableCell>
         {rounds.map((round) => (
           <TableCell key={round.key} className="px-2 py-1.5 text-center">
             <div className="text-xs select-none blur-[3px]">$---.--</div>
@@ -160,7 +164,7 @@ export const TeamTableRow = memo(function TeamTableRow({
       <TableCell className={`px-2 py-1.5 text-xs font-medium whitespace-nowrap ${indented ? 'pl-6' : ''}`}>
         {team.name}
       </TableCell>
-      <TableCell className="px-2 py-1.5 text-xs">{formatGroupLabel(team.group)}</TableCell>
+      <TableCell className="px-2 py-1.5 text-xs">{formatGroupLabel(team.group, config)}</TableCell>
 
       {rounds.map((round) => (
         <ProfitCell
@@ -169,6 +173,7 @@ export const TeamTableRow = memo(function TeamTableRow({
           odds={team.odds[round.key] ?? 0}
           roundValue={team.roundValues[round.key] ?? 0}
           round={round}
+          hasPrice={team.purchasePrice > 0}
         />
       ))}
 
@@ -351,7 +356,9 @@ export const BundleRow = memo(function BundleRow({
           <TableCell key={round.key} className="px-2 py-1.5 text-center">
             <div
               className={`text-xs font-medium tabular-nums ${
-                combinedProfits[round.key] > 0
+                combinedPrice === 0
+                  ? 'text-white/35'
+                  : combinedProfits[round.key] > 0
                   ? 'text-emerald-400'
                   : combinedProfits[round.key] < 0
                   ? 'text-red-400'
