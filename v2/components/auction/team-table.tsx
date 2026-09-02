@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { TeamTableRow, BundleRow } from './team-table-row';
 import { getBundlePresets } from '@/lib/tournaments/bundles';
 import { formatGroupLabel } from '@/lib/calculations/format';
+import { payingRounds } from '@/lib/calculations/rounds';
 import { ArrowUpDown, Lock, Info } from 'lucide-react';
 import type { GroupFilter, StatusFilter, SortOption, BundlePreset } from '@/lib/calculations/types';
 
@@ -92,7 +93,9 @@ export function TeamTable() {
     });
   };
 
-  const rounds = config?.rounds ?? [];
+  // Display list only — a round the league pays nothing for is not a column
+  // an owner can act on. Value math still walks the full config.
+  const rounds = payingRounds(config, state.payoutRules);
 
   return (
     <div className="space-y-3">

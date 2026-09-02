@@ -13,6 +13,7 @@ import {
   type OddsDisplayRound,
 } from '@/lib/calculations/format';
 import { calculateRoundProfits } from '@/lib/calculations/profits';
+import { payingRounds } from '@/lib/calculations/rounds';
 import { useAuction } from '@/lib/auction/auction-context';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import type { Team, TeamBundle, PayoutRules } from '@/lib/calculations/types';
@@ -71,7 +72,10 @@ export const TeamTableRow = memo(function TeamTableRow({
   indented,
 }: TeamTableRowProps) {
   const { config } = useAuction();
-  const rounds = config?.rounds ?? [];
+  // Display list only — see `payingRounds`. Profit math below still uses the
+  // full config, so a zero-rate round contributes zero rather than vanishing
+  // from the cumulative.
+  const rounds = payingRounds(config, payoutRules);
   const showSeed = config?.showSeedColumn !== false;
 
   const profits = config
@@ -207,7 +211,10 @@ export const BundleRow = memo(function BundleRow({
   locked,
 }: BundleRowProps) {
   const { config } = useAuction();
-  const rounds = config?.rounds ?? [];
+  // Display list only — see `payingRounds`. Profit math below still uses the
+  // full config, so a zero-rate round contributes zero rather than vanishing
+  // from the cumulative.
+  const rounds = payingRounds(config, payoutRules);
   const showSeed = config?.showSeedColumn !== false;
   const [expanded, setExpanded] = useState(false);
 

@@ -10,6 +10,7 @@ import { strategyPriceDollars } from '@/lib/pricing';
 import { calculateTeamValues } from '@/lib/calculations/values';
 import { formatCurrency, formatRoundOdds } from '@/lib/calculations/format';
 import { calculateRoundProfits } from '@/lib/calculations/profits';
+import { payingRounds } from '@/lib/calculations/rounds';
 import { TrendingUp, Lock, ExternalLink, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
 
 const SUGGESTED_BID_KEY = 'calcutta_suggested_bid_pct';
@@ -37,7 +38,10 @@ function RoundOddsRow({
   // cumulative added parallel rounds (Division) into every later column and
   // priced NFL's flatRate Wins round as a single win.
   const profits = calculateRoundProfits(purchasePrice, payoutRules, projectedPot, config, team.odds);
-  const roundData = config.rounds.map((round) => {
+  // Only rounds this league actually pays for. `profits` above is still built
+  // from the FULL config — its ladder and flat-rate baseline need every round —
+  // so this filters the display alone, not the arithmetic.
+  const roundData = payingRounds(config, payoutRules).map((round) => {
     const roundOdds = team.odds?.[round.key] ?? 0;
     const profit = purchasePrice > 0 ? profits[round.key] ?? 0 : null;
     return { round, roundOdds, profit };
