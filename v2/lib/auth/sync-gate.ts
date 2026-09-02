@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import type { createAdminClient } from '@/lib/supabase/admin';
 import { authorizeSessionSync } from './sync-access';
 import { lastSystemSyncAt, cooldownRemainingMs } from '@/lib/auction/sync-cooldown';
+import { SYNC_SKIPPED_MESSAGE } from '@/lib/auction/sync-messages';
 
-/** Shown to the pressing member when the cooldown swallows their request. */
-export const SYNC_SKIPPED_MESSAGE = 'Just synced — already up to date';
+export { SYNC_SKIPPED_MESSAGE };
 
 /**
  * The standard gate for a member-initiated sync of one session: authorize the
