@@ -14,6 +14,7 @@ import { SettlementMatrix } from './settlement-matrix';
 import { PropsEntry } from './props-entry';
 import { GroupTables } from './group-tables';
 import { SoccerStandings } from './soccer-standings';
+import { SYNC_SKIPPED_MESSAGE } from '@/lib/auction/sync-messages';
 import { ClipboardList, Trophy, BarChart3, Calculator, DollarSign, Dice5, RefreshCw, Activity } from 'lucide-react';
 
 interface TournamentDashboardProps {
@@ -116,16 +117,7 @@ export function TournamentDashboard({
       } else if (data.skipped) {
         // Server-side cooldown: somebody else in the league just synced. This
         // is a neutral outcome, not a failure and not new data.
-        //
-        // The fallback string below is intentionally NOT imported from
-        // `@/lib/auth/sync-gate` (SYNC_SKIPPED_MESSAGE) — that module also
-        // pulls in `next/headers` via `authorizeSessionSync`, which breaks
-        // the client bundle ("You're importing a component that needs
-        // 'next/headers'"). The server always sends `data.message`, so this
-        // literal is a defensive default that in practice never fires; keep
-        // it byte-for-byte identical to SYNC_SKIPPED_MESSAGE if that ever
-        // changes.
-        setSyncMessage(data.message ?? 'Just synced — already up to date');
+        setSyncMessage(data.message ?? SYNC_SKIPPED_MESSAGE);
         if (data.lastSyncedAt) setLastSyncedAt(data.lastSyncedAt);
       } else if (data.inserted === 0 && data.updated === 0) {
         const lowRoundMsg = data.lowRound
