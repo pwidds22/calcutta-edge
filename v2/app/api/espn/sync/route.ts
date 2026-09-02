@@ -11,10 +11,13 @@ import { guardMemberSync } from '@/lib/auth/sync-gate';
  * Two modes:
  * 1. Vercel Cron — called every 15 min during tournament, syncs today's results
  *    for ALL active sessions. Protected by CRON_SECRET.
- * 2. Commissioner — called from "Sync Results" button, syncs for a specific session.
- *    Protected by session ownership check.
+ * 2. League member — called from the "Sync Results" button, syncs one session.
+ *    Authorization and the per-session cooldown both live in `guardMemberSync`
+ *    (lib/auth/sync-gate.ts) — never re-implement either here. Until 2026-09
+ *    this comment claimed a "session ownership check" that did not exist: the
+ *    route ran for any caller who knew a session UUID.
  *
- * Body (commissioner mode): { sessionId: string }
+ * Body (member mode): { sessionId: string }
  * Header (cron mode): Authorization: Bearer <CRON_SECRET>
  */
 export async function POST(req: NextRequest) {
