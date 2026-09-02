@@ -89,6 +89,7 @@ export function TournamentDashboard({
   // ESPN auto-sync state
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   // Determine which sync endpoint to use based on tournament sport
   const syncEndpoint =
@@ -112,6 +113,20 @@ export function TournamentDashboard({
       const data = await res.json();
       if (data.error) {
         setSyncMessage(`Error: ${data.error}`);
+      } else if (data.skipped) {
+        // Server-side cooldown: somebody else in the league just synced. This
+        // is a neutral outcome, not a failure and not new data.
+        //
+        // The fallback string below is intentionally NOT imported from
+        // `@/lib/auth/sync-gate` (SYNC_SKIPPED_MESSAGE) — that module also
+        // pulls in `next/headers` via `authorizeSessionSync`, which breaks
+        // the client bundle ("You're importing a component that needs
+        // 'next/headers'"). The server always sends `data.message`, so this
+        // literal is a defensive default that in practice never fires; keep
+        // it byte-for-byte identical to SYNC_SKIPPED_MESSAGE if that ever
+        // changes.
+        setSyncMessage(data.message ?? 'Just synced — already up to date');
+        if (data.lastSyncedAt) setLastSyncedAt(data.lastSyncedAt);
       } else if (data.inserted === 0 && data.updated === 0) {
         const lowRoundMsg = data.lowRound
           ? ` | Low R${data.lowRound.round}: ${data.lowRound.players.join(', ')} (${data.lowRound.score > 0 ? '+' : ''}${data.lowRound.score})`
@@ -126,6 +141,7 @@ export function TournamentDashboard({
         const unit =
           config.sport === 'golf' ? 'players' : config.sport === 'nfl' ? 'teams' : 'games';
         setSyncMessage(`Synced ${count} ${unit}${lowRoundMsg}`);
+        setLastSyncedAt(new Date().toISOString());
         // Results will update via broadcast — no manual refetch needed
       }
     } catch {
@@ -273,6 +289,17 @@ export function TournamentDashboard({
     { key: 'settlement', label: 'Settlement', icon: DollarSign },
   ];
 
+  /** "3m ago" / "just now" — plain relative age for the sync button tooltip. */
+  const lastSyncedLabel = (() => {
+    if (!lastSyncedAt) return null;
+    const ms = Date.now() - new Date(lastSyncedAt).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    const mins = Math.floor(ms / 60_000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    return `${Math.floor(mins / 60)}h ago`;
+  })();
+
   return (
     <div className="space-y-4">
       {/* Tab bar + sync button */}
@@ -309,7 +336,12 @@ export function TournamentDashboard({
             onClick={handleEspnSync}
             disabled={syncing}
             className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
-            title={`Sync ${config.sport === 'golf' ? 'leaderboard' : 'game results'} from ${config.sport === 'golf' ? 'DataGolf' : 'ESPN'}`}
+            title={[
+              `Sync ${config.sport === 'golf' ? 'leaderboard' : 'game results'} from ${config.sport === 'golf' ? 'DataGolf' : 'ESPN'}`,
+              lastSyncedLabel ? `Last synced ${lastSyncedLabel}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           >
             <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync Scores'}</span>
@@ -322,7 +354,7 @@ export function TournamentDashboard({
         <div className={`rounded-md px-3 py-2 text-xs ${
           syncMessage.startsWith('Error') || syncMessage.includes('failed')
             ? 'bg-red-500/10 text-red-400'
-            : syncMessage.includes('No new')
+            : syncMessage.includes('No new') || syncMessage.includes('already up to date')
               ? 'bg-white/[0.04] text-white/50'
               : 'bg-emerald-500/10 text-emerald-400'
         }`}>
