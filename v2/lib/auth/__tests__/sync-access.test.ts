@@ -68,9 +68,10 @@ describe('isCronRequest', () => {
   });
 
   it('rejects "Bearer undefined" when the secret is unset', () => {
-    // The other three sync routes compare against `Bearer ${process.env.CRON_SECRET}`,
-    // which IS the literal string 'Bearer undefined' when unset — handing cron
-    // privileges to anyone who sends it. This is the hole this helper closes.
+    // Comparing against `Bearer ${process.env.CRON_SECRET}` directly IS the
+    // literal string 'Bearer undefined' when unset — handing cron privileges to
+    // anyone who sends it. Three other sync routes used to compare that way
+    // inline; all four now call this helper instead, which is the hole it closes.
     expect(isCronRequest(req('Bearer undefined'))).toBe(false);
     expect(isCronRequest(req())).toBe(false);
   });

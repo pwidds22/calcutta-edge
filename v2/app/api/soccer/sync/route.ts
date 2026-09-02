@@ -23,7 +23,10 @@ type TournamentEntry = NonNullable<ReturnType<typeof getTournament>>;
  * Modes (mirrors /api/espn/sync):
  * 1. Vercel Cron — Authorization: Bearer <CRON_SECRET>; syncs ALL active
  *    sessions of every sync-eligible soccer tournament.
- * 2. Commissioner — body { sessionId }; the "Sync Scores" button.
+ * 2. League member — body { sessionId }; the "Sync Scores" button, which the
+ *    dashboard shows to every participant. Authorization and the per-session
+ *    cooldown both live in `guardMemberSync` (lib/auth/sync-gate.ts) — never
+ *    re-implement either here.
  *
  * Group rows (winGroup/r32 incl. best-8-thirds) come from computeGroupResults;
  * knockout rows from computeKnockoutResults. Idempotent upserts on
