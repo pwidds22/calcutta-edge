@@ -11,6 +11,8 @@ import {
 import type { SyncResultRow } from '@/lib/espn/soccer';
 import { fetchScoreboardWindow } from '@/lib/espn/soccer-client';
 import { dedupeBy } from '@/lib/auction/winning-bids';
+import { isCronRequest } from '@/lib/auth/sync-access';
+import { guardMemberSync } from '@/lib/auth/sync-gate';
 
 type GroupProps = { worstGroupDiff: number | null; bestGroupDiff: number | null };
 type TournamentEntry = NonNullable<ReturnType<typeof getTournament>>;
@@ -28,10 +30,9 @@ type TournamentEntry = NonNullable<ReturnType<typeof getTournament>>;
  * (session_id, team_id, round_key); never writes 'pending'.
  */
 export async function POST(req: NextRequest) {
-  const isCron = req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
   const supabase = createAdminClient();
 
-  if (isCron) return await syncAllSoccerSessions(supabase);
+  if (isCronRequest(req)) return await syncAllSoccerSessions(supabase);
 
   let body: { sessionId?: string };
   try {
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
   if (!body.sessionId) {
     return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
   }
+
+  // This route previously performed NO authorization at all.
+  const blocked = await guardMemberSync(supabase, body.sessionId);
+  if (blocked) return blocked;
 
   const { data: session, error } = await supabase
     .from('auction_sessions')
@@ -65,8 +70,7 @@ export async function POST(req: NextRequest) {
 
 // Vercel Cron uses GET by default.
 export async function GET(req: NextRequest) {
-  const isCron = req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
-  if (!isCron) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isCronRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   return await syncAllSoccerSessions(createAdminClient());
 }
 

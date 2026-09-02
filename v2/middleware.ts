@@ -22,7 +22,10 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Allow specific API routes — they handle their own auth.
+  // Allow specific API routes past the login redirect so they can answer with
+  // a JSON 401 instead of an HTML redirect. The sync routes authorize through
+  // `guardMemberSync` (lib/auth/sync-gate.ts); until 2026-09 that claim was
+  // true of /api/nfl only and simply wrong about the rest.
   // SECURITY: Allowlist only known prefixes, not blanket /api/
   if (path.startsWith('/api/webhooks') || path.startsWith('/api/test-') || path.startsWith('/api/espn') || path.startsWith('/api/golf') || path.startsWith('/api/soccer') || path.startsWith('/api/nfl') || path.startsWith('/api/worldcup') || path.startsWith('/ingest')) {
     return supabaseResponse
