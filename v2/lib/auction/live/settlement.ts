@@ -71,7 +71,6 @@ export function calculateSettlement(
     console.warn(`Settlement: payout rules sum to ${totalPct}%, expected ~100%. Payouts may be inaccurate.`);
   }
 
-
   // Group sold teams by participant
   const byParticipant = new Map<string, { name: string; teams: SoldTeam[] }>();
   for (const sold of soldTeams) {
