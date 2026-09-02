@@ -223,6 +223,26 @@ async function writeSessionResults(
   if (rows.length === 0) return { message: 'No decidable results yet', inserted: 0, updated: 0 };
 
   const enteredAt = new Date().toISOString();
+
+  // Collapse any duplicate (team, round) before batching. Postgres aborts an
+  // ON CONFLICT DO UPDATE that tries to touch the same row twice in one
+  // statement ("cannot affect row a second time"), so a single duplicated team
+  // in the ESPN feed would fail the ENTIRE league's sync — where the previous
+  // row-at-a-time loop just upserted it twice, last write winning, and nobody
+  // noticed. `buildTeamIdMap` checks that every feed name resolves and that no
+  // configured team is missing, but never that feed names are distinct, so this
+  // is not a guarantee we currently have. Keeping the LAST occurrence
+  // reproduces the old behaviour exactly.
+  const byKey = new Map<string, NflSyncResultRow>();
+  for (const row of rows) byKey.set(`${row.teamId}:${row.roundKey}`, row);
+  if (byKey.size !== rows.length) {
+    console.error(
+      `[NFL Sync] ${rows.length - byKey.size} duplicate (team, round) row(s) for session ` +
+        `${sessionId} — collapsed to the last of each. Check the standings parser.`
+    );
+  }
+  rows = [...byKey.values()];
+
   const payload = rows.map((row) => ({
     session_id: sessionId,
     team_id: row.teamId,
