@@ -7,7 +7,7 @@ const HOSTING_FEATURES = [
 ]
 
 const STRATEGY_FEATURES = [
-  { icon: Calculator, text: 'Fair values & bid ceilings from devigged sportsbook odds' },
+  { icon: Calculator, text: 'Fair values & bid ceilings from devigged market odds' },
   { icon: TrendingUp, text: 'Live strategy overlay shows edge during your auction' },
 ]
 
@@ -49,9 +49,9 @@ export function FeaturesSection() {
               Know what every team is worth.
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-white/50">
-              We pull odds from 13+ sportsbooks, strip the vig, and calculate
-              fair values based on your pool&apos;s payout structure. One smart
-              bid pays for itself.
+              We pull live odds from sportsbooks and prediction markets, strip
+              the vig, and calculate fair values based on your pool&apos;s payout
+              structure. One smart bid pays for itself.
             </p>
             <ul className="mt-6 space-y-4">
               {STRATEGY_FEATURES.map((f) => (

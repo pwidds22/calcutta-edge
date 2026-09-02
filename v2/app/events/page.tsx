@@ -1,25 +1,37 @@
-import { listTournamentsWithTeams } from '@/lib/tournaments/registry';
+import { listTournamentsByPhase } from '@/lib/tournaments/registry';
 import { TournamentCard } from '@/components/events/tournament-card';
 import { PublicPageLayout } from '@/components/layout/public-page-layout';
+
+// Derived from dates on every request, so the buckets below can never go stale
+// between deploys. Without this the page is built once and keeps whatever the
+// calendar looked like that day.
+export const revalidate = 3600;
 
 export const metadata = {
   title: 'Events & Tournaments | Calcutta Edge',
   description:
-    'Browse upcoming Calcutta auction tournaments — March Madness, The Masters, Kentucky Derby, NFL Playoffs, and more. Host your auction for free.',
+    'Browse Calcutta auction tournaments open for hosting — the NFL season, March Madness, golf majors, the World Cup and more. Host your auction for free.',
 };
 
 export default function EventsPage() {
-  const tournaments = listTournamentsWithTeams();
+  // Phase, never `config.isActive`. `isActive` is the legacy flag and it lies:
+  // the PGA Championship (ended May) and the World Cup (ended July) both still
+  // carry `isActive: true`, so this page filed two finished tournaments under a
+  // pulsing "Live Now" badge and sorted them ABOVE the NFL season — the one
+  // event a visitor can actually host right now.
+  const byPhase = listTournamentsByPhase();
+  const byStartDate = (a: { config: { startDate: string } }, b: { config: { startDate: string } }) =>
+    a.config.startDate.localeCompare(b.config.startDate);
 
-  // Sort: active first, then by start date ascending
-  const sorted = [...tournaments].sort((a, b) => {
-    if (a.config.isActive && !b.config.isActive) return -1;
-    if (!a.config.isActive && b.config.isActive) return 1;
-    return a.config.startDate.localeCompare(b.config.startDate);
-  });
-
-  const active = sorted.filter((t) => t.config.isActive);
-  const upcoming = sorted.filter((t) => !t.config.isActive);
+  const live = [...byPhase.live].sort(byStartDate);
+  // Hostable and upcoming share a section: both are "coming", and the card's own
+  // CTA is what distinguishes "host it now" from "opens later".
+  const upcoming = [...byPhase.hostable, ...byPhase.upcoming].sort(byStartDate);
+  // Completed events stay listed — they are real pages with real search value —
+  // but plainly labelled as finished. Archived ones drop off entirely.
+  const past = [...byPhase.completed].sort((a, b) =>
+    b.config.endDate.localeCompare(a.config.endDate)
+  );
 
   return (
     <PublicPageLayout>
@@ -33,8 +45,8 @@ export default function EventsPage() {
           </p>
         </div>
 
-        {/* Active tournaments */}
-        {active.length > 0 && (
+        {/* Tournaments actually in progress right now */}
+        {live.length > 0 && (
           <section className="mb-12">
             <div className="mb-4 flex items-center gap-3">
               <h2 className="text-lg font-semibold text-white">Live Now</h2>
@@ -44,7 +56,7 @@ export default function EventsPage() {
               </span>
             </div>
             <div className="grid gap-6 sm:grid-cols-2">
-              {active.map((t) => (
+              {live.map((t) => (
                 <TournamentCard
                   key={t.config.id}
                   config={t.config}
@@ -60,10 +72,28 @@ export default function EventsPage() {
         {upcoming.length > 0 && (
           <section>
             <h2 className="mb-4 text-lg font-semibold text-white">
-              Upcoming Tournaments
+              Open for Hosting
             </h2>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {upcoming.map((t) => (
+                <TournamentCard
+                  key={t.config.id}
+                  config={t.config}
+                  teamCount={t.teams.length}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Finished events — kept for search value, honestly labelled. */}
+        {past.length > 0 && (
+          <section className="mt-12">
+            <h2 className="mb-4 text-lg font-semibold text-white/50">
+              Recently Completed
+            </h2>
+            <div className="grid gap-6 opacity-60 sm:grid-cols-2 lg:grid-cols-3">
+              {past.map((t) => (
                 <TournamentCard
                   key={t.config.id}
                   config={t.config}

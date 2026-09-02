@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { sendWelcomeEmail } from '@/lib/email/welcome'
+import { safeNext } from '@/lib/auth/safe-redirect'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -18,7 +19,10 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  // Honour where the user was headed before the auth wall. `safeNext` rejects
+  // anything that is not a path on this origin, so this cannot become an open
+  // redirect; a rejected or absent value falls back to the dashboard.
+  redirect(safeNext(formData.get('next')) ?? '/dashboard')
 }
 
 export async function signup(formData: FormData) {
@@ -47,7 +51,11 @@ export async function signup(formData: FormData) {
   sendWelcomeEmail(email).catch(() => {});
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  // Carry the visitor's original intent through signup. Landing CTAs point at
+  // /register?next=/host/create?tournament=..., so a cold visitor who came to
+  // host a specific Calcutta lands on the create form rather than on an empty
+  // dashboard with no idea what to do next.
+  redirect(safeNext(formData.get('next')) ?? '/dashboard')
 }
 
 export async function resetPassword(formData: FormData) {

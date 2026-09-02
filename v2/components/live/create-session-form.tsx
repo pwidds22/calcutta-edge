@@ -35,7 +35,17 @@ interface CreateSessionFormProps {
   initialTournamentId?: string;
 }
 
-type PayoutMode = 'balanced' | 'topHeavy' | 'withProps' | 'custom';
+/**
+ * A preset key, or 'custom'.
+ *
+ * Deliberately NOT a hand-written union of preset names. It used to list
+ * 'balanced' | 'topHeavy' | 'withProps', which never included NFL's 'everyWeek'
+ * — the `key as PayoutMode` cast where presets are enumerated hid the mismatch,
+ * so the union checked nothing while looking like it did. Keying off the real
+ * preset records means a new preset is covered the moment it is added, and a
+ * misspelt key is a compile error rather than a silently dead button.
+ */
+type PayoutMode = keyof ReturnType<typeof getPayoutPresets> | 'custom';
 
 export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSessionFormProps) {
   const router = useRouter();
@@ -302,6 +312,12 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
   const presetEntries: [PayoutMode, PayoutPreset][] = Object.entries(presets).map(
     ([key, preset]) => [key as PayoutMode, preset]
   );
+
+  // Grid sized to the preset count, not hardcoded to 3. NFL ships four
+  // structures (the fourth being Season Only) and a fixed 3-up left the last
+  // one stranded alone on a second row, reading as an afterthought rather than
+  // a peer option. Other sports still have three and still get a clean 3-up.
+  const presetGridCols = presetEntries.length % 4 === 0 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3';
 
   if (tournaments.length === 0) {
     return (
@@ -644,7 +660,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
           </p>
 
           {/* Preset selector */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className={`grid grid-cols-1 gap-2 ${presetGridCols}`}>
             {presetEntries.map(([key, preset]) => (
               <button
                 key={key}
@@ -774,7 +790,7 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
                         <p className="mt-0.5 text-[10px] text-white/20">
                           {isFlat
                             ? `per ${unitNoun} × ${units} = ${roundBudget(round, rate).toFixed(1)}%`
-                            : `${units} ${unitNoun}s = ${roundBudget(round, rate).toFixed(1)}%`}
+                            : `${units} ${unitNoun}${units === 1 ? '' : 's'} = ${roundBudget(round, rate).toFixed(1)}%`}
                         </p>
                       )}
                     </div>
@@ -802,8 +818,16 @@ export function CreateSessionForm({ tournaments, initialTournamentId }: CreateSe
               </span>
               {showPropsSection ? <ChevronUp className="size-4 text-white/30" /> : <ChevronDown className="size-4 text-white/30" />}
             </button>
+            {/* Examples come from THIS tournament's own props — the hardcoded
+                "biggest upset, highest seed in Final Four" was March Madness
+                copy, shown verbatim on an NFL form. */}
             <p className="text-xs text-white/30 mb-2">
-              Side bets that pay out to a single winner — biggest upset, highest seed in Final Four, etc.
+              Side bets that pay out to a single winner
+              {standardProps.length > 0
+                ? // Labels verbatim — lower-casing turned "Best Record in the NFL"
+                  // into "best record in the nfl".
+                  ` — ${standardProps.slice(0, 2).map((p) => p.label).join(', ')}, etc.`
+                : '.'}
             </p>
 
             {showPropsSection && (

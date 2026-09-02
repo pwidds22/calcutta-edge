@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   },
   title: "Calcutta Edge | Free Online Calcutta Auction Hosting + Strategy Analytics",
   description:
-    "Host your Masters, March Madness, or NFL Calcutta auction free. Get devigged odds, fair values, and bid strategy from $14.99/event. The only all-in-one Calcutta platform.",
+    "Host your NFL season, March Madness, or golf Calcutta auction free. Get devigged odds, fair values, and bid strategy from $14.99/event. The only all-in-one Calcutta platform.",
   keywords: [
     "masters calcutta auction 2026",
     "masters calcutta auction",
@@ -40,11 +40,16 @@ export const metadata: Metadata = {
     "masters pool 2026",
     "calcutta auction payout structure",
     "march madness calcutta",
+    "nfl calcutta auction",
+    "nfl calcutta league",
+    "nfl season calcutta",
+    "nfl auction pool",
+    "calcutta auction nfl teams",
   ],
   openGraph: {
     title: "Calcutta Edge | Free Calcutta Auction Hosting + Strategy Analytics",
     description:
-      "Host your Masters or March Madness Calcutta auction free. Devigged odds, fair values, and bid strategy from $14.99/event.",
+      "Host your NFL season or March Madness Calcutta auction free. Devigged odds, fair values, and bid strategy from $14.99/event.",
     url: "https://calcuttaedge.com",
     siteName: "Calcutta Edge",
     type: "website",
@@ -61,7 +66,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Calcutta Edge | Free Calcutta Auction Hosting + Strategy Analytics",
     description:
-      "Host your Masters Calcutta auction free. Devigged odds, fair values, and profit projections from $14.99/event.",
+      "Host your NFL season Calcutta auction free. Devigged odds, fair values, and profit projections from $14.99/event.",
     images: ["/brand/calcutta_edge_banner.png"],
   },
   robots: {

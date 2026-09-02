@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/card'
 import Link from 'next/link'
 
-export function RegisterForm() {
+export function RegisterForm({ next }: { next?: string }) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -41,6 +41,9 @@ export function RegisterForm() {
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
+          {/* Where to land after signup. Read back through `safeNext` on the
+              server — never trusted just because it round-tripped a form. */}
+          {next && <input type="hidden" name="next" value={next} />}
           {error && (
             <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400">
               {error}
@@ -71,7 +74,10 @@ export function RegisterForm() {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/login" className="text-primary underline">
+            <Link
+              href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}
+              className="text-primary underline"
+            >
               Sign in
             </Link>
           </p>

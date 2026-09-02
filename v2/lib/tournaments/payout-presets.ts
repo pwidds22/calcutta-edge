@@ -225,12 +225,21 @@ export const KENTUCKY_DERBY_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
 };
 
 /**
- * NFL season Calcutta. Budget = rate × (payoutUnits ?? teamsAdvancing).
- * The per-win round has 272 units (272 regular-season games), so its budget is
- * rate × 272. Props are absolute percentages.
+ * NFL season Calcutta. Budget = rate × (payoutUnits ?? teamsAdvancing) — always
+ * via `roundBudget`, never inlined. The per-win round has 272 units (the 272
+ * regular-season games), so its budget is rate × 272. Props are absolute
+ * percentages.
  *
- * Balanced splits the pot 50/50 between the regular season and the playoffs;
- * every playoff rung pays less per team than the 10% champion award.
+ * Four structures, and the axis that separates them is how much of the pot
+ * survives past week 18:
+ *
+ *   balanced   50/50 regular season vs playoffs — the default.
+ *   everyWeek  same shape, more weight on the win-by-win money.
+ *   topHeavy   most of the pot on the Super Bowl.
+ *   seasonOnly NOTHING after the regular season — see its note below.
+ *
+ * All four sum to 100% (±0.5%); `__tests__/payout-presets.test.ts` enforces it
+ * for every preset of every registered tournament automatically.
  */
 export const NFL_SEASON_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
   balanced: {
@@ -277,6 +286,41 @@ export const NFL_SEASON_PAYOUT_PRESETS: Record<string, PayoutPreset> = {
       bestRecord: 3.0,
       worstRecord: 3.0,
     },                           // total = 100%
+  },
+  /**
+   * Everything settles by week 18. The four postseason rungs are explicitly 0,
+   * so the entire pot is distributed across per-win money, the eight division
+   * titles, the fourteen playoff berths and the two record props.
+   *
+   * Why a pool would want this: the season is the product. Payouts land every
+   * Sunday instead of in a February lump, the league closes its books before
+   * the playoffs start, and nobody's prize money hinges on a January injury.
+   *
+   * It also compresses the value spread, which is the point — with no Super Bowl
+   * money, the best team (Rams, ~4.6% of pot in EV) is worth roughly 5x the
+   * worst (Cardinals, ~0.9%) instead of the ~15x the champion-weighted
+   * structures produce. Every team stays worth bidding on.
+   *
+   * The zeroed rounds are left in the rules rather than omitted: the payout
+   * editors render one field per configured round either way, and an explicit 0
+   * shows a host exactly what this structure gives up. Nothing downstream
+   * misbehaves on a 0% round — the tie adjustment has no budget to redistribute,
+   * and `session-rules-card` filters rounds to `pct > 0` before display.
+   */
+  seasonOnly: {
+    label: 'Season Only',
+    description: 'No playoff payouts — the whole pot rides on the regular season',
+    rules: {
+      regularSeasonWins: 0.2022, // ×272 = 54.9984%
+      divisionWinner: 2.5,       // ×8   = 20%
+      playoffBerth: 1.2857,      // ×14  = 17.9998%
+      reachDivisional: 0,
+      reachConfChamp: 0,
+      reachSuperBowl: 0,
+      superBowl: 0,
+      bestRecord: 3.5,
+      worstRecord: 3.5,
+    },                           // total = 99.9982%
   },
 };
 
@@ -364,28 +408,6 @@ export function getPayoutPresets(tournamentId: string): Record<string, PayoutPre
  */
 export function roundBudget(round: RoundConfig, rate: number): number {
   return rate * (round.payoutUnits ?? round.teamsAdvancing);
-}
-
-/**
- * What one full round is worth, as a percent of the pot, for the payout-preview
- * surfaces (the settlement matrix, its "Per-Win Payout Structure" chips, and the
- * dashboard's break-even column). Those surfaces walk `config.rounds` and add the
- * stored rate ONCE per round, which is right for a round that pays a team once —
- * and 272x wrong for NFL's per-win round, where the stored 0.1029% is the price of
- * a SINGLE win and the round covers a 272-win season.
- *
- * Rounds without `payoutUnits` are returned untouched, so this is a provable no-op
- * for every tournament but NFL (`payoutUnits` appears on exactly one round of one
- * config). Rounds WITH it get `roundBudget`'s convention: rate x units.
- *
- * Caveat worth knowing at the call sites: for a per-unit round the unit count is
- * LEAGUE-wide (272 wins across 32 teams), so this is the round's total share of the
- * pot, not what any single team can collect. `calculateTeamEarnings` remains the
- * only authority on an individual team's actual earnings — it multiplies by that
- * team's own recorded `result_count`.
- */
-export function fullRoundRate(round: RoundConfig, rate: number): number {
-  return round.payoutUnits === undefined ? rate : roundBudget(round, rate);
 }
 
 /**

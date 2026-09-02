@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { useAuctionChannel } from '@/lib/auction/live/use-auction-channel';
+import { useLiveSessionSettings } from '@/lib/auction/live/use-live-session-settings';
 import { useTimer } from '@/lib/auction/live/use-timer';
 import type { BaseTeam, TournamentConfig, PayoutRules, TeamBundle } from '@/lib/tournaments/types';
 import type { BidEntry, SoldTeam } from '@/lib/auction/live/use-auction-channel';
@@ -121,6 +122,21 @@ export function ParticipantView({
     },
   });
 
+  // Live settings — the commissioner can change the pot and payout structure
+  // from the lobby, and SETTINGS_UPDATED carries that to every client. Before
+  // this hook only the commissioner's own view subscribed, so participants bid
+  // against fair values computed from the pot as it stood at page load and then
+  // settled on the pre-edit payout rules. Read these, never `session.*`.
+  const {
+    payoutRules: livePayoutRules,
+    estimatedPotSize: livePotSize,
+    settings: liveSettings,
+  } = useLiveSessionSettings({
+    payoutRules: session.payout_rules,
+    estimatedPotSize: session.estimated_pot_size,
+    settings: session.settings,
+  });
+
   const activeTeamOrder = channel.teamOrder ?? session.team_order;
 
   const teamMap = new Map(baseTeams.map((t) => [t.id, t]));
@@ -182,9 +198,9 @@ export function ParticipantView({
         {/* Show session rules so participants know the setup */}
         <div className="grid gap-4 md:grid-cols-3">
           <SessionRulesCard
-            payoutRules={session.payout_rules}
-            estimatedPotSize={session.estimated_pot_size}
-            settings={session.settings}
+            payoutRules={livePayoutRules}
+            estimatedPotSize={livePotSize}
+            settings={liveSettings}
             teamCount={activeTeamOrder.length}
             rounds={config.rounds}
             config={config}
@@ -249,10 +265,10 @@ export function ParticipantView({
           sessionName={session.name}
           isCommissioner={false}
           config={config}
-          payoutRules={session.payout_rules}
+          payoutRules={livePayoutRules}
           initialResults={tournamentResults}
           initialPaymentTracking={session.payment_tracking ?? {}}
-          enabledProps={session.settings?.enabledProps}
+          enabledProps={liveSettings?.enabledProps}
           initialPropResults={session.prop_results ?? []}
           currentUserId={userId}
         />
@@ -289,8 +305,8 @@ export function ParticipantView({
               currentHighestBid={channel.currentHighestBid}
               config={config}
               baseTeams={baseTeams}
-              payoutRules={session.payout_rules}
-              estimatedPotSize={session.estimated_pot_size}
+              payoutRules={livePayoutRules}
+              estimatedPotSize={livePotSize}
               soldTeams={channel.soldTeams}
               bundles={bundles}
               oddsRegistry={oddsRegistry}

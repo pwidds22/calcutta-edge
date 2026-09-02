@@ -54,15 +54,19 @@ export function HeroSection() {
 
           <p className="mt-4 max-w-lg text-base leading-relaxed text-white/60 sm:text-lg">
             Live auction hosting with real-time bidding, strategy analytics
-            powered by sportsbook odds, and everything your commissioner
+            powered by live market odds, and everything your commissioner
             needs. No spreadsheets. No shouting.
           </p>
 
           {/* CTA buttons — visible without scrolling on mobile */}
           <div className="mt-6 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            {/* Deep-links through signup to the create form with the featured
+                tournament preselected — the visitor arrived because of THIS
+                event, so converting them onto a generic dashboard throws that
+                away. Falls back to a plain /register when nothing is featured. */}
             <Button size="lg" asChild className="gap-2 text-base">
-              <Link href="/register">
-                Host Your Calcutta Free
+              <Link href={featured?.hostHref ?? '/register'}>
+                {featured?.hostCtaLabel ?? 'Host Your Calcutta Free'}
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -72,7 +76,13 @@ export function HeroSection() {
               asChild
               className="border-white/10 bg-transparent text-white hover:bg-white/[0.06] hover:text-white"
             >
-              <Link href="/strategy">See Strategy Analytics</Link>
+              <Link
+                href={
+                  featured ? `/strategy?tournament=${featured.id}` : '/strategy'
+                }
+              >
+                See Strategy Analytics
+              </Link>
             </Button>
           </div>
 
