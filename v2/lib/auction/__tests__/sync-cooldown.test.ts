@@ -38,8 +38,19 @@ function makeAdmin(rows: Row[]) {
     async maybeSingle() {
       let out = rows.filter((r) => filters.every((f) => f(r)));
       out = [...out].sort((a, b) => {
-        const av = String(a.entered_at ?? '');
-        const bv = String(b.entered_at ?? '');
+        // Postgres treats NULL as GREATER than every non-null value: NULLS LAST
+        // on ASC, NULLS FIRST on DESC. Modelling that is the entire point of
+        // this mock — coercing null to '' makes it the smallest value, sorts
+        // nulls last on DESC, and renders the missing-not-null-filter bug
+        // undetectable.
+        const aNull = a.entered_at == null;
+        const bNull = b.entered_at == null;
+        if (aNull || bNull) {
+          if (aNull && bNull) return 0;
+          return (aNull ? 1 : -1) * (orderDesc ? -1 : 1);
+        }
+        const av = String(a.entered_at);
+        const bv = String(b.entered_at);
         return (av < bv ? -1 : av > bv ? 1 : 0) * (orderDesc ? -1 : 1);
       });
       return { data: out[0] ?? null, error: null };
