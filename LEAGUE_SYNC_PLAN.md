@@ -525,25 +525,210 @@ would otherwise be one with no timestamp and the cooldown would never fire."
 
 ---
 
-### Task 3: Wire the guard and cooldown into `/api/nfl/sync`
+### Task 3: Combined member-sync gate
+
+**Files:**
+- Create: `v2/lib/auth/sync-gate.ts`
+- Test: `v2/lib/auth/__tests__/sync-gate.test.ts`
+
+**Interfaces:**
+- Consumes: `authorizeSessionSync` (Task 1); `lastSystemSyncAt`, `cooldownRemainingMs` (Task 2).
+- Produces:
+  - `const SYNC_SKIPPED_MESSAGE = 'Just synced — already up to date'`
+  - `async function guardMemberSync(admin, sessionId: string): Promise<NextResponse | null>`
+
+  Tasks 4 and 5 call `guardMemberSync` and nothing else from Tasks 1-2.
+
+Without this, the same 14-line authorize-then-cooldown block would be pasted
+into four route handlers, and the skipped-response shape and its copy string
+would be defined in four places, free to drift.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `v2/lib/auth/__tests__/sync-gate.test.ts`:
+
+```ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const holder = vi.hoisted(() => ({
+  access: { ok: true, userId: 'u1' } as
+    | { ok: true; userId: string }
+    | { ok: false; status: 401 | 403 | 404; error: string },
+  lastSync: null as Date | null,
+  remaining: 0,
+}));
+
+vi.mock('../sync-access', () => ({
+  authorizeSessionSync: async () => holder.access,
+}));
+
+vi.mock('@/lib/auction/sync-cooldown', () => ({
+  lastSystemSyncAt: async () => holder.lastSync,
+  cooldownRemainingMs: () => holder.remaining,
+}));
+
+import { guardMemberSync, SYNC_SKIPPED_MESSAGE } from '../sync-gate';
+
+const admin = {} as Parameters<typeof guardMemberSync>[0];
+
+describe('guardMemberSync', () => {
+  beforeEach(() => {
+    holder.access = { ok: true, userId: 'u1' };
+    holder.lastSync = null;
+    holder.remaining = 0;
+  });
+
+  it('returns null when the caller is a member and no sync is pending', async () => {
+    // null means "proceed" - the route does its real work.
+    expect(await guardMemberSync(admin, 'sess-1')).toBeNull();
+  });
+
+  it('passes an authorization failure straight through with its status', async () => {
+    holder.access = { ok: false, status: 403, error: 'You are not a member of this league' };
+    const res = await guardMemberSync(admin, 'sess-1');
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(403);
+    await expect(res!.json()).resolves.toEqual({
+      error: 'You are not a member of this league',
+    });
+  });
+
+  it('401s an anonymous caller', async () => {
+    holder.access = { ok: false, status: 401, error: 'Not authenticated' };
+    const res = await guardMemberSync(admin, 'sess-1');
+    expect(res!.status).toBe(401);
+  });
+
+  it('returns a 200 skipped response while the cooldown is active', async () => {
+    // Deliberately 200, not 429: nothing went wrong, the data is simply fresh.
+    holder.lastSync = new Date('2026-09-14T11:59:30.000Z');
+    holder.remaining = 30_000;
+    const res = await guardMemberSync(admin, 'sess-1');
+    expect(res!.status).toBe(200);
+    await expect(res!.json()).resolves.toEqual({
+      skipped: true,
+      message: SYNC_SKIPPED_MESSAGE,
+      lastSyncedAt: '2026-09-14T11:59:30.000Z',
+      retryInMs: 30_000,
+    });
+  });
+
+  it('does not run the cooldown check for an unauthorized caller', async () => {
+    // A stranger must not learn when a league last synced.
+    holder.access = { ok: false, status: 403, error: 'nope' };
+    holder.remaining = 30_000;
+    const res = await guardMemberSync(admin, 'sess-1');
+    expect(res!.status).toBe(403);
+    await expect(res!.json()).resolves.not.toHaveProperty('lastSyncedAt');
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `cd v2 && npx vitest run sync-gate`
+Expected: FAIL - `Failed to resolve import "../sync-gate"`.
+
+- [ ] **Step 3: Write the implementation**
+
+Create `v2/lib/auth/sync-gate.ts`:
+
+```ts
+import { NextResponse } from 'next/server';
+import type { createAdminClient } from '@/lib/supabase/admin';
+import { authorizeSessionSync } from './sync-access';
+import { lastSystemSyncAt, cooldownRemainingMs } from '@/lib/auction/sync-cooldown';
+
+/** Shown to the pressing member when the cooldown swallows their request. */
+export const SYNC_SKIPPED_MESSAGE = 'Just synced — already up to date';
+
+/**
+ * The standard gate for a member-initiated sync of one session: authorize the
+ * caller, then apply the per-session cooldown.
+ *
+ * Returns a response to send back IMMEDIATELY, or `null` when the route may
+ * proceed with its real work. Four routes need exactly this sequence, so it
+ * lives here rather than being pasted into each - that also keeps the skipped
+ * response's shape and copy in one place.
+ *
+ * NEVER call this on the cron path. Cron carries no sessionId and must never
+ * be skipped because a member pressed the button a minute earlier.
+ */
+export async function guardMemberSync(
+  admin: ReturnType<typeof createAdminClient>,
+  sessionId: string
+): Promise<NextResponse | null> {
+  const access = await authorizeSessionSync(admin, sessionId);
+  if (!access.ok) {
+    // Returned before the cooldown lookup on purpose: a non-member must not be
+    // able to learn when a league they cannot see last synced.
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const lastSync = await lastSystemSyncAt(admin, sessionId);
+  const retryInMs = cooldownRemainingMs(lastSync);
+  if (retryInMs > 0) {
+    // 200, not 429. Nothing failed and the caller did nothing wrong - the data
+    // is simply already fresh, and the dashboard renders this neutrally.
+    return NextResponse.json({
+      skipped: true,
+      message: SYNC_SKIPPED_MESSAGE,
+      lastSyncedAt: lastSync?.toISOString() ?? null,
+      retryInMs,
+    });
+  }
+
+  return null;
+}
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `cd v2 && npx vitest run sync-gate`
+Expected: PASS, 5 tests.
+
+- [ ] **Step 5: Prove the ordering test guards something**
+
+Temporarily move the `authorizeSessionSync` check to AFTER the cooldown block in
+`sync-gate.ts`.
+Run: `cd v2 && npx vitest run sync-gate`
+Expected: FAIL on "does not run the cooldown check for an unauthorized caller".
+Restore the original order and re-run - expected PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add v2/lib/auth/sync-gate.ts v2/lib/auth/__tests__/sync-gate.test.ts
+git commit -m "feat(sync): single member-sync gate composing auth and cooldown
+
+Four routes need the identical authorize-then-cooldown sequence. Composing
+it once keeps the skipped-response shape and its copy in one place, and
+keeps the authorization failure ahead of the cooldown lookup so a stranger
+cannot learn when a league last synced."
+```
+
+---
+
+### Task 4: Wire the gate into `/api/nfl/sync`
 
 **Files:**
 - Modify: `v2/app/api/nfl/sync/route.ts`
 
 **Interfaces:**
-- Consumes: `isCronRequest`, `authorizeSessionSync` (Task 1); `lastSystemSyncAt`, `cooldownRemainingMs` (Task 2).
-- Produces: a `{ skipped: true, message, lastSyncedAt, retryInMs }` response shape that Task 5 renders.
+- Consumes: `isCronRequest` (Task 1), `guardMemberSync` (Task 3).
+- Produces: nothing new.
 
-This is the route the request was actually about — do it first and alone, so a reviewer can accept or reject it independently of the three archived-tournament routes.
+This is the route the request was actually about - do it alone, so a reviewer
+can accept or reject it independently of the three archived-tournament routes.
 
-- [ ] **Step 1: Replace the route's local cron check with the shared one**
+- [ ] **Step 1: Swap the local cron check for the shared one**
 
 In `v2/app/api/nfl/sync/route.ts`, DELETE this entire function:
 
 ```ts
 /**
- * `header === \`Bearer ${process.env.CRON_SECRET}\`` — the shape the other sync
- * routes use — matches the literal string 'Bearer undefined' when the secret is
+ * `header === \`Bearer ${process.env.CRON_SECRET}\`` - the shape the other sync
+ * routes use - matches the literal string 'Bearer undefined' when the secret is
  * unset, handing cron privileges to anyone who sends it. Require the secret to
  * exist first.
  */
@@ -553,12 +738,15 @@ function isCronRequest(req: NextRequest): boolean {
 }
 ```
 
-and add to the imports at the top of the file:
+Add to the imports at the top of the file:
 
 ```ts
-import { isCronRequest, authorizeSessionSync } from '@/lib/auth/sync-access';
-import { lastSystemSyncAt, cooldownRemainingMs } from '@/lib/auction/sync-cooldown';
+import { isCronRequest } from '@/lib/auth/sync-access';
+import { guardMemberSync } from '@/lib/auth/sync-gate';
 ```
+
+DELETE the now-unused import of `createClient` from `@/lib/supabase/server`
+(`guardMemberSync` builds its own).
 
 - [ ] **Step 2: Replace the commissioner-only gate**
 
@@ -593,16 +781,14 @@ In `POST`, find this block:
 and replace it with:
 
 ```ts
-  // ── Auth gate ───────────────────────────────────────────────────────────
-  // ANY member of the league, not just the commissioner — the dashboard has
-  // always shown them the "Sync Scores" button, and a commissioner-only route
-  // meant pressing it returned 403. Writes below still go through the admin
-  // client because system rows need `entered_by: null`, which RLS will not
-  // accept from a user session.
-  const access = await authorizeSessionSync(supabase, body.sessionId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
+  // ── Auth + cooldown ─────────────────────────────────────────────────────
+  // ANY member of the league, not just the commissioner. The dashboard has
+  // always shown every participant the "Sync Scores" button, so a
+  // commissioner-only route meant pressing it returned 403. Writes below still
+  // go through the admin client because system rows need `entered_by: null`,
+  // which RLS will not accept from a user session.
+  const blocked = await guardMemberSync(supabase, body.sessionId);
+  if (blocked) return blocked;
 
   const { data: session, error } = await supabase
     .from('auction_sessions')
@@ -614,40 +800,21 @@ and replace it with:
   }
 ```
 
-Then DELETE the now-unused import of `createClient` from `@/lib/supabase/server` at the top of the file (`authorizeSessionSync` builds its own).
-
-- [ ] **Step 3: Add the cooldown before the expensive work**
-
-Immediately AFTER the existing NFL sport check:
-
-```ts
-  const tournament = getTournament(session.tournament_id);
-  if (!tournament || tournament.config.sport !== 'nfl') {
-    return NextResponse.json({ error: 'Not an NFL tournament session' }, { status: 400 });
-  }
-```
-
-insert:
-
-```ts
-  // Member-initiated only — the cron path returned above and must never be
-  // skipped because somebody pressed the button a minute earlier.
-  const lastSync = await lastSystemSyncAt(supabase, session.id);
-  const retryInMs = cooldownRemainingMs(lastSync);
-  if (retryInMs > 0) {
-    return NextResponse.json({
-      skipped: true,
-      message: 'Just synced — already up to date',
-      lastSyncedAt: lastSync?.toISOString() ?? null,
-      retryInMs,
-    });
-  }
-```
-
-- [ ] **Step 4: Verify types and the whole suite still pass**
+- [ ] **Step 3: Verify types and the whole suite**
 
 Run: `cd v2 && npx tsc --noEmit && npx vitest run`
-Expected: no type errors, and **396 tests pass** — 380 before this plan, plus 8 from Task 1 and 8 from Task 2. If the printed total differs, stop and find out why before continuing.
+
+Expected: no type errors, and **401 tests pass** - 380 before this plan, plus 8
+from Task 1, 8 from Task 2 and 5 from Task 3. If the printed total differs, stop
+and find out why before continuing.
+
+- [ ] **Step 4: Confirm the cron path is untouched**
+
+Run: `cd v2 && grep -n "isCronRequest" app/api/nfl/sync/route.ts`
+
+Expected: two call sites (`POST` and `GET`), both still guarding before any
+member logic. `guardMemberSync` must appear only AFTER the `isCronRequest`
+early-return in `POST`, and nowhere in `GET`.
 
 - [ ] **Step 5: Commit**
 
@@ -657,15 +824,15 @@ git commit -m "fix(nfl-sync): any league member may sync, not just the commissio
 
 The dashboard has always rendered the Sync Scores button for every
 participant (it sits outside every isCommissioner gate), but the route
-allowed only the commissioner — so pressing it showed 'Error: Not
+allowed only the commissioner - so pressing it showed 'Error: Not
 authorized'. Broken affordance, live in production.
 
-Adds the 60s per-session cooldown on the member path; cron is unaffected."
+Brings the 60s per-session cooldown with it. Cron is unaffected."
 ```
 
 ---
 
-### Task 4: Apply the same guard to golf, soccer and espn
+### Task 5: Apply the same gate to golf, soccer and espn
 
 **Files:**
 - Modify: `v2/app/api/golf/sync/route.ts`
@@ -674,18 +841,24 @@ Adds the 60s per-session cooldown on the member path; cron is unaffected."
 - Modify: `v2/middleware.ts:22-26`
 
 **Interfaces:**
-- Consumes: `isCronRequest`, `authorizeSessionSync` (Task 1); `lastSystemSyncAt`, `cooldownRemainingMs` (Task 2).
+- Consumes: `isCronRequest` (Task 1), `guardMemberSync` (Task 3).
 - Produces: nothing new.
 
-These three currently have NO authorization — any caller who knows a session UUID can trigger writes. All three tournaments are archived, so tightening them cannot affect a live league.
+These three currently have NO authorization - any caller who knows a session
+UUID can trigger writes. All three tournaments are archived, so tightening them
+cannot affect a live league.
 
-- [ ] **Step 1: golf — imports and cron check**
+Each route takes the same two edits: swap its inline cron comparison for
+`isCronRequest(req)`, then insert the gate immediately after its `sessionId`
+validation.
+
+- [ ] **Step 1: golf**
 
 In `v2/app/api/golf/sync/route.ts`, add to the imports:
 
 ```ts
-import { isCronRequest, authorizeSessionSync } from '@/lib/auth/sync-access';
-import { lastSystemSyncAt, cooldownRemainingMs } from '@/lib/auction/sync-cooldown';
+import { isCronRequest } from '@/lib/auth/sync-access';
+import { guardMemberSync } from '@/lib/auth/sync-gate';
 ```
 
 Replace:
@@ -709,9 +882,7 @@ with:
   }
 ```
 
-- [ ] **Step 2: golf — authorize, then cooldown**
-
-Replace:
+Then replace:
 
 ```ts
   const { sessionId } = body;
@@ -730,33 +901,15 @@ with:
     return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
   }
 
-  // This route previously performed NO authorization at all — any caller who
+  // This route previously performed NO authorization at all - any caller who
   // knew a session UUID could trigger writes.
-  //
-  // Placed before the sport check (unlike the NFL route, where it sits after)
-  // simply because golf's sport check comes much later in the handler. The
-  // dashboard picks the endpoint by sport, so a cross-sport call cannot happen
-  // through the UI and the ordering has no practical effect.
-  const access = await authorizeSessionSync(supabase, sessionId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
-  const lastSync = await lastSystemSyncAt(supabase, sessionId);
-  const retryInMs = cooldownRemainingMs(lastSync);
-  if (retryInMs > 0) {
-    return NextResponse.json({
-      skipped: true,
-      message: 'Just synced — already up to date',
-      lastSyncedAt: lastSync?.toISOString() ?? null,
-      retryInMs,
-    });
-  }
+  const blocked = await guardMemberSync(supabase, sessionId);
+  if (blocked) return blocked;
 
   const { data: session } = await supabase
 ```
 
-- [ ] **Step 3: soccer — same treatment**
+- [ ] **Step 2: soccer**
 
 In `v2/app/api/soccer/sync/route.ts`, add the same two imports, then replace:
 
@@ -775,7 +928,7 @@ with:
   if (isCronRequest(req)) return await syncAllSoccerSessions(supabase);
 ```
 
-and replace:
+Then replace:
 
 ```ts
   if (!body.sessionId) {
@@ -793,26 +946,13 @@ with:
   }
 
   // This route previously performed NO authorization at all.
-  const access = await authorizeSessionSync(supabase, body.sessionId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
-  const lastSync = await lastSystemSyncAt(supabase, body.sessionId);
-  const retryInMs = cooldownRemainingMs(lastSync);
-  if (retryInMs > 0) {
-    return NextResponse.json({
-      skipped: true,
-      message: 'Just synced — already up to date',
-      lastSyncedAt: lastSync?.toISOString() ?? null,
-      retryInMs,
-    });
-  }
+  const blocked = await guardMemberSync(supabase, body.sessionId);
+  if (blocked) return blocked;
 
   const { data: session, error } = await supabase
 ```
 
-- [ ] **Step 4: espn — same treatment**
+- [ ] **Step 3: espn**
 
 In `v2/app/api/espn/sync/route.ts`, add the same two imports, then replace:
 
@@ -832,7 +972,7 @@ with:
   if (isCronRequest(req)) {
 ```
 
-and replace:
+Then replace:
 
 ```ts
   const { sessionId } = body;
@@ -852,26 +992,13 @@ with:
   }
 
   // This route previously performed NO authorization at all.
-  const access = await authorizeSessionSync(supabase, sessionId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
-  const lastSync = await lastSystemSyncAt(supabase, sessionId);
-  const retryInMs = cooldownRemainingMs(lastSync);
-  if (retryInMs > 0) {
-    return NextResponse.json({
-      skipped: true,
-      message: 'Just synced — already up to date',
-      lastSyncedAt: lastSync?.toISOString() ?? null,
-      retryInMs,
-    });
-  }
+  const blocked = await guardMemberSync(supabase, sessionId);
+  if (blocked) return blocked;
 
   // Verify the session exists and is a March Madness tournament
 ```
 
-- [ ] **Step 5: Correct the middleware comment**
+- [ ] **Step 4: Correct the middleware comment**
 
 In `v2/middleware.ts`, replace:
 
@@ -885,30 +1012,39 @@ with:
 ```ts
   // Allow specific API routes past the login redirect so they can answer with
   // a JSON 401 instead of an HTML redirect. The sync routes authorize through
-  // `authorizeSessionSync` (lib/auth/sync-access.ts); until 2026-09 that was
-  // true of /api/nfl only and this comment was simply wrong about the rest.
+  // `guardMemberSync` (lib/auth/sync-gate.ts); until 2026-09 that claim was
+  // true of /api/nfl only and simply wrong about the rest.
   // SECURITY: Allowlist only known prefixes, not blanket /api/
 ```
 
-- [ ] **Step 6: Verify**
+- [ ] **Step 5: Verify**
 
 Run: `cd v2 && npx tsc --noEmit && npx vitest run && npm run build`
-Expected: no type errors, all tests pass, build succeeds.
+
+Expected: no type errors, 401 tests pass, build succeeds.
 
 Then confirm no route still carries the vulnerable comparison:
 
-Run: `cd v2 && grep -rn 'Bearer \${process.env.CRON_SECRET}' app/`
+Run: `cd v2 && grep -rn "Bearer \${process.env.CRON_SECRET}" app/`
+
 Expected: no output.
 
-- [ ] **Step 7: Commit**
+And confirm every sync route now gates:
+
+Run: `cd v2 && grep -rln "guardMemberSync" app/api/`
+
+Expected: four files - `golf/sync/route.ts`, `soccer/sync/route.ts`,
+`espn/sync/route.ts`, `nfl/sync/route.ts`.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add v2/app/api/golf/sync/route.ts v2/app/api/soccer/sync/route.ts v2/app/api/espn/sync/route.ts v2/middleware.ts
 git commit -m "fix(sync): authorize golf, soccer and espn sync routes
 
-All three accepted any caller who knew a session UUID and could be handed
+All three accepted any caller who knew a session UUID, and could be handed
 cron privileges by sending 'Bearer undefined' when CRON_SECRET is unset.
-Now behind the same league-member guard as NFL, plus the cooldown.
+Now behind the same league-member gate as NFL, with the cooldown.
 
 The middleware comment claiming these routes handle their own auth is now
 true rather than aspirational."
@@ -916,13 +1052,14 @@ true rather than aspirational."
 
 ---
 
-### Task 5: Render the cooldown response
+### Task 6: Render the cooldown response
 
 **Files:**
 - Modify: `v2/components/live/tournament-dashboard.tsx:103-138` (`handleEspnSync`) and `:307-317` (the button)
 
 **Interfaces:**
-- Consumes: the `{ skipped, message, lastSyncedAt }` response shape from Tasks 3 and 4.
+- Consumes: the `{ skipped, message, lastSyncedAt }` response shape and
+  `SYNC_SKIPPED_MESSAGE`, both from `@/lib/auth/sync-gate` (Task 3).
 - Produces: nothing.
 
 The button already renders for every member and needs no gating change.
@@ -955,7 +1092,7 @@ with:
       } else if (data.skipped) {
         // Server-side cooldown: somebody else in the league just synced. This
         // is a neutral outcome, not a failure and not new data.
-        setSyncMessage(data.message ?? 'Just synced — already up to date');
+        setSyncMessage(data.message ?? SYNC_SKIPPED_MESSAGE);
         if (data.lastSyncedAt) setLastSyncedAt(data.lastSyncedAt);
       } else if (data.inserted === 0 && data.updated === 0) {
 ```
@@ -1030,7 +1167,7 @@ with:
 - [ ] **Step 5: Full verification**
 
 Run: `cd v2 && npx tsc --noEmit && npx vitest run && npm run build && npm run lint`
-Expected: no type errors; all tests pass; build succeeds; lint reports **15 errors / 32 warnings** — identical to the baseline. Any new error or warning must be fixed before committing.
+Expected: no type errors; **401 tests pass**; build succeeds; lint reports **15 errors / 32 warnings** — identical to the baseline. Any new error or warning must be fixed before committing.
 
 - [ ] **Step 6: Commit**
 
