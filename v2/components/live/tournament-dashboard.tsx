@@ -91,6 +91,10 @@ export function TournamentDashboard({
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  // Whether the last response was a cooldown skip. A boolean, not a substring
+  // test on the copy: matching on the message text means editing that copy
+  // silently re-styles a "nothing happened" result as a green success.
+  const [syncSkipped, setSyncSkipped] = useState(false);
 
   // Determine which sync endpoint to use based on tournament sport
   const syncEndpoint =
@@ -105,6 +109,7 @@ export function TournamentDashboard({
   const handleEspnSync = useCallback(async () => {
     setSyncing(true);
     setSyncMessage(null);
+    setSyncSkipped(false);
     try {
       const res = await fetch(syncEndpoint, {
         method: 'POST',
@@ -118,6 +123,7 @@ export function TournamentDashboard({
         // Server-side cooldown: somebody else in the league just synced. This
         // is a neutral outcome, not a failure and not new data.
         setSyncMessage(data.message ?? SYNC_SKIPPED_MESSAGE);
+        setSyncSkipped(true);
         if (data.lastSyncedAt) setLastSyncedAt(data.lastSyncedAt);
       } else if (data.inserted === 0 && data.updated === 0) {
         const lowRoundMsg = data.lowRound
@@ -141,7 +147,10 @@ export function TournamentDashboard({
     } finally {
       setSyncing(false);
       // Clear message after 4 seconds
-      setTimeout(() => setSyncMessage(null), 4000);
+      setTimeout(() => {
+        setSyncMessage(null);
+        setSyncSkipped(false);
+      }, 4000);
     }
   }, [sessionId, syncEndpoint, config.sport]);
 
@@ -346,7 +355,7 @@ export function TournamentDashboard({
         <div className={`rounded-md px-3 py-2 text-xs ${
           syncMessage.startsWith('Error') || syncMessage.includes('failed')
             ? 'bg-red-500/10 text-red-400'
-            : syncMessage.includes('No new') || syncMessage.includes('already up to date')
+            : syncSkipped || syncMessage.includes('No new')
               ? 'bg-white/[0.04] text-white/50'
               : 'bg-emerald-500/10 text-emerald-400'
         }`}>

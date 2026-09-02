@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     return await syncAllSessions(supabase);
   }
 
-  // ── Commissioner mode: sync a specific session ──
+  // ── Member mode: sync a specific session ──
   let body: { sessionId?: string };
   try {
     body = await req.json();

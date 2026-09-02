@@ -20,9 +20,11 @@ export type SyncAccess =
  * True only when CRON_SECRET is configured AND the request presents it.
  *
  * The `!!secret` is the point: `header === \`Bearer ${process.env.CRON_SECRET}\``
- * — the shape the golf, soccer and espn routes still use inline — matches the
- * literal string 'Bearer undefined' whenever the variable is unset, granting
- * cron privileges to any caller who guesses that.
+ * — the shape the golf, soccer and espn routes used to compare inline, before
+ * they were routed through this helper — matches the literal string
+ * 'Bearer undefined' whenever the variable is unset, granting cron privileges
+ * to any caller who guesses that. All four sync routes now call
+ * `isCronRequest` here instead of comparing inline, so the hole is closed.
  */
 export function isCronRequest(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;

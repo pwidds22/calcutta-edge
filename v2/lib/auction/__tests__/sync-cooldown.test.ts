@@ -16,6 +16,7 @@ type Row = Record<string, unknown>;
 function makeAdmin(rows: Row[]) {
   const filters: Array<(r: Row) => boolean> = [];
   let orderDesc = false;
+  let limitN: number | null = null;
   const q = {
     select: () => q,
     eq(col: string, val: unknown) {
@@ -34,7 +35,10 @@ function makeAdmin(rows: Row[]) {
       orderDesc = opts?.ascending === false;
       return q;
     },
-    limit: () => q,
+    limit(n: number) {
+      limitN = n;
+      return q;
+    },
     async maybeSingle() {
       let out = rows.filter((r) => filters.every((f) => f(r)));
       out = [...out].sort((a, b) => {
@@ -53,6 +57,12 @@ function makeAdmin(rows: Row[]) {
         const bv = String(b.entered_at);
         return (av < bv ? -1 : av > bv ? 1 : 0) * (orderDesc ? -1 : 1);
       });
+      if (limitN !== null) out = out.slice(0, limitN);
+      // Real PostgREST: maybeSingle() errors when more than one row matches.
+      // Modelling it is what makes a dropped .limit(1) detectable.
+      if (out.length > 1) {
+        return { data: null, error: { message: 'multiple rows returned' } };
+      }
       return { data: out[0] ?? null, error: null };
     },
   };
@@ -116,5 +126,29 @@ describe('lastSystemSyncAt', () => {
     ]);
     const out = await lastSystemSyncAt(admin, SESSION);
     expect(out?.toISOString()).toBe('2026-09-14T11:00:00.000Z');
+  });
+
+  it('ignores rows belonging to a different session', async () => {
+    // Without .eq('session_id', ...) this returns the OTHER league's newer row,
+    // and one league's sync would throttle every other league's.
+    const admin = makeAdmin([
+      { session_id: 'other-session', entered_by: null, entered_at: '2026-09-14T11:59:00.000Z' },
+      { session_id: SESSION, entered_by: null, entered_at: '2026-09-14T11:00:00.000Z' },
+    ]);
+    const out = await lastSystemSyncAt(admin, SESSION);
+    expect(out?.toISOString()).toBe('2026-09-14T11:00:00.000Z');
+  });
+
+  it('asks for a single row, so maybeSingle cannot error on a synced session', async () => {
+    // Every synced session accumulates many system rows. Without .limit(1),
+    // maybeSingle() errors, the helper returns null, and the cooldown silently
+    // stops working for exactly the sessions that have been synced most.
+    const admin = makeAdmin([
+      { session_id: SESSION, entered_by: null, entered_at: '2026-09-14T11:00:00.000Z' },
+      { session_id: SESSION, entered_by: null, entered_at: '2026-09-14T11:30:00.000Z' },
+      { session_id: SESSION, entered_by: null, entered_at: '2026-09-14T11:59:00.000Z' },
+    ]);
+    const out = await lastSystemSyncAt(admin, SESSION);
+    expect(out?.toISOString()).toBe('2026-09-14T11:59:00.000Z');
   });
 });
