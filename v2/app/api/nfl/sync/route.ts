@@ -14,11 +14,13 @@ import { guardMemberSync } from '@/lib/auth/sync-gate';
  * Modes (mirrors /api/soccer/sync):
  * 1. Vercel Cron — Authorization: Bearer <CRON_SECRET>; syncs ALL active
  *    sessions of every sync-eligible NFL tournament.
- * 2. Commissioner — body { sessionId }; the "Sync Scores" button. UNLIKE the
- *    soccer and golf routes, this one actually authenticates: see the gate
- *    below. Those two allow any caller who knows a session UUID to force a
- *    sync, despite middleware.ts allowlisting them as "they handle their own
- *    auth". Do not copy that hole into new routes.
+ * 2. League member — body { sessionId }; the "Sync Scores" button, which the
+ *    dashboard shows to every participant, not just the commissioner.
+ *    Authorization and the per-session cooldown both live in
+ *    `guardMemberSync` (lib/auth/sync-gate.ts) — never re-implement either
+ *    here. At the time of writing the soccer and golf routes still perform no
+ *    authorization at all, despite middleware.ts allowlisting them as "they
+ *    handle their own auth"; they move behind the same gate next.
  *
  * SCOPE — weekly wins only. This phase writes the `regularSeasonWins` running
  * total and nothing else. `divisionWinner`, `playoffBerth` and the playoff
