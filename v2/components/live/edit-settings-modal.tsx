@@ -22,7 +22,17 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type PayoutMode = 'balanced' | 'topHeavy' | 'withProps' | 'custom';
+/**
+ * A preset key, or 'custom'.
+ *
+ * Deliberately NOT a hand-written union of preset names. It used to list
+ * 'balanced' | 'topHeavy' | 'withProps', which never included NFL's 'everyWeek'
+ * — the `key as PayoutMode` cast where presets are enumerated hid the mismatch,
+ * so the union checked nothing while looking like it did. Keying off the real
+ * preset records means a new preset is covered the moment it is added, and a
+ * misspelt key is a compile error rather than a silently dead button.
+ */
+type PayoutMode = keyof ReturnType<typeof getPayoutPresets> | 'custom';
 
 interface EditSettingsModalProps {
   sessionId: string;
@@ -146,6 +156,11 @@ export function EditSettingsModal({
   };
 
   const presetEntries = Object.entries(presets) as [PayoutMode, (typeof presets)[string]][];
+  // Grid sized to the preset count, not hardcoded to 3. NFL ships four
+  // structures (the fourth being Season Only) and a fixed 3-up left the last
+  // one stranded alone on a second row, reading as an afterthought rather than
+  // a peer option. Other sports still have three and still get a clean 3-up.
+  const presetGridCols = presetEntries.length % 4 === 0 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -203,7 +218,7 @@ export function EditSettingsModal({
               <Trophy className="inline size-3.5 mr-1" />
               Payout Structure
             </label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className={`grid grid-cols-1 gap-2 ${presetGridCols}`}>
               {presetEntries.map(([key, preset]) => (
                 <button
                   key={key}
@@ -269,7 +284,8 @@ export function EditSettingsModal({
                       </div>
                       <p className="mt-0.5 text-[10px] text-white/20">
                         {round.payoutUnits ?? round.teamsAdvancing}{' '}
-                        {round.unitLabel ?? config.teamLabel?.toLowerCase() ?? 'team'}s ={' '}
+                        {round.unitLabel ?? config.teamLabel?.toLowerCase() ?? 'team'}
+                        {(round.payoutUnits ?? round.teamsAdvancing) === 1 ? '' : 's'} ={' '}
                         {roundBudget(round, customRules[round.key] ?? 0).toFixed(1)}%
                       </p>
                     </div>

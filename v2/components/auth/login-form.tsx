@@ -20,6 +20,8 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const searchParams = useSearchParams()
   const passwordUpdated = searchParams.get('message') === 'password_updated'
+  // Preserved across the auth wall; validated server-side by `safeNext`.
+  const next = searchParams.get('next')
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true)
@@ -41,6 +43,7 @@ export function LoginForm() {
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
+          {next && <input type="hidden" name="next" value={next} />}
           {passwordUpdated && (
             <div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-400">
               Password updated successfully. Sign in with your new password.

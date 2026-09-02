@@ -45,7 +45,7 @@ export function SettlementCalculator({
           Per-Win Payout Structure (Pot: ${settlement.actualPot.toLocaleString()})
         </p>
         <div className="flex flex-wrap gap-2">
-          {settlement.roundLabels.map(({ key, label, pct, amount }) => {
+          {settlement.roundLabels.map(({ key, label, pct, amount, unitSuffix }) => {
             return (
               <div
                 key={key}
@@ -55,7 +55,11 @@ export function SettlementCalculator({
                 <p className="text-xs font-mono font-medium text-emerald-400">
                   ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <span className="text-[9px] text-white/20">{Number(pct.toFixed(4))}%</span>
+                {/* A flat-rate round pays per unit, not once — without this the
+                    "$1.03" beside "Wins" reads as the whole season's prize. */}
+                <span className="text-[9px] text-white/20">
+                  {unitSuffix ? unitSuffix : `${Number(pct.toFixed(4))}%`}
+                </span>
               </div>
             );
           })}

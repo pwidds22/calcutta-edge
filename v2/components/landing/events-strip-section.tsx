@@ -32,6 +32,23 @@ export function EventsStripSection() {
   // If no upcoming events at all, hide the section entirely rather than show an empty grid.
   if (sorted.length === 0) return null;
 
+  const shown = sorted.slice(0, 4);
+  // Between seasons the calendar legitimately holds one event (right now: only
+  // the NFL season is hostable; everything else has archived). A fixed 4-column
+  // grid then renders a single card marooned in a quarter of the row, directly
+  // under a heading promising "every Calcutta" — the weakest possible moment on
+  // a page built to convert cold traffic. Size the grid to what actually exists,
+  // and when the list is thin, say the true thing: the breadth is on request.
+  const isSparse = shown.length < 3;
+  const gridCols =
+    shown.length === 1
+      ? 'grid-cols-1 max-w-sm'
+      : shown.length === 2
+        ? 'grid-cols-2 max-w-2xl'
+        : shown.length === 3
+          ? 'grid-cols-2 sm:grid-cols-3'
+          : 'grid-cols-2 sm:grid-cols-4';
+
   return (
     <section className="border-t border-white/[0.06]">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
@@ -53,8 +70,8 @@ export function EventsStripSection() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {sorted.slice(0, 4).map((t) => {
+        <div className={`grid gap-3 ${gridCols}`}>
+          {shown.map((t) => {
             const colorClass = SPORT_COLORS[t.config.sport] ?? 'bg-white/5 text-white/60 border-white/10';
             return (
               <Link
@@ -79,6 +96,20 @@ export function EventsStripSection() {
             );
           })}
         </div>
+
+        {isSparse && (
+          <p className="mt-5 text-sm text-white/40">
+            Between the big events we build Calcuttas to order — any sport, any
+            field, from $74.99.{' '}
+            <a
+              href="mailto:support@calcuttaedge.com?subject=Custom%20Calcutta%20request"
+              className="font-medium text-emerald-400 hover:text-emerald-300"
+            >
+              Tell us what you want to run
+            </a>
+            .
+          </p>
+        )}
 
         <div className="mt-6 text-center sm:hidden">
           <Link

@@ -18,8 +18,12 @@ export function SocialProofSection() {
             </div>
             <div className="h-8 w-px bg-white/[0.08]" />
             <div>
-              <p className="text-2xl font-bold text-white font-mono">13+</p>
-              <p className="text-xs text-white/40">Odds sources</p>
+              {/* Was "13+ Odds sources" — true of the golf/DataGolf pipeline
+                  only. NFL prices come from Kalshi, a single prediction
+                  market, so under an NFL hero the number was simply wrong.
+                  A claim about the MATH holds for every sport we support. */}
+              <p className="text-2xl font-bold text-white font-mono">Vig-free</p>
+              <p className="text-xs text-white/40">Fair value pricing</p>
             </div>
           </div>
         </div>

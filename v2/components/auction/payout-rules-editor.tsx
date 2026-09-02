@@ -9,6 +9,18 @@ import type { PayoutRules } from '@/lib/calculations/types';
 import { roundBudget } from '@/lib/tournaments/payout-presets';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
+/**
+ * How far a payout structure may sit from 100% before we flag it.
+ *
+ * 0.01 was too tight to survive a per-unit round: NFL's per-win rate is stored
+ * to 4 decimals, and 0.1029 x 272 = 27.9888, so the shipped Balanced preset
+ * totals 99.9888 and this editor painted the untouched default amber. No
+ * 4-decimal rate hits 100.0000 exactly, so the host could not clear it either.
+ * 0.5 matches the create-session form and edit-settings modal, and still catches
+ * any real mistake (a dropped tier moves the total by whole points).
+ */
+const PAYOUT_TOTAL_TOLERANCE = 0.5;
+
 const propDescriptions: Record<string, string> = {
   lowRoundR1: 'Lowest score in Round 1 (Thursday)',
   lowRoundR2: 'Lowest score in Round 2 (Friday)',
@@ -70,7 +82,7 @@ export function PayoutRulesEditor() {
           <h3 className="text-sm font-semibold">Payout Rules</h3>
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              Math.abs(totalPercent - 100) < 0.01
+              Math.abs(totalPercent - 100) < PAYOUT_TOTAL_TOLERANCE
                 ? 'bg-emerald-500/15 text-emerald-400'
                 : 'bg-amber-500/15 text-amber-400'
             }`}
@@ -91,7 +103,8 @@ export function PayoutRulesEditor() {
               <div key={round.key}>
                 <Label className="flex min-h-8 items-end text-xs leading-tight">
                   {round.payoutLabel} ({round.payoutUnits ?? round.teamsAdvancing}{' '}
-                  {round.unitLabel ?? config?.teamLabel?.toLowerCase() ?? 'team'}s)
+                  {round.unitLabel ?? config?.teamLabel?.toLowerCase() ?? 'team'}
+                  {(round.payoutUnits ?? round.teamsAdvancing) === 1 ? '' : 's'})
                 </Label>
                 <div className="relative mt-1">
                   <Input
@@ -140,7 +153,7 @@ export function PayoutRulesEditor() {
                 Total:{' '}
                 <span
                   className={`font-semibold ${
-                    Math.abs(totalPercent - 100) < 0.01
+                    Math.abs(totalPercent - 100) < PAYOUT_TOTAL_TOLERANCE
                       ? 'text-emerald-400'
                       : 'text-amber-400'
                   }`}

@@ -17,8 +17,8 @@ export function CtaSection() {
           </p>
           <div className="mt-6">
             <Button size="lg" asChild className="gap-2">
-              <Link href="/register">
-                Host Your Calcutta
+              <Link href={featured?.hostHref ?? '/register'}>
+                {featured?.hostCtaLabel ?? 'Host Your Calcutta'}
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

@@ -222,37 +222,50 @@ async function writeSessionResults(
 ) {
   if (rows.length === 0) return { message: 'No decidable results yet', inserted: 0, updated: 0 };
 
+  const enteredAt = new Date().toISOString();
+  const payload = rows.map((row) => ({
+    session_id: sessionId,
+    team_id: row.teamId,
+    round_key: row.roundKey,
+    result: row.result,
+    // Without this the wins round pays every team exactly 1 — no other writer
+    // in the codebase sets this column, so soccer's payload copied verbatim
+    // would look correct and settle wrong. Set on EVERY row (never omitted for
+    // some): PostgREST rejects a bulk payload whose objects have differing key
+    // sets with PGRST102.
+    result_count: row.resultCount ?? null,
+    entered_by: null, // system-entered (ESPN)
+    entered_at: enteredAt,
+  }));
+
+  // ONE statement for all 32 rows, not 32 awaited round trips. The cron fans out
+  // over every active league, and at ~50ms per trip a few dozen leagues pushed
+  // the function past its duration limit — where the kill looks like success to
+  // Vercel (no error is returned, so the `allFailed` 502 below never fires) and
+  // the leagues after the cutoff silently stop settling.
+  //
+  // The trade is all-or-nothing per session instead of per row, which is the
+  // better failure mode here: a half-written standings sweep is a league where
+  // some teams show this week's wins and others last week's.
   let inserted = 0;
   let updated = 0;
-  // Every row is its own statement, so a partial failure is a real state. Track
-  // WHICH rows landed: the broadcast must carry only those. Sending a row the DB
-  // rejected paints a win total on every client that vanishes on the next reload.
-  const persisted: NflSyncResultRow[] = [];
-  const failed: Array<{ teamId: number; roundKey: string }> = [];
-  for (const row of rows) {
-    const { error, status } = await supabase.from('tournament_results').upsert(
-      {
-        session_id: sessionId,
-        team_id: row.teamId,
-        round_key: row.roundKey,
-        result: row.result,
-        // Without this the wins round pays every team exactly 1 — no other
-        // writer in the codebase sets this column, so soccer's payload copied
-        // verbatim would look correct and settle wrong.
-        result_count: row.resultCount ?? null,
-        entered_by: null, // system-entered (ESPN)
-        entered_at: new Date().toISOString(),
-      },
-      { onConflict: 'session_id,team_id,round_key' }
-    );
-    if (error) {
-      console.error(`[NFL Sync] upsert failed team ${row.teamId} ${row.roundKey}:`, error);
-      failed.push({ teamId: row.teamId, roundKey: row.roundKey });
-    } else {
-      persisted.push(row);
-      if (status === 201) inserted++;
-      else updated++;
-    }
+  const { error, status } = await supabase
+    .from('tournament_results')
+    .upsert(payload, { onConflict: 'session_id,team_id,round_key' });
+
+  // The broadcast must carry only rows that actually landed — painting a win
+  // total on every client that vanishes on the next reload is worse than a
+  // client that is merely stale.
+  const persisted: NflSyncResultRow[] = error ? [] : rows;
+  const failed: Array<{ teamId: number; roundKey: string }> = error
+    ? rows.map((r) => ({ teamId: r.teamId, roundKey: r.roundKey }))
+    : [];
+  if (error) {
+    console.error(`[NFL Sync] bulk upsert failed for session ${sessionId}:`, error);
+  } else if (status === 201) {
+    inserted = rows.length;
+  } else {
+    updated = rows.length;
   }
 
   // This is a WRITE-SUCCESS gate, not a change signal: the wins round is a

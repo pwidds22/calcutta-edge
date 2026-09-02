@@ -11,7 +11,10 @@ export async function middleware(request: NextRequest) {
   // Allow public routes (exact match or prefix match for /blog/*)
   const isPublic = publicRoutes.includes(path) || path.startsWith('/blog/')
   if (isPublic) {
-    if (user && (path === '/login' || path === '/register')) {
+    // Signed-in visitors don't need the auth pages — but a `next` on them is a
+    // real destination, so let the page handle the redirect rather than
+    // bouncing to /dashboard here and dropping it.
+    if (user && (path === '/login' || path === '/register') && !request.nextUrl.searchParams.has('next')) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
@@ -29,6 +32,12 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    // Remember where they were going. Without this, a deep link from an email
+    // (e.g. /host/create?tournament=nfl_season_2026) is silently downgraded to
+    // a generic dashboard landing the moment the visitor is signed out.
+    // `search` is carried too, so the tournament choice survives; the login and
+    // signup actions re-validate it with `safeNext` before redirecting.
+    url.search = `?next=${encodeURIComponent(path + request.nextUrl.search)}`
     return NextResponse.redirect(url)
   }
 

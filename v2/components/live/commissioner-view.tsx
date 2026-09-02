@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuctionChannel } from '@/lib/auction/live/use-auction-channel';
+import { useLiveSessionSettings } from '@/lib/auction/live/use-live-session-settings';
 import { useTimer } from '@/lib/auction/live/use-timer';
 import type { BaseTeam, TournamentConfig, PayoutRules, TeamBundle } from '@/lib/tournaments/types';
 import type { BidEntry, SoldTeam } from '@/lib/auction/live/use-auction-channel';
@@ -270,21 +271,19 @@ export function CommissionerView({
 
   // Edit settings modal
   const [showEditSettings, setShowEditSettings] = useState(false);
-  const [localPayoutRules, setLocalPayoutRules] = useState(session.payout_rules);
-  const [localPotSize, setLocalPotSize] = useState(session.estimated_pot_size);
-  const [localSettings, setLocalSettings] = useState(session.settings);
-
-  // Listen for settings broadcasts from other clients
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__settingsUpdate = (payload: Record<string, unknown>) => {
-      if (payload.payoutRules) setLocalPayoutRules(payload.payoutRules as PayoutRules);
-      if (payload.estimatedPotSize) setLocalPotSize(payload.estimatedPotSize as number);
-      if (payload.settings) setLocalSettings(payload.settings as SessionSettings);
-    };
-    return () => {
-      delete (window as unknown as Record<string, unknown>).__settingsUpdate;
-    };
-  }, []);
+  // Live settings — see `useLiveSessionSettings`. EVERY child that renders money
+  // must read these, never the `session.*` server props, or its numbers freeze
+  // at page-load values the moment the commissioner edits anything.
+  const {
+    payoutRules: localPayoutRules,
+    estimatedPotSize: localPotSize,
+    settings: localSettings,
+    applyLocalUpdate,
+  } = useLiveSessionSettings({
+    payoutRules: session.payout_rules,
+    estimatedPotSize: session.estimated_pot_size,
+    settings: session.settings,
+  });
 
   // Toggle auto-mode handler
   const [togglingAutoMode, setTogglingAutoMode] = useState(false);
@@ -378,10 +377,10 @@ export function CommissionerView({
           sessionName={session.name}
           isCommissioner={true}
           config={config}
-          payoutRules={session.payout_rules}
+          payoutRules={localPayoutRules}
           initialResults={tournamentResults}
           initialPaymentTracking={session.payment_tracking ?? {}}
-          enabledProps={session.settings?.enabledProps}
+          enabledProps={localSettings?.enabledProps}
           initialPropResults={session.prop_results ?? []}
           currentUserId={userId}
         />
@@ -552,11 +551,7 @@ export function CommissionerView({
           currentEstimatedPotSize={localPotSize}
           currentSettings={localSettings}
           onClose={() => setShowEditSettings(false)}
-          onSaved={(updates) => {
-            setLocalPayoutRules(updates.payoutRules);
-            setLocalPotSize(updates.estimatedPotSize);
-            setLocalSettings(updates.settings);
-          }}
+          onSaved={applyLocalUpdate}
         />
       )}
     </div>

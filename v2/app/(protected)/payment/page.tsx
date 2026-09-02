@@ -34,6 +34,17 @@ const FEATURES_BY_SPORT: Record<string, string[]> = {
     'Per-win payout modeling for season-long pools',
     'Bid tracker and budget planner for auction night',
   ],
+  // Without this key soccer fell through to DEFAULT_FEATURES and sold a
+  // 48-nation product with "All 64 teams with full analytics" on the card.
+  soccer: [
+    'All 48 nations with full analytics',
+    'Devigged prediction-market odds',
+    'Fair value calculations per round',
+    'Suggested bid prices',
+    'Group stage through final projections',
+    'Live strategy overlay during auctions',
+    'Auto-save to your account',
+  ],
 }
 
 const DEFAULT_FEATURES = FEATURES_BY_SPORT.basketball
@@ -73,7 +84,12 @@ export default async function PaymentPage({ searchParams }: PaymentPageProps) {
 
   // Build payment URL with user attribution + tournament context
   const linkEnvKey = config.stripePaymentLinkEnvKey ?? 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL'
-  const linkUrl = process.env[linkEnvKey] ?? PAYMENT_LINK_URL
+  // Truthiness, not `??`: an env var that EXISTS but is empty (added without a
+  // value, or cleared during a key rotation) passes `??` straight through, and
+  // `new URL('')` throws — 500ing checkout instead of falling back to the
+  // default link this line exists to provide. `.trim()` because Vercel bakes
+  // trailing whitespace into NEXT_PUBLIC_* values verbatim.
+  const linkUrl = process.env[linkEnvKey]?.trim() || PAYMENT_LINK_URL
   const paymentUrl = new URL(linkUrl)
   // Encode tournament ID in client_reference_id: userId--tournamentId
   // NOTE: Stripe only allows alphanumeric, dashes, underscores. Colons are silently dropped.

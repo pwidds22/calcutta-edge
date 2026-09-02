@@ -10,7 +10,7 @@ import type { TournamentResult } from '@/actions/tournament-results';
 import type { PayoutRules } from '@/lib/tournaments/types';
 import type { PropResult } from '@/lib/tournaments/props';
 import { getPropWinners } from '@/lib/tournaments/props';
-import { fullRoundRate } from '@/lib/tournaments/payout-presets';
+import { calculateRoundProfits } from '@/lib/calculations/profits';
 import { dedupeBy } from '@/lib/auction/winning-bids';
 import { fetchAllPages } from '@/lib/supabase/fetch-all';
 import { normalizeName } from '@/lib/datagolf/ev';
@@ -348,16 +348,30 @@ export async function getDashboardData(): Promise<DashboardData> {
         userEliminatedCost += bid.amount;
       }
 
-      // Compute break-even round: first round where cumulative payout exceeds purchase price
+      // Compute break-even round: the first round at which this team's cumulative
+      // payout covers what was paid for it.
+      //
+      // Shares `calculateRoundProfits` with the strategy table, the live overlay
+      // and the settlement calculator, so all four agree. That matters most for
+      // NFL: the per-win round stores the price of ONE win and its `payoutUnits`
+      // (272) is a LEAGUE-wide count, so the round's budget (~28% of the pot,
+      // $279.89 on a $1k pot) is what all 32 teams collect between them, not what
+      // one team earns. Feeding that budget in per team labelled every NFL team
+      // under $280 as "profit at Wins" when an average team earns about $8.75.
+      // `probabilities` supplies this team's own expected wins (Rams ~11.5,
+      // Cardinals ~4.2); it is read only for flat-rate rounds, so every other
+      // tournament is untouched.
       let breakEvenRound: string | null = null;
       if (config && payoutRules) {
-        let cumulative = 0;
+        const profits = calculateRoundProfits(
+          bid.amount,
+          payoutRules,
+          actualPot,
+          config,
+          baseTeam?.probabilities
+        );
         for (const round of config.rounds) {
-          // Unit-aware - see `fullRoundRate`. A flat-rate per-unit round (NFL wins)
-          // stores the price of one unit; counting it once per round makes a whole
-          // 272-win season look like a rounding error against the purchase price.
-          cumulative += actualPot * (fullRoundRate(round, payoutRules[round.key] ?? 0) / 100);
-          if (cumulative >= bid.amount) {
+          if ((profits[round.key] ?? -Infinity) >= 0) {
             breakEvenRound = round.label;
             break;
           }

@@ -33,6 +33,24 @@ export interface FeaturedInfo {
   /** Urgency headline for the bottom CTA, e.g. "NFL Season starts September 10." */
   ctaHeadline: string
   isLive: boolean
+  /** Registry id, e.g. `nfl_season_2026`. */
+  id: string
+  /** Label for the primary CTA, e.g. "Host Your NFL Season Calcutta Free". */
+  hostCtaLabel: string
+  /**
+   * Where the primary CTA should point: sign-up, carrying the create form (and
+   * this tournament) as the post-signup destination.
+   *
+   * A bare `/register` loses the visitor's intent at exactly the moment they
+   * convert — they arrive from an NFL-themed hero and land on an empty
+   * dashboard. `next` survives signup (see `actions/auth.ts`) and is re-checked
+   * server-side by `safeNext`, so this is a hint, not a trusted input.
+   */
+  hostHref: string
+}
+
+function hostHrefFor(id: string): string {
+  return `/register?next=${encodeURIComponent(`/host/create?tournament=${id}`)}`
 }
 
 export function getFeaturedInfo(): FeaturedInfo | null {
@@ -50,6 +68,9 @@ export function getFeaturedInfo(): FeaturedInfo | null {
       badgeText: `${fullName} — Live Now`,
       ctaHeadline: `${shortName} is live right now.`,
       isLive: true,
+      id: featured.config.id,
+      hostCtaLabel: `Host Your ${shortName} Calcutta Free`,
+      hostHref: hostHrefFor(featured.config.id),
     }
   }
   if (phase === 'hostable') {
@@ -60,6 +81,9 @@ export function getFeaturedInfo(): FeaturedInfo | null {
       badgeText: `${fullName} — Starts ${dateText}`,
       ctaHeadline: `${shortName} starts ${dateText}.`,
       isLive: false,
+      id: featured.config.id,
+      hostCtaLabel: `Host Your ${shortName} Calcutta Free`,
+      hostHref: hostHrefFor(featured.config.id),
     }
   }
   if (phase === 'upcoming') {
@@ -70,6 +94,11 @@ export function getFeaturedInfo(): FeaturedInfo | null {
       badgeText: `${fullName} — Hosting opens ${opensText}`,
       ctaHeadline: `${shortName} is coming — hosting opens ${opensText}.`,
       isLive: false,
+      id: featured.config.id,
+      // Hosting is not open yet, so send them to sign up without pre-selecting a
+      // tournament they cannot create — the create form would only gate them.
+      hostCtaLabel: 'Create Your Free Account',
+      hostHref: '/register',
     }
   }
   return null

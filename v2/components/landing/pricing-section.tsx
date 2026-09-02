@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Check, ArrowRight } from 'lucide-react'
 import { STRATEGY_PRICE_DOLLARS, STRATEGY_PRICE_MAX_DOLLARS } from '@/lib/pricing'
+import { getFeaturedInfo } from '@/lib/tournaments/featured'
 
 const TIERS = [
   {
@@ -18,7 +19,6 @@ const TIERS = [
       'Unlimited participants',
     ],
     cta: 'Host Free',
-    href: '/register',
     highlighted: false,
   },
   {
@@ -28,19 +28,23 @@ const TIERS = [
     description: 'See what every team is actually worth before you bid.',
     features: [
       'Everything in Free, plus:',
-      'Devigged sportsbook odds',
+      'Devigged odds from books and prediction markets',
       'Fair value calculations',
       'Suggested bid prices',
       'Round-by-round P&L projections',
       'Live strategy overlay during auction',
     ],
     cta: 'Get the Edge',
-    href: '/register',
     highlighted: true,
   },
 ]
 
 export function PricingSection() {
+  // Same deep link as the hero: these buttons are a conversion point too, and a
+  // bare /register drops the tournament the visitor came for.
+  const featured = getFeaturedInfo()
+  const hostHref = featured?.hostHref ?? '/register'
+
   return (
     <section id="pricing" className="border-t border-white/[0.06]">
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 md:py-24">
@@ -110,7 +114,7 @@ export function PricingSection() {
                     : ''
                 }`}
               >
-                <Link href={tier.href}>
+                <Link href={hostHref}>
                   {tier.cta}
                   <ArrowRight className="size-4" />
                 </Link>
