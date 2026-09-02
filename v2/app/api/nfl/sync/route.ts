@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
 import { listSyncEligibleTournaments, getTournament } from '@/lib/tournaments/registry';
 import { parseStandings, computeSeasonResults } from '@/lib/espn/nfl';
 import type { NflSyncResultRow } from '@/lib/espn/nfl';
 import { fetchStandings } from '@/lib/espn/nfl-client';
+import { isCronRequest } from '@/lib/auth/sync-access';
+import { guardMemberSync } from '@/lib/auth/sync-gate';
 
 /**
  * POST /api/nfl/sync — ESPN NFL standings → tournament_results.
@@ -44,28 +45,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
   }
 
-  // ── Auth gate (pattern from actions/tournament-results.ts) ──────────────
-  // The user client reads the caller's cookies; writes below still go through
-  // the admin client because system rows need `entered_by: null`, which RLS
-  // will not accept from a user session.
-  const userClient = await createClient();
-  const {
-    data: { user },
-  } = await userClient.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
+  // ── Auth + cooldown ─────────────────────────────────────────────────────
+  // ANY member of the league, not just the commissioner. The dashboard has
+  // always shown every participant the "Sync Scores" button, so a
+  // commissioner-only route meant pressing it returned 403. Writes below still
+  // go through the admin client because system rows need `entered_by: null`,
+  // which RLS will not accept from a user session.
+  const blocked = await guardMemberSync(supabase, body.sessionId);
+  if (blocked) return blocked;
 
   const { data: session, error } = await supabase
     .from('auction_sessions')
-    .select('id, tournament_id, commissioner_id')
+    .select('id, tournament_id')
     .eq('id', body.sessionId)
     .single();
   if (error || !session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-  }
-  if (session.commissioner_id !== user.id) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
 
   const tournament = getTournament(session.tournament_id);
@@ -83,17 +78,6 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   if (!isCronRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   return await syncAllNflSessions(createAdminClient());
-}
-
-/**
- * `header === \`Bearer ${process.env.CRON_SECRET}\`` — the shape the other sync
- * routes use — matches the literal string 'Bearer undefined' when the secret is
- * unset, handing cron privileges to anyone who sends it. Require the secret to
- * exist first.
- */
-function isCronRequest(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  return !!secret && req.headers.get('authorization') === `Bearer ${secret}`;
 }
 
 /**
