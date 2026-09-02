@@ -7,6 +7,8 @@ import { fetchDataGolfLeaderboard, positionToTierResults, identifyLowRounds } fr
 import type { GolfLeaderboard } from '@/lib/datagolf/leaderboard';
 import { fetchInPlay } from '@/lib/datagolf/client';
 import { fetchGolfLeaderboard, matchPlayerToTeamId, positionToResults } from '@/lib/espn/golf-leaderboard';
+import { isCronRequest } from '@/lib/auth/sync-access';
+import { guardMemberSync } from '@/lib/auth/sync-gate';
 
 /**
  * How long after `endDate` a tournament stays eligible for the cron sync.
@@ -38,10 +40,9 @@ const POST_END_SYNC_GRACE_DAYS = 1;
  * 2. Manual — syncs a specific session. Body: { sessionId: string }
  */
 export async function POST(req: NextRequest) {
-  const isCron = req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
   const supabase = createAdminClient();
 
-  if (isCron) {
+  if (isCronRequest(req)) {
     return await syncAllGolfSessions(supabase);
   }
 
@@ -56,6 +57,11 @@ export async function POST(req: NextRequest) {
   if (!sessionId) {
     return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
   }
+
+  // This route previously performed NO authorization at all - any caller who
+  // knew a session UUID could trigger writes.
+  const blocked = await guardMemberSync(supabase, sessionId);
+  if (blocked) return blocked;
 
   const { data: session } = await supabase
     .from('auction_sessions')
@@ -86,8 +92,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const isCron = req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
-  if (!isCron) {
+  if (!isCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const supabase = createAdminClient();

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchTournamentResults } from '@/lib/espn/scoreboard';
 import { broadcastToChannel } from '@/lib/supabase/broadcast';
+import { isCronRequest } from '@/lib/auth/sync-access';
+import { guardMemberSync } from '@/lib/auth/sync-gate';
 
 /**
  * POST /api/espn/sync
@@ -16,11 +18,9 @@ import { broadcastToChannel } from '@/lib/supabase/broadcast';
  * Header (cron mode): Authorization: Bearer <CRON_SECRET>
  */
 export async function POST(req: NextRequest) {
-  const isCron = req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
-
   const supabase = createAdminClient();
 
-  if (isCron) {
+  if (isCronRequest(req)) {
     // ── Cron mode: sync ALL active March Madness sessions ──
     return await syncAllSessions(supabase);
   }
@@ -37,6 +37,10 @@ export async function POST(req: NextRequest) {
   if (!sessionId) {
     return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
   }
+
+  // This route previously performed NO authorization at all.
+  const blocked = await guardMemberSync(supabase, sessionId);
+  if (blocked) return blocked;
 
   // Verify the session exists and is a March Madness tournament
   const { data: session, error: sessionErr } = await supabase
@@ -59,8 +63,7 @@ export async function POST(req: NextRequest) {
 
 // Also support GET for Vercel Cron (cron jobs use GET by default)
 export async function GET(req: NextRequest) {
-  const isCron = req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
-  if (!isCron) {
+  if (!isCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
