@@ -21,14 +21,16 @@ Discovery was the constraint, not the product or the price. The app worked —
 | Supabase project `xtkdwyrxllqmgoedfotf` | **DELETED** | Returns HTTP 410 "Project removed". All data gone — users, leagues, bids, results, payment records. Not recoverable unless a backup was downloaded before deletion. |
 | Resend | Cancelled | Welcome email + `scripts/send-*.ts` blasts |
 | Google Workspace (Business Starter) | Cancelled | The `support@calcuttaedge.com` mailbox no longer exists |
-| Vercel project `calcutta-edge` | See below | |
+| Vercel project `calcutta-edge` | **DELETED** | Site returns 404 on both `calcuttaedge.com` and `www`. The four cron jobs went with it. |
 | Stripe account + payment links | Still live at shutdown | Deactivate the links — see below |
 | Domain `calcuttaedge.com` | Kept (at time of writing) | Cheap to hold, hard to reacquire |
 
-**At shutdown the site was half-alive:** public pages were still served from
-Vercel's cache and still said "Host Your NFL Season Calcutta Free", but signup,
-login and every data read failed because the database was gone. If the Vercel
-project still exists, take it down rather than leave that trap up.
+**For a few hours the site was half-alive:** after the database was deleted,
+public pages were still served from Vercel's cache and still said "Host Your
+NFL Season Calcutta Free", but signup, login and every data read failed. Deleting
+the Vercel project the same day closed that — both hostnames now return 404.
+Deleting it saved no money (Vercel Pro is billed per seat, and the team keeps
+other projects); it was done so nobody would hit a broken signup.
 
 ## State of the code
 
@@ -74,9 +76,11 @@ Roughly in order. Nothing here is automatic.
 5. **A tournament to host** — add a config. `CLAUDE.md` lists everything a new
    one needs (`PRESET_MAP`, `getStandardProps()`, a bundling scheme,
    `liveSyncMatchers`); the preset test only catches some of it.
-6. **Vercel** — if the project was deleted, re-import `pwidds22/calcutta-edge`
-   from GitHub with the **root directory set to `v2`**. `v2/vercel.json`
-   schedules four cron jobs; they will fail loudly until the database exists.
+6. **Vercel** — the project was deleted, so re-import `pwidds22/calcutta-edge`
+   from GitHub with the **root directory set to `v2`**, then re-add
+   `calcuttaedge.com` and `www` as domains. `v2/vercel.json` schedules four
+   cron jobs; they fail loudly until the database exists, so bring Supabase up
+   first. Set every variable from step 2 before the first deploy.
 
 `CLAUDE.md` holds the anti-patterns learned the hard way. Read it before
 changing anything.
